@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./dist-scripts",
+    "rootDir": ".",
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": false
+  },
+  "include": ["scripts/**/*", "src/lib/types.ts", "src/lib/scoring.ts"]
+}
