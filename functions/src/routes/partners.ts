@@ -2,6 +2,7 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
+import { formatError } from '../services/logger.js';
 import type { Partner, PartnerWithStats } from '../types/index.js';
 
 const router = Router();
@@ -14,17 +15,22 @@ router.get('/', async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 200);
 
+    req.log?.debug('Listing partners', { region, search, page, pageSize });
+
     let query: admin.firestore.Query = db.collection('partners');
     if (region) {
       query = query.where('regions', 'array-contains', region);
     }
 
     const snap = await query.get();
+    req.log?.debug('Fetched partners from Firestore', { count: snap.size });
+
     let partners = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Partner);
 
     if (search) {
       const lower = search.toLowerCase();
       partners = partners.filter((p) => p.displayName.toLowerCase().includes(lower));
+      req.log?.debug('Filtered partners by search', { searchTerm: search, matchCount: partners.length });
     }
 
     const total = partners.length;
@@ -59,6 +65,7 @@ router.get('/', async (req, res) => {
       }),
     );
 
+    req.log?.info('Partners listed', { total, returned: results.length, page });
     res.json({
       data: results,
       total,
@@ -67,6 +74,7 @@ router.get('/', async (req, res) => {
       totalPages: Math.ceil(total / pageSize),
     });
   } catch (err) {
+    req.log?.error('Failed to list partners', formatError(err));
     res.status(500).json({ error: 'Failed to list partners', detail: String(err) });
   }
 });
@@ -74,8 +82,12 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const db = admin.firestore();
-    const doc = await db.collection('partners').doc((req.params.id as string)).get();
+    const partnerId = req.params.id as string;
+    req.log?.debug('Getting partner detail', { partnerId });
+
+    const doc = await db.collection('partners').doc(partnerId).get();
     if (!doc.exists) {
+      req.log?.warn('Partner not found', { partnerId });
       res.status(404).json({ error: 'Partner not found' });
       return;
     }
@@ -95,8 +107,10 @@ router.get('/:id', async (req, res) => {
       }
     }
 
+    req.log?.info('Partner detail fetched', { partnerId, keyCount: partnerKeys.length, deviceCount: devices.length });
     res.json({ ...partner, partnerKeys, devices });
   } catch (err) {
+    req.log?.error('Failed to get partner', formatError(err));
     res.status(500).json({ error: 'Failed to get partner', detail: String(err) });
   }
 });
@@ -106,9 +120,12 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
     const db = admin.firestore();
     const { displayName, regions, countriesIso2 } = req.body;
     if (!displayName) {
+      req.log?.warn('Partner creation failed: missing displayName');
       res.status(400).json({ error: 'displayName is required' });
       return;
     }
+
+    req.log?.info('Creating partner', { displayName, regions, userId: req.user!.uid });
 
     const now = new Date().toISOString();
     const docRef = await db.collection('partners').add({
@@ -130,8 +147,10 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
     });
 
     const created = await docRef.get();
+    req.log?.info('Partner created', { partnerId: docRef.id, displayName });
     res.status(201).json({ id: docRef.id, ...created.data() });
   } catch (err) {
+    req.log?.error('Failed to create partner', formatError(err));
     res.status(500).json({ error: 'Failed to create partner', detail: String(err) });
   }
 });
@@ -139,9 +158,13 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
 router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const docRef = db.collection('partners').doc((req.params.id as string));
+    const partnerId = req.params.id as string;
+    req.log?.info('Updating partner', { partnerId, userId: req.user!.uid });
+
+    const docRef = db.collection('partners').doc(partnerId);
     const existing = await docRef.get();
     if (!existing.exists) {
+      req.log?.warn('Partner not found for update', { partnerId });
       res.status(404).json({ error: 'Partner not found' });
       return;
     }
@@ -152,11 +175,13 @@ router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
     delete updates.createdAt;
 
     await docRef.update(updates);
-    await diffAndLog('partner', (req.params.id as string), oldData, updates, req.user!.uid, req.user!.email);
+    await diffAndLog('partner', partnerId, oldData, updates, req.user!.uid, req.user!.email);
 
     const updated = await docRef.get();
+    req.log?.info('Partner updated', { partnerId, updatedFields: Object.keys(req.body) });
     res.json({ id: docRef.id, ...updated.data() });
   } catch (err) {
+    req.log?.error('Failed to update partner', formatError(err));
     res.status(500).json({ error: 'Failed to update partner', detail: String(err) });
   }
 });
@@ -164,26 +189,33 @@ router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
 router.delete('/:id', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const docRef = db.collection('partners').doc((req.params.id as string));
+    const partnerId = req.params.id as string;
+    req.log?.info('Deleting partner', { partnerId, userId: req.user!.uid });
+
+    const docRef = db.collection('partners').doc(partnerId);
     const existing = await docRef.get();
     if (!existing.exists) {
+      req.log?.warn('Partner not found for deletion', { partnerId });
       res.status(404).json({ error: 'Partner not found' });
       return;
     }
 
+    const displayName = existing.data()!.displayName;
     await docRef.delete();
     await logAuditEntry({
       entityType: 'partner',
-      entityId: (req.params.id as string),
+      entityId: partnerId,
       field: '*',
-      oldValue: existing.data()!.displayName,
+      oldValue: displayName,
       newValue: null,
       userId: req.user!.uid,
       userEmail: req.user!.email,
     });
 
+    req.log?.info('Partner deleted', { partnerId, displayName });
     res.json({ success: true });
   } catch (err) {
+    req.log?.error('Failed to delete partner', formatError(err));
     res.status(500).json({ error: 'Failed to delete partner', detail: String(err) });
   }
 });

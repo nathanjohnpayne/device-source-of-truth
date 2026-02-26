@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import type { DeviceSpec, HardwareTier } from '../types/index.js';
+import { log } from './logger.js';
 
 const CODEC_FIELD_MAP: Record<string, keyof DeviceSpec['codecs']> = {
   avc: 'avcSupport',
@@ -29,17 +30,32 @@ function deviceMeetsTier(spec: DeviceSpec, tier: HardwareTier): boolean {
 }
 
 export async function assignTierToDevice(deviceId: string): Promise<string | null> {
+  log.info('Assigning tier to device', { deviceId });
+
   const db = admin.firestore();
   const specSnap = await db.collection('deviceSpecs').where('deviceId', '==', deviceId).limit(1).get();
-  if (specSnap.empty) return null;
+  if (specSnap.empty) {
+    log.warn('No specs found for tier assignment, skipping', { deviceId });
+    return null;
+  }
 
   const spec = { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } as DeviceSpec;
   const tiersSnap = await db.collection('hardwareTiers').orderBy('tierRank', 'asc').get();
   const tiers = tiersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as HardwareTier);
 
+  log.debug('Evaluating device against tiers', { deviceId, tierCount: tiers.length });
+
   let assignedTierId: string | null = null;
   for (const tier of tiers) {
-    if (deviceMeetsTier(spec, tier)) {
+    const meets = deviceMeetsTier(spec, tier);
+    log.debug('Tier evaluation', {
+      deviceId,
+      tierId: tier.id,
+      tierName: tier.tierName,
+      tierRank: tier.tierRank,
+      meets,
+    });
+    if (meets) {
       assignedTierId = tier.id;
       break;
     }
@@ -61,16 +77,31 @@ export async function assignTierToDevice(deviceId: string): Promise<string | nul
     });
   }
 
+  log.info('Tier assignment complete', {
+    deviceId,
+    assignedTierId,
+    tierName: assignedTierId ? tiers.find((t) => t.id === assignedTierId)?.tierName : 'none',
+  });
+
   return assignedTierId;
 }
 
 export async function reassignAllDevices(): Promise<number> {
+  log.info('Starting full device tier reassignment');
+
   const db = admin.firestore();
   const specsSnap = await db.collection('deviceSpecs').get();
   let count = 0;
 
   const tiersSnap = await db.collection('hardwareTiers').orderBy('tierRank', 'asc').get();
   const tiers = tiersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as HardwareTier);
+
+  log.info('Reassignment context', { specCount: specsSnap.size, tierCount: tiers.length });
+
+  const tierAssignmentCounts: Record<string, number> = { unassigned: 0 };
+  for (const tier of tiers) {
+    tierAssignmentCounts[tier.tierName] = 0;
+  }
 
   for (const specDoc of specsSnap.docs) {
     const spec = { id: specDoc.id, ...specDoc.data() } as DeviceSpec;
@@ -97,9 +128,18 @@ export async function reassignAllDevices(): Promise<number> {
         assignedAt: now,
         trigger: 'tier_definition_update' as const,
       });
+      const tierName = tiers.find((t) => t.id === assignedTierId)?.tierName ?? 'unknown';
+      tierAssignmentCounts[tierName] = (tierAssignmentCounts[tierName] ?? 0) + 1;
+    } else {
+      tierAssignmentCounts['unassigned']++;
     }
     count++;
   }
+
+  log.info('Full device tier reassignment complete', {
+    totalDevicesProcessed: count,
+    distribution: tierAssignmentCounts,
+  });
 
   return count;
 }
@@ -108,6 +148,8 @@ export function previewTierAssignment(
   tiers: HardwareTier[],
   specs: DeviceSpec[],
 ): Record<string, { tierName: string; count: number; devices: string[] }> {
+  log.debug('Previewing tier assignment', { tierCount: tiers.length, specCount: specs.length });
+
   const sorted = [...tiers].sort((a, b) => a.tierRank - b.tierRank);
   const result: Record<string, { tierName: string; count: number; devices: string[] }> = {};
 
@@ -132,6 +174,10 @@ export function previewTierAssignment(
     }
   }
 
+  log.debug('Tier preview result', {
+    distribution: Object.fromEntries(Object.entries(result).map(([_k, v]) => [v.tierName, v.count])),
+  });
+
   return result;
 }
 
@@ -146,6 +192,8 @@ export function simulateEligibility(
   },
   specs: DeviceSpec[],
 ): { eligible: DeviceSpec[]; ineligible: DeviceSpec[] } {
+  log.debug('Simulating eligibility', { requirements, specCount: specs.length });
+
   const pseudoTier: HardwareTier = {
     id: 'sim',
     tierName: 'Simulation',
@@ -171,6 +219,12 @@ export function simulateEligibility(
       ineligible.push(spec);
     }
   }
+
+  log.info('Eligibility simulation result', {
+    eligible: eligible.length,
+    ineligible: ineligible.length,
+    total: specs.length,
+  });
 
   return { eligible, ineligible };
 }

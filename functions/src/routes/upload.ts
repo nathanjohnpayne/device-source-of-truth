@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { requireRole } from '../middleware/auth.js';
 import { calculateSpecCompleteness } from '../services/specCompleteness.js';
 import { assignTierToDevice } from '../services/tierEngine.js';
+import { formatError } from '../services/logger.js';
 
 const router = Router();
 
@@ -14,9 +15,12 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
     const { csvData } = req.body;
 
     if (!csvData) {
+      req.log?.warn('Migration upload failed: missing csvData');
       res.status(400).json({ error: 'csvData is required' });
       return;
     }
+
+    req.log?.info('Starting device migration', { csvLength: csvData.length, userId: req.user!.uid });
 
     const parsed = Papa.parse<Record<string, string>>(csvData, {
       header: true,
@@ -24,12 +28,15 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
     });
 
     if (parsed.errors.length > 0) {
+      req.log?.warn('Migration CSV parse errors', { errorCount: parsed.errors.length, errors: parsed.errors.slice(0, 5).map((e) => e.message) });
       res.status(400).json({
         error: 'CSV parse errors',
         detail: parsed.errors.map((e) => e.message),
       });
       return;
     }
+
+    req.log?.info('Migration CSV parsed', { rowCount: parsed.data.length });
 
     const now = new Date().toISOString();
     let created = 0;
@@ -75,8 +82,17 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
       } catch (rowErr) {
         errored++;
         errors.push(`Error on device: ${String(rowErr)}`);
+        req.log?.warn('Migration row error', { error: String(rowErr) });
       }
     }
+
+    req.log?.info('Device migration complete', {
+      totalRows: parsed.data.length,
+      created,
+      duplicates,
+      errored,
+      errorSample: errors.slice(0, 5),
+    });
 
     res.json({
       success: true,
@@ -87,6 +103,7 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
       errors: errors.slice(0, 100),
     });
   } catch (err) {
+    req.log?.error('Migration failed', formatError(err));
     res.status(500).json({ error: 'Migration failed', detail: String(err) });
   }
 });
@@ -99,20 +116,25 @@ router.post('/bulk-specs', requireRole('editor', 'admin'), async (req, res) => {
     let rows: Record<string, string>[];
 
     if (csvData) {
+      req.log?.info('Starting bulk spec import from CSV', { csvLength: csvData.length, userId: req.user!.uid });
       const parsed = Papa.parse<Record<string, string>>(csvData, {
         header: true,
         skipEmptyLines: true,
       });
       rows = parsed.data;
     } else if (fileData && fileType === 'xlsx') {
+      req.log?.info('Starting bulk spec import from XLSX', { fileDataLength: fileData.length, userId: req.user!.uid });
       const buffer = Buffer.from(fileData, 'base64');
       const workbook = XLSX.read(buffer, { type: 'buffer' });
       const sheetName = workbook.SheetNames[0];
       rows = XLSX.utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheetName]);
     } else {
+      req.log?.warn('Bulk spec import failed: missing data source');
       res.status(400).json({ error: 'csvData or fileData (with fileType) is required' });
       return;
     }
+
+    req.log?.info('Bulk spec data parsed', { rowCount: rows.length });
 
     let matched = 0;
     let notFound = 0;
@@ -269,8 +291,17 @@ router.post('/bulk-specs', requireRole('editor', 'admin'), async (req, res) => {
       } catch (rowErr) {
         errored++;
         errors.push(`Error: ${String(rowErr)}`);
+        req.log?.warn('Bulk spec row error', { deviceId: row['device_id'] || row['deviceId'], error: String(rowErr) });
       }
     }
+
+    req.log?.info('Bulk spec import complete', {
+      totalRows: rows.length,
+      matched,
+      notFound,
+      errored,
+      errorSample: errors.slice(0, 5),
+    });
 
     res.json({
       success: true,
@@ -281,11 +312,13 @@ router.post('/bulk-specs', requireRole('editor', 'admin'), async (req, res) => {
       errors: errors.slice(0, 100),
     });
   } catch (err) {
+    req.log?.error('Bulk spec import failed', formatError(err));
     res.status(500).json({ error: 'Bulk spec import failed', detail: String(err) });
   }
 });
 
-router.get('/migration/template', (_req, res) => {
+router.get('/migration/template', (req, res) => {
+  req.log?.debug('Serving migration template');
   const headers = [
     'device_id',
     'display_name',
@@ -302,7 +335,8 @@ router.get('/migration/template', (_req, res) => {
   res.send(headers.join(',') + '\n');
 });
 
-router.get('/bulk-specs/template', (_req, res) => {
+router.get('/bulk-specs/template', (req, res) => {
+  req.log?.debug('Serving bulk specs template');
   const headers = [
     'device_id',
     'device_model', 'manufacturer', 'brand_name', 'model_year', 'device_category',

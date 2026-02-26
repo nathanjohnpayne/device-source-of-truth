@@ -1,17 +1,26 @@
 import { Router } from 'express';
 import admin from 'firebase-admin';
+import { formatError } from '../services/logger.js';
 import type { Device } from '../types/index.js';
 
 const router = Router();
 
-router.get('/dashboard', async (_req, res) => {
+router.get('/dashboard', async (req, res) => {
   try {
     const db = admin.firestore();
+    req.log?.debug('Generating dashboard report');
+
     const [devicesSnap, alertsSnap, keysSnap] = await Promise.all([
       db.collection('devices').get(),
       db.collection('alerts').where('status', '==', 'open').get(),
       db.collection('partnerKeys').get(),
     ]);
+
+    req.log?.debug('Dashboard data loaded', {
+      deviceCount: devicesSnap.size,
+      openAlertCount: alertsSnap.size,
+      keyCount: keysSnap.size,
+    });
 
     const devices = devicesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Device);
 
@@ -49,6 +58,15 @@ router.get('/dashboard', async (_req, res) => {
       regionCounts[region] = (regionCounts[region] ?? 0) + 1;
     }
 
+    req.log?.info('Dashboard report generated', {
+      totalDevices,
+      totalActiveDevices,
+      specCoverage,
+      openAlerts: alertsSnap.size,
+      certificationStatuses: Object.keys(certCounts),
+      regions: Object.keys(regionCounts),
+    });
+
     res.json({
       totalDevices,
       totalActiveDevices,
@@ -59,6 +77,7 @@ router.get('/dashboard', async (_req, res) => {
       regionBreakdown: regionCounts,
     });
   } catch (err) {
+    req.log?.error('Failed to generate dashboard', formatError(err));
     res.status(500).json({ error: 'Failed to generate dashboard', detail: String(err) });
   }
 });
@@ -66,13 +85,17 @@ router.get('/dashboard', async (_req, res) => {
 router.get('/partner/:id', async (req, res) => {
   try {
     const db = admin.firestore();
-    const partnerDoc = await db.collection('partners').doc((req.params.id as string)).get();
+    const partnerId = req.params.id as string;
+    req.log?.debug('Generating partner report', { partnerId });
+
+    const partnerDoc = await db.collection('partners').doc(partnerId).get();
     if (!partnerDoc.exists) {
+      req.log?.warn('Partner not found for report', { partnerId });
       res.status(404).json({ error: 'Partner not found' });
       return;
     }
 
-    const keysSnap = await db.collection('partnerKeys').where('partnerId', '==', (req.params.id as string)).get();
+    const keysSnap = await db.collection('partnerKeys').where('partnerId', '==', partnerId).get();
     const keyIds = keysSnap.docs.map((d) => d.id);
 
     let devices: Device[] = [];
@@ -98,6 +121,14 @@ router.get('/partner/:id', async (req, res) => {
       certCounts[status] = (certCounts[status] ?? 0) + 1;
     }
 
+    req.log?.info('Partner report generated', {
+      partnerId,
+      deviceCount: devices.length,
+      totalActiveDevices: totalActive,
+      specCoverage,
+      keyCount: keyIds.length,
+    });
+
     res.json({
       partner: { id: partnerDoc.id, ...partnerDoc.data() },
       deviceCount: devices.length,
@@ -116,6 +147,7 @@ router.get('/partner/:id', async (req, res) => {
       })),
     });
   } catch (err) {
+    req.log?.error('Failed to generate partner report', formatError(err));
     res.status(500).json({ error: 'Failed to generate partner report', detail: String(err) });
   }
 });
@@ -126,6 +158,8 @@ router.get('/spec-coverage', async (req, res) => {
     const sortBy = (req.query.sortBy as string) ?? 'specCompleteness';
     const sortDir = (req.query.sortDir as string) === 'asc' ? 'asc' : 'desc';
     const hasSpecs = req.query.hasSpecs as string | undefined;
+
+    req.log?.debug('Generating spec coverage report', { sortBy, sortDir, hasSpecs });
 
     const snap = await db.collection('devices').orderBy(sortBy, sortDir as 'asc' | 'desc').get();
     let devices = snap.docs.map((d) => {
@@ -146,8 +180,10 @@ router.get('/spec-coverage', async (req, res) => {
       devices = devices.filter((d) => d.specCompleteness === 0);
     }
 
+    req.log?.info('Spec coverage report generated', { total: devices.length, sortBy, sortDir, hasSpecsFilter: hasSpecs });
     res.json({ data: devices, total: devices.length });
   } catch (err) {
+    req.log?.error('Failed to generate spec coverage report', formatError(err));
     res.status(500).json({ error: 'Failed to generate spec coverage report', detail: String(err) });
   }
 });

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import admin from 'firebase-admin';
+import { formatError } from '../services/logger.js';
 
 const router = Router();
 
@@ -14,6 +15,8 @@ router.get('/', async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 200);
 
+    req.log?.debug('Listing audit log', { entityType, entityId, userId, startDate, endDate, page, pageSize });
+
     let query: admin.firestore.Query = db.collection('auditLog').orderBy('timestamp', 'desc');
     if (entityType) query = query.where('entityType', '==', entityType);
     if (entityId) query = query.where('entityId', '==', entityId);
@@ -26,6 +29,7 @@ router.get('/', async (req, res) => {
     const total = all.length;
     const paged = all.slice((page - 1) * pageSize, page * pageSize);
 
+    req.log?.info('Audit log listed', { total, returned: paged.length, page, filters: { entityType, entityId, userId } });
     res.json({
       data: paged,
       total,
@@ -34,6 +38,7 @@ router.get('/', async (req, res) => {
       totalPages: Math.ceil(total / pageSize),
     });
   } catch (err) {
+    req.log?.error('Failed to list audit log', formatError(err));
     res.status(500).json({ error: 'Failed to list audit log', detail: String(err) });
   }
 });

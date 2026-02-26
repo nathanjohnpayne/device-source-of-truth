@@ -2,6 +2,7 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import Papa from 'papaparse';
 import { requireRole } from '../middleware/auth.js';
+import { formatError } from '../services/logger.js';
 
 const router = Router();
 
@@ -19,9 +20,17 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
     const { csvData, snapshotDate, fileName } = req.body;
 
     if (!csvData || !snapshotDate) {
+      req.log?.warn('Telemetry upload failed: missing required fields', { hasCsvData: !!csvData, hasSnapshotDate: !!snapshotDate });
       res.status(400).json({ error: 'csvData and snapshotDate are required' });
       return;
     }
+
+    req.log?.info('Starting telemetry upload', {
+      snapshotDate,
+      fileName: fileName ?? 'telemetry.csv',
+      csvLength: csvData.length,
+      userId: req.user!.uid,
+    });
 
     const parsed = Papa.parse<TelemetryRow>(csvData, {
       header: true,
@@ -29,6 +38,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
     });
 
     if (parsed.errors.length > 0) {
+      req.log?.warn('Telemetry CSV parse errors', { errorCount: parsed.errors.length, errors: parsed.errors.slice(0, 5).map((e) => e.message) });
       res.status(400).json({
         error: 'CSV parse errors',
         detail: parsed.errors.map((e) => e.message),
@@ -37,6 +47,8 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
     }
 
     const rows = parsed.data;
+    req.log?.info('Telemetry CSV parsed', { rowCount: rows.length });
+
     let successCount = 0;
     const errors: string[] = [];
     const deviceCounts: Record<string, number> = {};
@@ -68,20 +80,27 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
       }
     }
 
+    req.log?.debug('Committing telemetry batch write', { successCount, errorCount: errors.length });
     await batch.commit();
+    req.log?.info('Telemetry batch write committed', { successCount });
 
+    req.log?.debug('Updating device active counts', { deviceCount: Object.keys(deviceCounts).length });
     for (const [deviceId, count] of Object.entries(deviceCounts)) {
       const devSnap = await db.collection('devices').where('deviceId', '==', deviceId).limit(1).get();
       if (!devSnap.empty) {
         await devSnap.docs[0].ref.update({ activeDeviceCount: count });
       }
     }
+    req.log?.info('Device active counts updated', { devicesUpdated: Object.keys(deviceCounts).length });
 
     const allPartnerKeys = new Set(rows.map((r) => r.partner).filter(Boolean));
     const allDeviceIds = new Set(rows.map((r) => r.device).filter(Boolean));
     const alertBatch = db.batch();
     const now = new Date().toISOString();
+    let newPartnerKeyAlerts = 0;
+    let newDeviceAlerts = 0;
 
+    req.log?.debug('Checking for unregistered partner keys', { keyCount: allPartnerKeys.size });
     for (const pk of allPartnerKeys) {
       const pkSnap = await db.collection('partnerKeys').where('key', '==', pk).limit(1).get();
       if (pkSnap.empty) {
@@ -108,10 +127,12 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
             dismissedAt: null,
             consecutiveMisses: 0,
           });
+          newPartnerKeyAlerts++;
         }
       }
     }
 
+    req.log?.debug('Checking for unregistered devices', { deviceCount: allDeviceIds.size });
     for (const devId of allDeviceIds) {
       const devSnap = await db.collection('devices').where('deviceId', '==', devId).limit(1).get();
       if (devSnap.empty) {
@@ -138,10 +159,12 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
             dismissedAt: null,
             consecutiveMisses: 0,
           });
+          newDeviceAlerts++;
         }
       }
     }
 
+    req.log?.debug('Committing alert batch', { newPartnerKeyAlerts, newDeviceAlerts });
     await alertBatch.commit();
 
     await db.collection('uploadHistory').add({
@@ -156,6 +179,15 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
       errors,
     });
 
+    req.log?.info('Telemetry upload complete', {
+      rowCount: rows.length,
+      successCount,
+      errorCount: errors.length,
+      devicesUpdated: Object.keys(deviceCounts).length,
+      newPartnerKeyAlerts,
+      newDeviceAlerts,
+    });
+
     res.json({
       success: true,
       rowCount: rows.length,
@@ -165,17 +197,23 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
       devicesUpdated: Object.keys(deviceCounts).length,
     });
   } catch (err) {
+    req.log?.error('Failed to upload telemetry', formatError(err));
     res.status(500).json({ error: 'Failed to upload telemetry', detail: String(err) });
   }
 });
 
-router.get('/history', async (_req, res) => {
+router.get('/history', async (req, res) => {
   try {
     const db = admin.firestore();
+    req.log?.debug('Listing upload history');
+
     const snap = await db.collection('uploadHistory').orderBy('uploadedAt', 'desc').limit(100).get();
     const history = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    req.log?.info('Upload history listed', { count: history.length });
     res.json({ data: history });
   } catch (err) {
+    req.log?.error('Failed to list upload history', formatError(err));
     res.status(500).json({ error: 'Failed to list upload history', detail: String(err) });
   }
 });

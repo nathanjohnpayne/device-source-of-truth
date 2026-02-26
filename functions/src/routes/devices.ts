@@ -2,6 +2,7 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
+import { formatError } from '../services/logger.js';
 import type { Device, DeviceWithRelations } from '../types/index.js';
 
 const router = Router();
@@ -20,6 +21,11 @@ router.get('/', async (req, res) => {
     const specCompleteness = req.query.specCompleteness as string | undefined;
     const search = req.query.search as string | undefined;
 
+    req.log?.debug('Listing devices', {
+      page, pageSize, partnerId, partnerKeyId, region,
+      deviceType, certificationStatus, tierId, specCompleteness, search,
+    });
+
     let query: admin.firestore.Query = db.collection('devices').orderBy('activeDeviceCount', 'desc');
 
     if (partnerKeyId) query = query.where('partnerKeyId', '==', partnerKeyId);
@@ -29,17 +35,20 @@ router.get('/', async (req, res) => {
 
     const snap = await query.get();
     let devices = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Device);
+    req.log?.debug('Firestore device query returned', { rawCount: devices.length });
 
     if (partnerId) {
       const keysSnap = await db.collection('partnerKeys').where('partnerId', '==', partnerId).get();
       const keyIds = new Set(keysSnap.docs.map((d) => d.id));
       devices = devices.filter((d) => keyIds.has(d.partnerKeyId));
+      req.log?.debug('Filtered by partnerId', { partnerId, keyCount: keyIds.size, remaining: devices.length });
     }
 
     if (region) {
       const keysSnap = await db.collection('partnerKeys').where('region', '==', region).get();
       const keyIds = new Set(keysSnap.docs.map((d) => d.id));
       devices = devices.filter((d) => keyIds.has(d.partnerKeyId));
+      req.log?.debug('Filtered by region', { region, remaining: devices.length });
     }
 
     if (specCompleteness === 'has_specs') {
@@ -55,6 +64,7 @@ router.get('/', async (req, res) => {
           d.displayName.toLowerCase().includes(lower) ||
           d.deviceId.toLowerCase().includes(lower),
       );
+      req.log?.debug('Filtered by search', { searchTerm: search, remaining: devices.length });
     }
 
     const total = devices.length;
@@ -98,6 +108,7 @@ router.get('/', async (req, res) => {
       tierName: d.tierId ? tierMap[d.tierId] : undefined,
     }));
 
+    req.log?.info('Devices listed', { total, returned: results.length, page });
     res.json({
       data: results,
       total,
@@ -106,6 +117,7 @@ router.get('/', async (req, res) => {
       totalPages: Math.ceil(total / pageSize),
     });
   } catch (err) {
+    req.log?.error('Failed to list devices', formatError(err));
     res.status(500).json({ error: 'Failed to list devices', detail: String(err) });
   }
 });
@@ -113,13 +125,18 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const db = admin.firestore();
-    const doc = await db.collection('devices').doc((req.params.id as string)).get();
+    const deviceDocId = req.params.id as string;
+    req.log?.debug('Getting device detail', { deviceDocId });
+
+    const doc = await db.collection('devices').doc(deviceDocId).get();
     if (!doc.exists) {
+      req.log?.warn('Device not found', { deviceDocId });
       res.status(404).json({ error: 'Device not found' });
       return;
     }
 
     const device = { id: doc.id, ...doc.data() } as Device;
+    req.log?.debug('Fetching device relations', { deviceId: device.deviceId, partnerKeyId: device.partnerKeyId, tierId: device.tierId });
 
     const [pkSnap, specSnap, tierSnap, deploySnap, telSnap, auditSnap] = await Promise.all([
       db.collection('partnerKeys').doc(device.partnerKeyId).get(),
@@ -137,6 +154,15 @@ router.get('/:id', async (req, res) => {
       partner = partnerDoc.exists ? { id: partnerDoc.id, ...partnerDoc.data() } : null;
     }
 
+    req.log?.info('Device detail fetched', {
+      deviceDocId,
+      hasSpec: !specSnap.empty,
+      hasTier: !!(tierSnap && tierSnap.exists),
+      deploymentCount: deploySnap.size,
+      telemetrySnapshotCount: telSnap.size,
+      auditEntryCount: auditSnap.size,
+    });
+
     res.json({
       ...device,
       partner,
@@ -148,6 +174,7 @@ router.get('/:id', async (req, res) => {
       auditHistory: auditSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
     });
   } catch (err) {
+    req.log?.error('Failed to get device', formatError(err));
     res.status(500).json({ error: 'Failed to get device', detail: String(err) });
   }
 });
@@ -158,12 +185,16 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
     const { displayName, deviceId, partnerKeyId, deviceType, certificationStatus } = req.body;
 
     if (!displayName || !deviceId || !partnerKeyId) {
+      req.log?.warn('Device creation failed: missing required fields', { hasDisplayName: !!displayName, hasDeviceId: !!deviceId, hasPartnerKeyId: !!partnerKeyId });
       res.status(400).json({ error: 'displayName, deviceId, and partnerKeyId are required' });
       return;
     }
 
+    req.log?.info('Creating device', { displayName, deviceId, partnerKeyId, userId: req.user!.uid });
+
     const existing = await db.collection('devices').where('deviceId', '==', deviceId).limit(1).get();
     if (!existing.empty) {
+      req.log?.warn('Device creation failed: duplicate deviceId', { deviceId });
       res.status(409).json({ error: 'Device with this deviceId already exists' });
       return;
     }
@@ -200,8 +231,10 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
     });
 
     const created = await docRef.get();
+    req.log?.info('Device created', { docId: docRef.id, deviceId, displayName });
     res.status(201).json({ id: docRef.id, ...created.data() });
   } catch (err) {
+    req.log?.error('Failed to create device', formatError(err));
     res.status(500).json({ error: 'Failed to create device', detail: String(err) });
   }
 });
@@ -209,9 +242,13 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
 router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const docRef = db.collection('devices').doc((req.params.id as string));
+    const deviceDocId = req.params.id as string;
+    req.log?.info('Updating device', { deviceDocId, userId: req.user!.uid });
+
+    const docRef = db.collection('devices').doc(deviceDocId);
     const existing = await docRef.get();
     if (!existing.exists) {
+      req.log?.warn('Device not found for update', { deviceDocId });
       res.status(404).json({ error: 'Device not found' });
       return;
     }
@@ -222,11 +259,13 @@ router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
     delete updates.createdAt;
 
     await docRef.update(updates);
-    await diffAndLog('device', (req.params.id as string), oldData, updates, req.user!.uid, req.user!.email);
+    await diffAndLog('device', deviceDocId, oldData, updates, req.user!.uid, req.user!.email);
 
     const updated = await docRef.get();
+    req.log?.info('Device updated', { deviceDocId, updatedFields: Object.keys(req.body) });
     res.json({ id: docRef.id, ...updated.data() });
   } catch (err) {
+    req.log?.error('Failed to update device', formatError(err));
     res.status(500).json({ error: 'Failed to update device', detail: String(err) });
   }
 });
@@ -234,26 +273,33 @@ router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
 router.delete('/:id', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const docRef = db.collection('devices').doc((req.params.id as string));
+    const deviceDocId = req.params.id as string;
+    req.log?.info('Deleting device', { deviceDocId, userId: req.user!.uid });
+
+    const docRef = db.collection('devices').doc(deviceDocId);
     const existing = await docRef.get();
     if (!existing.exists) {
+      req.log?.warn('Device not found for deletion', { deviceDocId });
       res.status(404).json({ error: 'Device not found' });
       return;
     }
 
+    const displayName = existing.data()!.displayName;
     await docRef.delete();
     await logAuditEntry({
       entityType: 'device',
-      entityId: (req.params.id as string),
+      entityId: deviceDocId,
       field: '*',
-      oldValue: existing.data()!.displayName,
+      oldValue: displayName,
       newValue: null,
       userId: req.user!.uid,
       userEmail: req.user!.email,
     });
 
+    req.log?.info('Device deleted', { deviceDocId, displayName });
     res.json({ success: true });
   } catch (err) {
+    req.log?.error('Failed to delete device', formatError(err));
     res.status(500).json({ error: 'Failed to delete device', detail: String(err) });
   }
 });

@@ -25,6 +25,7 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 - **Role-Based Access Control** — viewer / editor / admin roles enforced on both frontend and backend
 - **Airtable Migration** — bulk CSV import of legacy AllModels data with spec mapping and tier assignment
 - **Auto-Update Notification** — polls for new deployments and prompts users to refresh when a new version is available
+- **Structured Logging** — request-scoped logging with timing, context propagation, and Cloud Logging integration for production troubleshooting
 - **Dashboard** — KPI summaries, certification breakdown, tier distribution, and top-device charts
 
 ## Quick Start
@@ -87,10 +88,14 @@ src/                          React frontend
     └── export.ts             CSV/PDF export utilities
 
 functions/src/                Firebase Cloud Functions backend
-├── index.ts                  Express app + route mounting
+├── index.ts                  Express app + route mounting + request logging middleware
 ├── middleware/auth.ts        Token verification, domain check, role guard
 ├── routes/                   11 Express routers (partners, devices, tiers, etc.)
-├── services/                 Business logic (audit, tierEngine, specCompleteness)
+├── services/
+│   ├── logger.ts             Structured logging (Cloud Logging integration)
+│   ├── audit.ts              Append-only field-level change tracking
+│   ├── tierEngine.ts         Hardware tier assignment engine
+│   └── specCompleteness.ts   Spec completeness calculator
 └── types/index.ts            Backend type definitions
 
 specs/                        Product specification document (877 lines)

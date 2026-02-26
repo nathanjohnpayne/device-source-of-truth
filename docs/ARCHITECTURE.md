@@ -213,6 +213,7 @@ A single Express application is exported as the `api` Cloud Function. All middle
 Express app
   ├─ cors({ origin: true })           — allow cross-origin requests
   ├─ express.json({ limit: '50mb' })  — parse JSON bodies up to 50MB (for CSV data)
+  ├─ requestLoggingMiddleware         — attaches req.log, logs request/response lifecycle
   ├─ authenticate (middleware)         — runs on all /api/* routes
   ├─ /api/partners       → partnersRouter
   ├─ /api/partner-keys   → partnerKeysRouter
@@ -234,6 +235,7 @@ Business logic that spans multiple routes or requires complex computation is ext
 
 | Service | File | Responsibility |
 |---|---|---|
+| **Logger** | `services/logger.ts` | Structured logging utility built on `firebase-functions/logger`. Provides request-scoped logging (`req.log`), standalone logging (`log`), request/response middleware, and error formatting. Integrates with Google Cloud Logging. |
 | **Audit** | `services/audit.ts` | `logAuditEntry()` writes a single field change. `diffAndLog()` compares two documents and logs every changed field. |
 | **Tier Engine** | `services/tierEngine.ts` | `assignTierToDevice(deviceId)` evaluates a device against all tiers (ordered by rank) and assigns the highest qualifying tier. `reassignAllDevices()` re-evaluates every device after a tier definition change. `previewTierAssignment()` and `simulateEligibility()` are read-only variants for what-if analysis. |
 | **Spec Completeness** | `services/specCompleteness.ts` | `calculateSpecCompleteness(spec)` counts non-null fields across all 12 spec categories and returns a percentage (0-100). This value is denormalized onto the `devices` document for query performance. |
@@ -377,6 +379,67 @@ Pages load on-demand. The initial login page load is minimal.
 
 ---
 
+## Logging & Observability
+
+### Backend Logging
+
+All backend logging is built on `firebase-functions/logger`, which integrates directly with Google Cloud Logging. Logs are structured JSON and viewable in both the Firebase Console (Functions > Logs) and Google Cloud Console (Logging > Logs Explorer).
+
+**Log Levels:**
+
+| Level | Usage |
+|---|---|
+| `debug` | Firestore query details, filter chain results, tier evaluation per-device, spec completeness category breakdown |
+| `info` | Request completed, entity created/updated/deleted, bulk operation summaries, tier assignment outcomes |
+| `warn` | Validation failures, 4xx responses, missing entities, auth rejections, domain check failures |
+| `error` | 5xx responses, unhandled exceptions (with stack traces), Firestore write failures |
+
+**Request-Scoped Logging:**
+
+The `requestLoggingMiddleware` in `services/logger.ts` attaches a `req.log` logger to every request. Each log entry includes:
+- `requestId` — 8-character UUID for correlating all logs from a single request
+- `method` / `path` — HTTP method and route
+- `elapsedMs` — time from request start to response
+
+Every route handler uses `req.log` for contextual logging. Service-layer functions use the standalone `log` object from `logger.ts`.
+
+**What Gets Logged:**
+
+| Layer | Logged Events |
+|---|---|
+| Request lifecycle | Entry (method, path, query params, user-agent, IP), completion (status code, elapsed ms) |
+| Authentication | Token verification attempts, domain validation, user lookup/auto-provisioning, role resolution |
+| Route handlers | Entity IDs, filter parameters, result counts, mutations with field lists, user attribution |
+| Tier engine | Per-device tier evaluation results, full reassignment distribution summary |
+| Spec completeness | Per-category filled/total breakdown |
+| Audit service | Diff field count, audit entry writes |
+| Telemetry upload | CSV parse results, batch write progress, alert generation counts |
+| Bulk operations | Row-by-row error logging, final created/duplicate/error breakdowns |
+
+### Frontend Logging
+
+The `apiFetch` wrapper in `src/lib/api.ts` logs all API interactions to the browser console in development mode (`import.meta.env.DEV`):
+- Request start (method + path)
+- Response completion (status + elapsed ms)
+- Error details (status, error body, network failures)
+- Warnings for unauthenticated requests
+
+Frontend logging is suppressed in production builds.
+
+### Viewing Logs
+
+```bash
+# Stream live logs from the deployed function
+firebase functions:log --only api
+
+# View in Google Cloud Console
+# https://console.cloud.google.com/logs/query;query=resource.type%3D%22cloud_function%22
+```
+
+In Cloud Logging, filter by `jsonPayload.service = "DST"` to isolate DST logs. Use `jsonPayload.requestId` to trace a single request across all log entries.
+
+---
+
 ## Design Decisions and Trade-offs
 
 | Decision | Rationale | Trade-off |
@@ -389,3 +452,4 @@ Pages load on-demand. The initial login page load is minimal.
 | No caching layer | Firestore is fast enough for internal tool usage | Repeated identical queries hit Firestore each time |
 | Audit log is append-only | Complete change history, tamper-resistant | Grows without bound; may need retention policy |
 | GA4 for analytics (not custom) | Zero infrastructure, built-in dashboards, free tier is generous | Limited to Firebase Analytics event model |
+| Structured logging via `firebase-functions/logger` | Zero setup, automatic Cloud Logging integration, structured JSON, filterable in GCP console | Debug-level logs in high-throughput routes add Firestore read latency logging overhead; may need log level tuning in production |

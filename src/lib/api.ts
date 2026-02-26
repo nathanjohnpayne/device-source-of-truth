@@ -24,7 +24,26 @@ class ApiError extends Error {
   }
 }
 
+const isDev = import.meta.env.DEV;
+
+function apiLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, data?: Record<string, unknown>) {
+  if (isDev) {
+    const prefix = `[API ${level.toUpperCase()}]`;
+    if (level === 'error') {
+      console.error(prefix, message, data ?? '');
+    } else if (level === 'warn') {
+      console.warn(prefix, message, data ?? '');
+    } else {
+      console.log(prefix, message, data ?? '');
+    }
+  }
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = options.method ?? 'GET';
+  const startTime = performance.now();
+  apiLog('debug', `${method} /api${path}`, { method, path });
+
   const user = auth.currentUser;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -34,6 +53,8 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   if (user) {
     const token = await user.getIdToken();
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    apiLog('warn', 'No authenticated user for API request', { path });
   }
 
   const isFormData = options.body instanceof FormData;
@@ -41,15 +62,36 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     delete headers['Content-Type'];
   }
 
-  const res = await fetch(`/api${path}`, { ...options, headers });
+  try {
+    const res = await fetch(`/api${path}`, { ...options, headers });
+    const elapsed = Math.round(performance.now() - startTime);
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new ApiError(res.status, body?.error || res.statusText, body);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      apiLog('error', `${method} /api${path} failed`, {
+        status: res.status,
+        statusText: res.statusText,
+        error: body?.error,
+        detail: body?.detail,
+        elapsedMs: elapsed,
+      });
+      throw new ApiError(res.status, body?.error || res.statusText, body);
+    }
+
+    apiLog('info', `${method} /api${path} completed`, { status: res.status, elapsedMs: elapsed });
+
+    if (res.status === 204) return undefined as T;
+    return res.json();
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+
+    const elapsed = Math.round(performance.now() - startTime);
+    apiLog('error', `${method} /api${path} network error`, {
+      error: err instanceof Error ? err.message : String(err),
+      elapsedMs: elapsed,
+    });
+    throw err;
   }
-
-  if (res.status === 204) return undefined as T;
-  return res.json();
 }
 
 type QueryParams = Record<string, string | number | boolean | undefined>;

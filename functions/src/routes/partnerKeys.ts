@@ -2,20 +2,24 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
+import { formatError } from '../services/logger.js';
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
     const db = admin.firestore();
+    req.log?.debug('Listing partner keys');
+
     const snap = await db.collection('partnerKeys').get();
     const keys = snap.docs.map((d) => ({ id: d.id, ...d.data() } as { id: string; partnerId: string } & Record<string, unknown>));
+    req.log?.debug('Fetched partner keys', { count: keys.length });
 
     const partnerIds = [...new Set(keys.map((k) => k.partnerId).filter(Boolean))];
     const partnerMap: Record<string, string> = {};
     const batchSize = 30;
     for (let i = 0; i < partnerIds.length; i += batchSize) {
-      const batch = partnerIds.slice(i, i + batchSize);
+      const batch = partnerIds.slice(i, i + 30);
       const pSnap = await db.collection('partners').where(admin.firestore.FieldPath.documentId(), 'in', batch).get();
       for (const doc of pSnap.docs) {
         partnerMap[doc.id] = doc.data().displayName;
@@ -27,8 +31,10 @@ router.get('/', async (_req, res) => {
       partnerDisplayName: partnerMap[k.partnerId] ?? null,
     }));
 
+    req.log?.info('Partner keys listed', { total: result.length, uniquePartners: partnerIds.length });
     res.json({ data: result });
   } catch (err) {
+    req.log?.error('Failed to list partner keys', formatError(err));
     res.status(500).json({ error: 'Failed to list partner keys', detail: String(err) });
   }
 });
@@ -36,13 +42,20 @@ router.get('/', async (_req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const db = admin.firestore();
-    const doc = await db.collection('partnerKeys').doc((req.params.id as string)).get();
+    const keyId = req.params.id as string;
+    req.log?.debug('Getting partner key', { keyId });
+
+    const doc = await db.collection('partnerKeys').doc(keyId).get();
     if (!doc.exists) {
+      req.log?.warn('Partner key not found', { keyId });
       res.status(404).json({ error: 'Partner key not found' });
       return;
     }
+
+    req.log?.info('Partner key fetched', { keyId });
     res.json({ id: doc.id, ...doc.data() });
   } catch (err) {
+    req.log?.error('Failed to get partner key', formatError(err));
     res.status(500).json({ error: 'Failed to get partner key', detail: String(err) });
   }
 });
@@ -52,12 +65,16 @@ router.post('/', requireRole('admin'), async (req, res) => {
     const db = admin.firestore();
     const { key, partnerId, chipset, oem, region, countries } = req.body;
     if (!key || !partnerId) {
+      req.log?.warn('Partner key creation failed: missing required fields', { hasKey: !!key, hasPartnerId: !!partnerId });
       res.status(400).json({ error: 'key and partnerId are required' });
       return;
     }
 
+    req.log?.info('Creating partner key', { key, partnerId, userId: req.user!.uid });
+
     const existing = await db.collection('partnerKeys').where('key', '==', key).limit(1).get();
     if (!existing.empty) {
+      req.log?.warn('Partner key creation failed: duplicate key', { key });
       res.status(409).json({ error: 'Partner key already exists' });
       return;
     }
@@ -82,8 +99,10 @@ router.post('/', requireRole('admin'), async (req, res) => {
     });
 
     const created = await docRef.get();
+    req.log?.info('Partner key created', { partnerKeyId: docRef.id, key, partnerId });
     res.status(201).json({ id: docRef.id, ...created.data() });
   } catch (err) {
+    req.log?.error('Failed to create partner key', formatError(err));
     res.status(500).json({ error: 'Failed to create partner key', detail: String(err) });
   }
 });
@@ -91,9 +110,13 @@ router.post('/', requireRole('admin'), async (req, res) => {
 router.put('/:id', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const docRef = db.collection('partnerKeys').doc((req.params.id as string));
+    const keyId = req.params.id as string;
+    req.log?.info('Updating partner key', { keyId, userId: req.user!.uid });
+
+    const docRef = db.collection('partnerKeys').doc(keyId);
     const existing = await docRef.get();
     if (!existing.exists) {
+      req.log?.warn('Partner key not found for update', { keyId });
       res.status(404).json({ error: 'Partner key not found' });
       return;
     }
@@ -103,11 +126,13 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
     delete updates.id;
 
     await docRef.update(updates);
-    await diffAndLog('partnerKey', (req.params.id as string), oldData, updates, req.user!.uid, req.user!.email);
+    await diffAndLog('partnerKey', keyId, oldData, updates, req.user!.uid, req.user!.email);
 
     const updated = await docRef.get();
+    req.log?.info('Partner key updated', { keyId, updatedFields: Object.keys(req.body) });
     res.json({ id: docRef.id, ...updated.data() });
   } catch (err) {
+    req.log?.error('Failed to update partner key', formatError(err));
     res.status(500).json({ error: 'Failed to update partner key', detail: String(err) });
   }
 });
@@ -115,26 +140,33 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
 router.delete('/:id', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const docRef = db.collection('partnerKeys').doc((req.params.id as string));
+    const keyId = req.params.id as string;
+    req.log?.info('Deleting partner key', { keyId, userId: req.user!.uid });
+
+    const docRef = db.collection('partnerKeys').doc(keyId);
     const existing = await docRef.get();
     if (!existing.exists) {
+      req.log?.warn('Partner key not found for deletion', { keyId });
       res.status(404).json({ error: 'Partner key not found' });
       return;
     }
 
+    const keyValue = existing.data()!.key;
     await docRef.delete();
     await logAuditEntry({
       entityType: 'partnerKey',
-      entityId: (req.params.id as string),
+      entityId: keyId,
       field: '*',
-      oldValue: existing.data()!.key,
+      oldValue: keyValue,
       newValue: null,
       userId: req.user!.uid,
       userEmail: req.user!.email,
     });
 
+    req.log?.info('Partner key deleted', { keyId, key: keyValue });
     res.json({ success: true });
   } catch (err) {
+    req.log?.error('Failed to delete partner key', formatError(err));
     res.status(500).json({ error: 'Failed to delete partner key', detail: String(err) });
   }
 });
