@@ -47,4 +47,4 @@ app.use(
   },
 );
 
-export const api = onRequest({ region: 'us-central1' }, app);
+export const api = onRequest({ region: 'us-central1', invoker: 'private' }, app);
