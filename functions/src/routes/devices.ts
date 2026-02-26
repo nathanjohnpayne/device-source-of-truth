@@ -134,14 +134,19 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const db = admin.firestore();
-    const deviceDocId = req.params.id as string;
-    req.log?.debug('Getting device detail', { deviceDocId });
+    const idParam = req.params.id as string;
+    req.log?.debug('Getting device detail', { idParam });
 
-    const doc = await db.collection('devices').doc(deviceDocId).get();
+    let doc = await db.collection('devices').doc(idParam).get();
     if (!doc.exists) {
-      req.log?.warn('Device not found', { deviceDocId });
-      res.status(404).json({ error: 'Device not found' });
-      return;
+      const byDeviceId = await db.collection('devices').where('deviceId', '==', idParam).limit(1).get();
+      if (byDeviceId.empty) {
+        req.log?.warn('Device not found', { idParam });
+        res.status(404).json({ error: 'Device not found' });
+        return;
+      }
+      doc = byDeviceId.docs[0];
+      req.log?.debug('Resolved device via deviceId fallback', { firestoreId: doc.id, deviceId: idParam });
     }
 
     const rawData = doc.data()!;
@@ -154,7 +159,7 @@ router.get('/:id', async (req, res) => {
     req.log?.debug('Fetching device relations', { deviceId: device.deviceId, partnerKeyId: device.partnerKeyId, tierId: device.tierId });
 
     const [pkSnap, specSnap, tierSnap, deploySnap, telSnap, auditSnap] = await Promise.all([
-      db.collection('partnerKeys').doc(device.partnerKeyId).get(),
+      device.partnerKeyId ? db.collection('partnerKeys').doc(device.partnerKeyId).get() : Promise.resolve(null),
       db.collection('deviceSpecs').where('deviceId', '==', device.id).limit(1).get(),
       device.tierId ? db.collection('hardwareTiers').doc(device.tierId).get() : Promise.resolve(null),
       db.collection('deviceDeployments').where('deviceId', '==', device.id).get(),
@@ -163,14 +168,16 @@ router.get('/:id', async (req, res) => {
     ]);
 
     let partner = null;
-    if (pkSnap.exists) {
+    if (pkSnap && pkSnap.exists) {
       const pkData = pkSnap.data()!;
-      const partnerDoc = await db.collection('partners').doc(pkData.partnerId).get();
-      partner = partnerDoc.exists ? { id: partnerDoc.id, ...partnerDoc.data() } : null;
+      if (pkData.partnerId) {
+        const partnerDoc = await db.collection('partners').doc(pkData.partnerId).get();
+        partner = partnerDoc.exists ? { id: partnerDoc.id, ...partnerDoc.data() } : null;
+      }
     }
 
     req.log?.info('Device detail fetched', {
-      deviceDocId,
+      idParam,
       hasSpec: !specSnap.empty,
       hasTier: !!(tierSnap && tierSnap.exists),
       deploymentCount: deploySnap.size,
@@ -181,7 +188,7 @@ router.get('/:id', async (req, res) => {
     res.json({
       ...device,
       partner,
-      partnerKey: pkSnap.exists ? { id: pkSnap.id, ...pkSnap.data() } : null,
+      partnerKey: pkSnap && pkSnap.exists ? { id: pkSnap.id, ...pkSnap.data() } : null,
       spec: specSnap.empty ? null : { id: specSnap.docs[0].id, ...specSnap.docs[0].data() },
       tier: tierSnap && tierSnap.exists ? { id: tierSnap.id, ...tierSnap.data() } : null,
       deployments: deploySnap.docs.map((d) => ({ id: d.id, ...d.data() })),

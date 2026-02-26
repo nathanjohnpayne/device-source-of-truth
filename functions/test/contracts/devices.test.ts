@@ -109,6 +109,21 @@ describe('GET /api/devices/:id', () => {
     const res = await request(app).get('/api/devices/nonexistent').expect(404);
     expect(res.body.error).toBeDefined();
   });
+
+  it('resolves a device by deviceId when Firestore doc ID does not match', async () => {
+    const res = await request(app).get('/api/devices/claro-brazil-hd-legacy').expect(200);
+    expect(res.body.displayName).toBe('Claro Brazil HD Legacy');
+    expect(res.body.id).toBe('d2');
+  });
+
+  it('returns 200 (not 500) for a device with empty partnerKeyId', async () => {
+    const res = await request(app).get('/api/devices/d2').expect(200);
+    expect(res.body.partnerKey).toBeNull();
+    expect(res.body.partner).toBeNull();
+    expect(Array.isArray(res.body.deployments)).toBe(true);
+    expect(Array.isArray(res.body.telemetrySnapshots)).toBe(true);
+    expect(Array.isArray(res.body.auditHistory)).toBe(true);
+  });
 });
 
 describe('POST /api/devices', () => {
