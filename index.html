@@ -7,6 +7,28 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.addEventListener('error', function(e) {
+        var r = document.getElementById('root');
+        if (r && !r.children.length) {
+          r.innerHTML = '<div style="padding:2rem;font-family:monospace">' +
+            '<h2 style="color:red">App failed to load</h2>' +
+            '<pre style="white-space:pre-wrap;background:#f5f5f5;padding:1rem;border-radius:4px">' +
+            (e.message || 'Unknown error') + '\n' + (e.filename || '') + ':' + (e.lineno || '') +
+            '</pre></div>';
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        var r = document.getElementById('root');
+        if (r && !r.children.length) {
+          r.innerHTML = '<div style="padding:2rem;font-family:monospace">' +
+            '<h2 style="color:red">App failed to load (async)</h2>' +
+            '<pre style="white-space:pre-wrap;background:#f5f5f5;padding:1rem;border-radius:4px">' +
+            (e.reason && e.reason.stack ? e.reason.stack : String(e.reason || 'Unknown rejection')) +
+            '</pre></div>';
+        }
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

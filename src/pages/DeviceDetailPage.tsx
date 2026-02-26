@@ -361,7 +361,7 @@ export default function DeviceDetailPage() {
         </div>
         <div className="flex flex-col items-end gap-2">
           <p className="text-3xl font-bold text-gray-900">
-            {device.activeDeviceCount.toLocaleString()}
+            {(device.activeDeviceCount ?? 0).toLocaleString()}
           </p>
           <p className="text-xs text-gray-500">Active Devices</p>
           {isEditor && (
@@ -561,7 +561,7 @@ export default function DeviceDetailPage() {
                 <div className="rounded-lg bg-gray-50 p-4">
                   <p className="text-sm font-medium text-gray-500">Total Unique Devices</p>
                   <p className="mt-1 text-2xl font-bold text-gray-900">
-                    {totalUniqueDevices.toLocaleString()}
+                    {(totalUniqueDevices ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-4">
@@ -598,7 +598,7 @@ export default function DeviceDetailPage() {
                             {v.version}
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-700">
-                            {v.count.toLocaleString()}
+                            {(v.count ?? 0).toLocaleString()}
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-700">{v.pct}%</td>
                         </tr>

@@ -44,7 +44,7 @@ const deviceColumns: Column<DeviceWithRelations>[] = [
     header: 'Active Devices',
     accessor: 'activeDeviceCount',
     sortable: true,
-    render: (row) => row.activeDeviceCount.toLocaleString(),
+    render: (row) => (row.activeDeviceCount ?? 0).toLocaleString(),
   },
   {
     header: 'Tier',
@@ -183,11 +183,11 @@ export default function PartnerDetailPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-5">
           <p className="text-sm font-medium text-gray-500">Total Devices</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{totalDevices.toLocaleString()}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{(totalDevices ?? 0).toLocaleString()}</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-5">
           <p className="text-sm font-medium text-gray-500">Active Devices</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{activeDevices.toLocaleString()}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{(activeDevices ?? 0).toLocaleString()}</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-5">
           <p className="text-sm font-medium text-gray-500">Spec Coverage</p>

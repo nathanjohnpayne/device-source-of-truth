@@ -95,7 +95,7 @@ function TierCard({
               {tier.devices.length.toLocaleString()} devices
             </span>
             <span className="text-gray-500">
-              {tier.activeDeviceCount.toLocaleString()} active
+              {(tier.activeDeviceCount ?? 0).toLocaleString()} active
             </span>
           </div>
         </div>
@@ -123,7 +123,7 @@ function TierCard({
                   <td className="px-4 py-2 font-medium text-gray-900">{d.displayName}</td>
                   <td className="px-4 py-2 text-gray-600">{d.partnerName ?? '—'}</td>
                   <td className="px-4 py-2 text-right text-gray-600">
-                    {d.activeDeviceCount.toLocaleString()}
+                    {(d.activeDeviceCount ?? 0).toLocaleString()}
                   </td>
                   <td className="px-4 py-2 text-right text-gray-600">—</td>
                   <td className="px-4 py-2 text-right text-gray-600">—</td>

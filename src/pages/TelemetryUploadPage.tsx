@@ -99,14 +99,14 @@ export default function TelemetryUploadPage() {
       header: 'Rows',
       accessor: 'rowCount',
       sortable: true,
-      render: (row) => row.rowCount.toLocaleString(),
+      render: (row) => (row.rowCount ?? 0).toLocaleString(),
     },
     {
       header: 'Successes',
       accessor: 'successCount',
       sortable: true,
       render: (row) => (
-        <Badge variant="success">{row.successCount.toLocaleString()}</Badge>
+        <Badge variant="success">{(row.successCount ?? 0).toLocaleString()}</Badge>
       ),
     },
     {
@@ -115,7 +115,7 @@ export default function TelemetryUploadPage() {
       sortable: true,
       render: (row) =>
         row.errorCount > 0 ? (
-          <Badge variant="danger">{row.errorCount.toLocaleString()}</Badge>
+          <Badge variant="danger">{(row.errorCount ?? 0).toLocaleString()}</Badge>
         ) : (
           <Badge variant="default">0</Badge>
         ),
@@ -224,13 +224,13 @@ export default function TelemetryUploadPage() {
             <div>
               <p className="text-gray-500">Rows Processed</p>
               <p className="text-lg font-semibold text-gray-900">
-                {uploadResult.rowCount.toLocaleString()}
+                {(uploadResult.rowCount ?? 0).toLocaleString()}
               </p>
             </div>
             <div>
               <p className="text-gray-500">Records Updated</p>
               <p className="text-lg font-semibold text-emerald-700">
-                {uploadResult.successCount.toLocaleString()}
+                {(uploadResult.successCount ?? 0).toLocaleString()}
               </p>
             </div>
             <div>
@@ -238,7 +238,7 @@ export default function TelemetryUploadPage() {
               <p
                 className={`text-lg font-semibold ${uploadResult.errorCount > 0 ? 'text-red-600' : 'text-gray-900'}`}
               >
-                {uploadResult.errorCount.toLocaleString()}
+                {(uploadResult.errorCount ?? 0).toLocaleString()}
               </p>
             </div>
           </div>

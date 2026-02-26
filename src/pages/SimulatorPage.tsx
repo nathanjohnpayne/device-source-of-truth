@@ -132,7 +132,7 @@ export default function SimulatorPage() {
       header: 'Active Devices',
       accessor: 'activeDeviceCount',
       sortable: true,
-      render: (row) => row.activeDeviceCount.toLocaleString(),
+      render: (row) => (row.activeDeviceCount ?? 0).toLocaleString(),
     },
   ];
 
@@ -143,7 +143,7 @@ export default function SimulatorPage() {
       header: 'Active Devices',
       accessor: 'activeDeviceCount',
       sortable: true,
-      render: (row) => row.activeDeviceCount.toLocaleString(),
+      render: (row) => (row.activeDeviceCount ?? 0).toLocaleString(),
     },
     {
       header: 'Shortfall',

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, Component, type ReactNode } from 'react';
 import {
   BrowserRouter,
   Routes,
@@ -12,6 +12,46 @@ import LoadingSpinner from './components/shared/LoadingSpinner';
 import UpdateToast from './components/shared/UpdateToast';
 import AppShell from './components/layout/AppShell';
 import WelcomeModal from './components/onboarding/WelcomeModal';
+
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: '2rem', fontFamily: 'monospace' }}>
+          <h2 style={{ color: 'red' }}>Application Error</h2>
+          <pre
+            style={{
+              whiteSpace: 'pre-wrap',
+              background: '#f5f5f5',
+              padding: '1rem',
+              borderRadius: '4px',
+            }}
+          >
+            {this.state.error.message}
+            {'\n'}
+            {this.state.error.stack}
+          </pre>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -215,10 +255,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

@@ -90,7 +90,21 @@ export default function DashboardPage() {
     trackEvent('report_view', { report_type: 'dashboard' });
     api.reports
       .dashboard()
-      .then((res) => setData(res as unknown as DashboardData))
+      .then((res) => {
+        const raw = (res ?? {}) as Record<string, unknown>;
+        setData({
+          totalActiveDevices: (raw.totalActiveDevices as number) ?? 0,
+          totalDevices: (raw.totalDevices as number) ?? 0,
+          specCoverageWeighted: (raw.specCoverageWeighted as number) ?? 0,
+          certifiedCount: (raw.certifiedCount as number) ?? 0,
+          pendingCount: (raw.pendingCount as number) ?? 0,
+          uncertifiedCount: (raw.uncertifiedCount as number) ?? 0,
+          openAlertCount: (raw.openAlertCount as number) ?? 0,
+          top20Devices: (raw.top20Devices as DashboardData['top20Devices']) ?? [],
+          adkVersions: (raw.adkVersions as DashboardData['adkVersions']) ?? [],
+          regionBreakdown: (raw.regionBreakdown as DashboardData['regionBreakdown']) ?? [],
+        });
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -214,7 +228,7 @@ export default function DashboardPage() {
                       {d.partnerName}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium text-gray-900">
-                      {d.activeDeviceCount.toLocaleString()}
+                      {(d.activeDeviceCount ?? 0).toLocaleString()}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm">
                       {d.tierName ? (
@@ -284,11 +298,11 @@ export default function DashboardPage() {
                   </div>
                   <div className="mt-3 space-y-1">
                     <p className="text-xl font-bold text-gray-900">
-                      {r.activeDevices.toLocaleString()}
+                      {(r.activeDevices ?? 0).toLocaleString()}
                     </p>
                     <p className="text-sm text-gray-500">active devices</p>
                     <p className="text-xs text-gray-400">
-                      {r.deviceCount.toLocaleString()} devices registered
+                      {(r.deviceCount ?? 0).toLocaleString()} devices registered
                     </p>
                   </div>
                 </div>

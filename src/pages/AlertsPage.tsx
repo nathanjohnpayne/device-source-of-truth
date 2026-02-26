@@ -152,7 +152,7 @@ export default function AlertsPage() {
       header: 'Unique Devices',
       accessor: 'uniqueDeviceCount',
       sortable: true,
-      render: (row) => row.uniqueDeviceCount.toLocaleString(),
+      render: (row) => (row.uniqueDeviceCount ?? 0).toLocaleString(),
     },
     {
       header: 'Status',

@@ -170,7 +170,7 @@ export default function SpecCoveragePage() {
       header: 'Active Devices',
       accessor: 'activeDeviceCount',
       sortable: true,
-      render: (row) => row.activeDeviceCount.toLocaleString(),
+      render: (row) => (row.activeDeviceCount ?? 0).toLocaleString(),
     },
     {
       header: 'Spec Completeness',

@@ -48,19 +48,19 @@ const columns: Column<PartnerWithStats>[] = [
     header: 'Partner Keys',
     accessor: 'partnerKeyCount',
     sortable: true,
-    render: (row) => row.partnerKeyCount.toLocaleString(),
+    render: (row) => (row.partnerKeyCount ?? 0).toLocaleString(),
   },
   {
     header: 'Devices',
     accessor: 'deviceCount',
     sortable: true,
-    render: (row) => row.deviceCount.toLocaleString(),
+    render: (row) => (row.deviceCount ?? 0).toLocaleString(),
   },
   {
     header: 'Active Devices',
     accessor: 'activeDeviceCount',
     sortable: true,
-    render: (row) => row.activeDeviceCount.toLocaleString(),
+    render: (row) => (row.activeDeviceCount ?? 0).toLocaleString(),
   },
 ];
 

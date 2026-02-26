@@ -448,7 +448,7 @@ export default function TierConfigPage() {
                     >
                       <span className="font-medium text-gray-900">{p.tierName}</span>
                       <span className="text-gray-600">
-                        {p.deviceCount.toLocaleString()} devices · {p.activeDeviceCount.toLocaleString()} active
+                        {(p.deviceCount ?? 0).toLocaleString()} devices · {(p.activeDeviceCount ?? 0).toLocaleString()} active
                       </span>
                     </div>
                   ))}
