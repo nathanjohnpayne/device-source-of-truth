@@ -13,6 +13,19 @@ import UpdateToast from './components/shared/UpdateToast';
 import AppShell from './components/layout/AppShell';
 import WelcomeModal from './components/onboarding/WelcomeModal';
 
+function lazyRetry(factory: () => Promise<{ default: React.ComponentType }>) {
+  return lazy(() =>
+    factory().catch(() => {
+      const reloaded = sessionStorage.getItem('chunk_reload');
+      if (!reloaded) {
+        sessionStorage.setItem('chunk_reload', '1');
+        window.location.reload();
+      }
+      return factory();
+    }),
+  );
+}
+
 class ErrorBoundary extends Component<
   { children: ReactNode },
   { error: Error | null }
@@ -20,6 +33,9 @@ class ErrorBoundary extends Component<
   state: { error: Error | null } = { error: null };
 
   static getDerivedStateFromError(error: Error) {
+    if (error.message?.includes('dynamically imported module')) {
+      window.location.reload();
+    }
     return { error };
   }
 
@@ -53,24 +69,24 @@ class ErrorBoundary extends Component<
   }
 }
 
-const LoginPage = lazy(() => import('./pages/LoginPage'));
-const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const DeviceListPage = lazy(() => import('./pages/DeviceListPage'));
-const DeviceCreatePage = lazy(() => import('./pages/DeviceCreatePage'));
-const DeviceDetailPage = lazy(() => import('./pages/DeviceDetailPage'));
-const SpecEditPage = lazy(() => import('./pages/SpecEditPage'));
-const PartnerListPage = lazy(() => import('./pages/PartnerListPage'));
-const PartnerDetailPage = lazy(() => import('./pages/PartnerDetailPage'));
-const TierBrowserPage = lazy(() => import('./pages/TierBrowserPage'));
-const TierConfigPage = lazy(() => import('./pages/TierConfigPage'));
-const SimulatorPage = lazy(() => import('./pages/SimulatorPage'));
-const SpecCoveragePage = lazy(() => import('./pages/SpecCoveragePage'));
-const AdminPage = lazy(() => import('./pages/AdminPage'));
-const TelemetryUploadPage = lazy(() => import('./pages/TelemetryUploadPage'));
-const AlertsPage = lazy(() => import('./pages/AlertsPage'));
-const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
-const MigrationPage = lazy(() => import('./pages/MigrationPage'));
-const ReadinessPage = lazy(() => import('./pages/ReadinessPage'));
+const LoginPage = lazyRetry(() => import('./pages/LoginPage'));
+const DashboardPage = lazyRetry(() => import('./pages/DashboardPage'));
+const DeviceListPage = lazyRetry(() => import('./pages/DeviceListPage'));
+const DeviceCreatePage = lazyRetry(() => import('./pages/DeviceCreatePage'));
+const DeviceDetailPage = lazyRetry(() => import('./pages/DeviceDetailPage'));
+const SpecEditPage = lazyRetry(() => import('./pages/SpecEditPage'));
+const PartnerListPage = lazyRetry(() => import('./pages/PartnerListPage'));
+const PartnerDetailPage = lazyRetry(() => import('./pages/PartnerDetailPage'));
+const TierBrowserPage = lazyRetry(() => import('./pages/TierBrowserPage'));
+const TierConfigPage = lazyRetry(() => import('./pages/TierConfigPage'));
+const SimulatorPage = lazyRetry(() => import('./pages/SimulatorPage'));
+const SpecCoveragePage = lazyRetry(() => import('./pages/SpecCoveragePage'));
+const AdminPage = lazyRetry(() => import('./pages/AdminPage'));
+const TelemetryUploadPage = lazyRetry(() => import('./pages/TelemetryUploadPage'));
+const AlertsPage = lazyRetry(() => import('./pages/AlertsPage'));
+const AuditLogPage = lazyRetry(() => import('./pages/AuditLogPage'));
+const MigrationPage = lazyRetry(() => import('./pages/MigrationPage'));
+const ReadinessPage = lazyRetry(() => import('./pages/ReadinessPage'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
