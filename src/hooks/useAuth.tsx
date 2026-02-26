@@ -30,7 +30,7 @@ interface AuthContextValue extends AuthState {
   isAdmin: boolean;
 }
 
-const ALLOWED_DOMAINS = ['disney.com', 'disneystreaming.com'];
+const ALLOWED_DOMAINS = ['disney.com', 'disneystreaming.com', 'nathanpayne.com'];
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 

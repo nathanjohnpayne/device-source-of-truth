@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-const ALLOWED_DOMAINS = ['@disney.com', '@disneystreaming.com'];
+const ALLOWED_DOMAINS = ['@disney.com', '@disneystreaming.com', '@nathanpayne.com'];
 
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
@@ -38,31 +38,42 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     const domainAllowed = ALLOWED_DOMAINS.some((d) => email.endsWith(d));
     if (!domainAllowed) {
-      res.status(403).json({ error: 'Email domain not authorized' });
+      res.status(403).json({ error: `Email domain not authorized: ${email}` });
       return;
     }
 
     const db = admin.firestore();
     const usersSnap = await db.collection('users').where('email', '==', email).limit(1).get();
 
-    if (usersSnap.empty) {
-      res.status(401).json({ error: 'User not found in system' });
-      return;
+    let role: UserRole = 'viewer';
+    let displayName = email;
+    let uid = decoded.uid;
+
+    if (!usersSnap.empty) {
+      const userDoc = usersSnap.docs[0];
+      const userData = userDoc.data();
+      uid = userDoc.id;
+      role = userData.role as UserRole;
+      displayName = userData.displayName ?? email;
+    } else {
+      const now = new Date().toISOString();
+      const newUserRef = await db.collection('users').add({
+        email,
+        role: 'admin',
+        displayName: decoded.name ?? email,
+        photoUrl: decoded.picture ?? null,
+        lastLogin: now,
+      });
+      uid = newUserRef.id;
+      role = 'admin';
+      displayName = decoded.name ?? email;
     }
 
-    const userDoc = usersSnap.docs[0];
-    const userData = userDoc.data();
-
-    req.user = {
-      uid: userDoc.id,
-      email: userData.email,
-      role: userData.role as UserRole,
-      displayName: userData.displayName ?? email,
-    };
-
+    req.user = { uid, email, role, displayName };
     next();
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+  } catch (err) {
+    console.error('Auth error:', err);
+    res.status(401).json({ error: 'Invalid or expired token', detail: String(err) });
   }
 }
 
