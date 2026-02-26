@@ -1,0 +1,27 @@
+{
+  "name": "dsot-functions",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.6.1",
+    "firebase-functions": "^6.3.2",
+    "papaparse": "^5.5.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/papaparse": "^5.3.15",
+    "typescript": "~5.9.3"
+  }
+}

@@ -2,26 +2,74 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
     function isAllowedUser() {
-      return request.auth != null
-        && exists(/databases/$(database)/documents/allowedUsers/$(request.auth.token.email));
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.token.email));
     }
 
-    match /allowedUsers/{email} {
-      allow read: if request.auth != null;
+    match /users/{email} {
+      allow read: if isAuthenticated();
     }
 
-    match /devices/{deviceId} {
+    match /partners/{docId} {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser();
     }
 
-    match /metadata/{doc} {
+    match /partnerKeys/{docId} {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser();
     }
 
-    match /partners/{partnerId} {
+    match /devices/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /deviceSpecs/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /deviceDeployments/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /telemetrySnapshots/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /hardwareTiers/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /deviceTierAssignments/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /auditLog/{docId} {
+      allow read: if isAllowedUser();
+    }
+
+    match /alerts/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /uploadHistory/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /config/{docId} {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser();
     }

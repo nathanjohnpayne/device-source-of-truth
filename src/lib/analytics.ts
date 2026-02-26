@@ -1,0 +1,76 @@
+import { logEvent } from './firebase';
+
+export type AnalyticsEvent =
+  | 'page_view'
+  | 'login'
+  | 'login_failed'
+  | 'device_search'
+  | 'device_filter'
+  | 'device_view'
+  | 'device_register'
+  | 'device_update'
+  | 'partner_view'
+  | 'partner_create'
+  | 'partner_update'
+  | 'spec_form_open'
+  | 'spec_form_save'
+  | 'spec_bulk_import'
+  | 'questionnaire_upload'
+  | 'telemetry_upload'
+  | 'alert_dismiss'
+  | 'tier_definition_save'
+  | 'tier_preview'
+  | 'simulator_run'
+  | 'global_search'
+  | 'report_view'
+  | 'export'
+  | 'audit_log_view'
+  | 'migration_run'
+  | 'readiness_declare'
+  | 'onboarding_start'
+  | 'onboarding_complete'
+  | 'help_tooltip_view';
+
+export interface AnalyticsParams {
+  page_view: { page_title: string; page_path: string };
+  login: { method: string };
+  login_failed: { reason: string };
+  device_search: { query: string };
+  device_filter: { filters: string };
+  device_view: { device_id: string };
+  device_register: { device_id: string };
+  device_update: { device_id: string; fields: string };
+  partner_view: { partner_id: string };
+  partner_create: { partner_name: string };
+  partner_update: { partner_id: string };
+  spec_form_open: { device_id: string };
+  spec_form_save: { device_id: string; category: string };
+  spec_bulk_import: { count: number };
+  questionnaire_upload: { device_id: string };
+  telemetry_upload: { file_name: string; row_count: number };
+  alert_dismiss: { alert_id: string; reason: string };
+  tier_definition_save: { tier_name: string };
+  tier_preview: { tier_count: number };
+  simulator_run: { result_tier: string };
+  global_search: { query: string; result_count: number };
+  report_view: { report_type: string };
+  export: { type: string; format: string };
+  audit_log_view: { entity_type?: string };
+  migration_run: { row_count: number };
+  readiness_declare: { device_id: string };
+  onboarding_start: Record<string, never>;
+  onboarding_complete: Record<string, never>;
+  help_tooltip_view: { tooltip_id: string };
+}
+
+export function trackEvent<E extends AnalyticsEvent>(
+  name: E,
+  params?: AnalyticsParams[E],
+) {
+  if (import.meta.env.DEV) return;
+  logEvent(name, params as Record<string, string | number>);
+}
+
+export function trackPageView(pageName: string, pagePath: string) {
+  trackEvent('page_view', { page_title: pageName, page_path: pagePath });
+}
