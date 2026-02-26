@@ -136,6 +136,7 @@ BrowserRouter
       └─ AppRoutes
           ├─ PageViewTracker (fires GA4 page_view on route change)
           ├─ OnboardingGate (shows WelcomeModal on first login)
+          ├─ UpdateToast (polls version.json, prompts refresh on new deploy)
           └─ Suspense (loading fallback for lazy-loaded pages)
               └─ Routes
                   ├─ /login → LoginPage
@@ -184,6 +185,10 @@ There is no external state library (no Redux, Zustand, etc.). State is managed w
 - **Form state:** `useState` for form fields, submitted via `api.*` methods.
 
 This is intentional for a POC/internal tool. If the application grows, consider React Query or SWR for data fetching with caching.
+
+### Auto-Update Notification
+
+The `useVersionCheck` hook polls `/version.json` every 60 seconds after the user authenticates. Each production build generates a unique version hash in `version.json` via a Vite plugin (`versionJsonPlugin` in `vite.config.ts`). When the fetched version differs from the one captured at page load, the `UpdateToast` component slides up from the bottom of the screen, prompting the user to refresh. Once shown, polling stops to avoid repeated notifications. The user can dismiss the toast or click Refresh to reload.
 
 ### Analytics Integration
 

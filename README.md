@@ -24,6 +24,7 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 - **Audit Log** — append-only, field-level change tracking for every mutation across all entities
 - **Role-Based Access Control** — viewer / editor / admin roles enforced on both frontend and backend
 - **Airtable Migration** — bulk CSV import of legacy AllModels data with spec mapping and tier assignment
+- **Auto-Update Notification** — polls for new deployments and prompts users to refresh when a new version is available
 - **Dashboard** — KPI summaries, certification breakdown, tier distribution, and top-device charts
 
 ## Quick Start
@@ -75,7 +76,9 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including
 src/                          React frontend
 ├── pages/                    18 route-level page components (lazy-loaded)
 ├── components/               Shared UI (DataTable, Badge, Modal, FilterPanel, etc.)
-├── hooks/useAuth.tsx         Auth context provider + useAuth() hook
+├── hooks/
+│   ├── useAuth.tsx          Auth context provider + useAuth() hook
+│   └── useVersionCheck.ts   Polls version.json for new deploys
 └── lib/
     ├── types.ts              All TypeScript interfaces (408 lines, single source of truth)
     ├── api.ts                Typed HTTP client for /api/* endpoints

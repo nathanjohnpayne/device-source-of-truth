@@ -40,7 +40,8 @@ Firebase Hosting (static SPA)
 │   │   ├── specs/                ← SpecFormFields (reusable form inputs)
 │   │   └── onboarding/           ← WelcomeModal (first-login wizard)
 │   ├── hooks/
-│   │   └── useAuth.tsx           ← AuthProvider + useAuth() hook
+│   │   ├── useAuth.tsx           ← AuthProvider + useAuth() hook
+│   │   └── useVersionCheck.ts    ← Polls version.json, detects new deployments
 │   └── lib/
 │       ├── firebase.ts           ← Firebase client SDK init (Auth, Firestore, Analytics)
 │       ├── api.ts                ← Typed fetch wrapper for /api/* endpoints
@@ -149,7 +150,7 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 - **Styling:** Tailwind CSS utility classes only. No CSS modules, no styled-components.
 - **Icons:** `lucide-react` exclusively.
 - **Charts:** `recharts` for all data visualizations.
-- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip` in `src/components/shared/`.
+- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `UpdateToast` in `src/components/shared/`.
 - **Analytics:** Use `trackEvent()` from `src/lib/analytics.ts`. Events are no-ops in development mode.
 - **Exports:** Use `exportToCsv()` and `exportToPdf()` from `src/lib/export.ts`.
 

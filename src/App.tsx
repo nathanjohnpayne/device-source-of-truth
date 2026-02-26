@@ -9,6 +9,7 @@ import {
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { trackPageView } from './lib/analytics';
 import LoadingSpinner from './components/shared/LoadingSpinner';
+import UpdateToast from './components/shared/UpdateToast';
 import AppShell from './components/layout/AppShell';
 import WelcomeModal from './components/onboarding/WelcomeModal';
 
@@ -111,6 +112,7 @@ function AppRoutes() {
     <>
       <PageViewTracker />
       <OnboardingGate />
+      <UpdateToast />
       <Suspense fallback={<LoadingSpinner className="min-h-screen" />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
