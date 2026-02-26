@@ -110,7 +110,7 @@ function crudEndpoints<T>(base: string) {
     create: (data: Partial<T>) =>
       apiFetch<T>(base, { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<T>) =>
-      apiFetch<T>(`${base}/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      apiFetch<T>(`${base}/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
       apiFetch<void>(`${base}/${id}`, { method: 'DELETE' }),
   };
@@ -123,21 +123,40 @@ export const api = {
     ...crudEndpoints<DeviceWithRelations>('/devices'),
     get: (id: string) => apiFetch<DeviceDetail>(`/devices/${id}`),
   },
-  deviceSpecs: crudEndpoints<DeviceSpec>('/device-specs'),
+  deviceSpecs: {
+    get: (deviceId: string) => apiFetch<DeviceSpec>(`/device-specs/${deviceId}`),
+    save: (deviceId: string, data: Partial<DeviceSpec>) =>
+      apiFetch<DeviceSpec>(`/device-specs/${deviceId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+  },
   tiers: {
     ...crudEndpoints<HardwareTier>('/tiers'),
-    preview: (thresholds: Partial<HardwareTier>) =>
-      apiFetch<{ devices: DeviceWithRelations[]; counts: Record<string, number> }>(
+    preview: (tiers: HardwareTier[]) =>
+      apiFetch<Record<string, { tierName: string; count: number; devices: string[] }>>(
         '/tiers/preview',
-        { method: 'POST', body: JSON.stringify(thresholds) },
+        { method: 'POST', body: JSON.stringify({ tiers }) },
       ),
     simulate: (requirements: Record<string, unknown>) =>
-      apiFetch<{ tier: string; matches: number }>('/tiers/simulate', {
+      apiFetch<{
+        eligibleCount: number;
+        ineligibleCount: number;
+        eligible: string[];
+        ineligible: string[];
+      }>('/tiers/simulate', {
         method: 'POST',
         body: JSON.stringify(requirements),
       }),
   },
-  alerts: crudEndpoints<Alert>('/alerts'),
+  alerts: {
+    list: (params?: QueryParams) => apiFetch<PaginatedResponse<Alert>>(`/alerts${qs(params)}`),
+    dismiss: (id: string, dismissReason: string) =>
+      apiFetch<Alert>(`/alerts/${id}/dismiss`, {
+        method: 'PUT',
+        body: JSON.stringify({ dismissReason }),
+      }),
+  },
   audit: {
     list: (params?: QueryParams) =>
       apiFetch<PaginatedResponse<AuditLogEntry>>(`/audit${qs(params)}`),
@@ -145,11 +164,12 @@ export const api = {
   },
 
   telemetry: {
-    upload: (file: File, snapshotDate?: string) => {
-      const form = new FormData();
-      form.append('file', file);
-      if (snapshotDate) form.append('snapshotDate', snapshotDate);
-      return apiFetch<UploadHistory>('/telemetry/upload', { method: 'POST', body: form });
+    upload: async (file: File, snapshotDate?: string) => {
+      const csvData = await file.text();
+      return apiFetch<UploadHistory>('/telemetry/upload', {
+        method: 'POST',
+        body: JSON.stringify({ csvData, snapshotDate, fileName: file.name }),
+      });
     },
     history: (params?: QueryParams) =>
       apiFetch<PaginatedResponse<UploadHistory>>(`/telemetry/history${qs(params)}`),
@@ -161,33 +181,62 @@ export const api = {
     ),
 
   reports: {
-    dashboard: () => apiFetch<Record<string, unknown>>('/reports/dashboard'),
-    partner: (id: string) => apiFetch<Record<string, unknown>>(`/reports/partner/${id}`),
+    dashboard: () => apiFetch<{
+      totalDevices: number;
+      totalActiveDevices: number;
+      specCoverageWeighted: number;
+      certifiedCount: number;
+      pendingCount: number;
+      uncertifiedCount: number;
+      openAlertCount: number;
+      top20Devices: { id: string; displayName: string; partnerName: string; activeDeviceCount: number; tierName: string | null }[];
+      adkVersions: { version: string; count: number }[];
+      regionBreakdown: { region: string; activeDevices: number; deviceCount: number }[];
+    }>('/reports/dashboard'),
+    partner: (id: string) => apiFetch<{
+      partner: Partner;
+      deviceCount: number;
+      totalActiveDevices: number;
+      specCoverage: number;
+      tierDistribution: Record<string, number>;
+      certificationCounts: Record<string, number>;
+      devices: { id: string; displayName: string; deviceId: string; activeDeviceCount: number; specCompleteness: number; certificationStatus: string; tierId: string | null }[];
+    }>(`/reports/partner/${id}`),
     specCoverage: (params?: QueryParams) =>
-      apiFetch<Record<string, unknown>>(`/reports/spec-coverage${qs(params)}`),
+      apiFetch<{
+        summary: { totalDevices: number; fullSpecs: number; partialSpecs: number; noSpecs: number; weightedCoverage: number };
+        devices: { id: string; displayName: string; partnerName: string; activeDeviceCount: number; specCompleteness: number; questionnaireStatus: string; region: string }[];
+      }>(`/reports/spec-coverage${qs(params)}`),
   },
 
   upload: {
-    migration: (file: File) => {
-      const form = new FormData();
-      form.append('file', file);
-      return apiFetch<{ success: number; errors: string[] }>('/upload/migration', {
-        method: 'POST',
-        body: form,
-      });
+    migration: async (file: File) => {
+      const csvData = await file.text();
+      return apiFetch<{ success: boolean; created: number; duplicates: number; errored: number; errors: string[] }>(
+        '/upload/migration',
+        { method: 'POST', body: JSON.stringify({ csvData }) },
+      );
     },
-    bulkSpecs: (file: File) => {
-      const form = new FormData();
-      form.append('file', file);
-      return apiFetch<{ success: number; errors: string[] }>('/upload/bulk-specs', {
-        method: 'POST',
-        body: form,
-      });
+    bulkSpecs: async (file: File) => {
+      const isXlsx = file.name.endsWith('.xlsx');
+      if (isXlsx) {
+        const buffer = await file.arrayBuffer();
+        const fileData = btoa(
+          new Uint8Array(buffer).reduce((s, b) => s + String.fromCharCode(b), ''),
+        );
+        return apiFetch<{ success: boolean; matched: number; notFound: number; errored: number; errors: string[] }>(
+          '/upload/bulk-specs',
+          { method: 'POST', body: JSON.stringify({ fileData, fileType: 'xlsx' }) },
+        );
+      }
+      const csvData = await file.text();
+      return apiFetch<{ success: boolean; matched: number; notFound: number; errored: number; errors: string[] }>(
+        '/upload/bulk-specs',
+        { method: 'POST', body: JSON.stringify({ csvData }) },
+      );
     },
   },
 
-  export: (type: string, format: string, params?: QueryParams) =>
-    apiFetch<Blob>(`/export/${type}${qs({ format, ...params })}`),
 };
 
 export { ApiError };

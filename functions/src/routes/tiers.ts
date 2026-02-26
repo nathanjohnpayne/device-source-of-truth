@@ -17,7 +17,13 @@ router.get('/', async (req, res) => {
     const tiers = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
     req.log?.info('Tiers listed', { count: tiers.length });
-    res.json({ data: tiers });
+    res.json({
+      data: tiers,
+      total: tiers.length,
+      page: 1,
+      pageSize: tiers.length,
+      totalPages: 1,
+    });
   } catch (err) {
     req.log?.error('Failed to list tiers', formatError(err));
     res.status(500).json({ error: 'Failed to list tiers', detail: String(err) });

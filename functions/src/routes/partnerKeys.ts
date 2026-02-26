@@ -9,30 +9,54 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const db = admin.firestore();
-    req.log?.debug('Listing partner keys');
+    const partnerId = req.query.partnerId as string | undefined;
+    const search = req.query.search as string | undefined;
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 500);
 
-    const snap = await db.collection('partnerKeys').get();
-    const keys = snap.docs.map((d) => ({ id: d.id, ...d.data() } as { id: string; partnerId: string } & Record<string, unknown>));
+    req.log?.debug('Listing partner keys', { partnerId, search, page, pageSize });
+
+    let query: admin.firestore.Query = db.collection('partnerKeys');
+    if (partnerId) {
+      query = query.where('partnerId', '==', partnerId);
+    }
+
+    const snap = await query.get();
+    let keys = snap.docs.map((d) => ({ id: d.id, ...d.data() } as { id: string; partnerId: string; key: string } & Record<string, unknown>));
     req.log?.debug('Fetched partner keys', { count: keys.length });
 
-    const partnerIds = [...new Set(keys.map((k) => k.partnerId).filter(Boolean))];
+    if (search) {
+      const lower = search.toLowerCase();
+      keys = keys.filter((k) => k.key?.toLowerCase().includes(lower));
+    }
+
+    const total = keys.length;
+    const paged = keys.slice((page - 1) * pageSize, page * pageSize);
+
+    const partnerIds = [...new Set(paged.map((k) => k.partnerId).filter(Boolean))];
     const partnerMap: Record<string, string> = {};
     const batchSize = 30;
     for (let i = 0; i < partnerIds.length; i += batchSize) {
-      const batch = partnerIds.slice(i, i + 30);
+      const batch = partnerIds.slice(i, i + batchSize);
       const pSnap = await db.collection('partners').where(admin.firestore.FieldPath.documentId(), 'in', batch).get();
       for (const doc of pSnap.docs) {
         partnerMap[doc.id] = doc.data().displayName;
       }
     }
 
-    const result = keys.map((k) => ({
+    const result = paged.map((k) => ({
       ...k,
       partnerDisplayName: partnerMap[k.partnerId] ?? null,
     }));
 
-    req.log?.info('Partner keys listed', { total: result.length, uniquePartners: partnerIds.length });
-    res.json({ data: result });
+    req.log?.info('Partner keys listed', { total, returned: result.length, page });
+    res.json({
+      data: result,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
   } catch (err) {
     req.log?.error('Failed to list partner keys', formatError(err));
     res.status(500).json({ error: 'Failed to list partner keys', detail: String(err) });

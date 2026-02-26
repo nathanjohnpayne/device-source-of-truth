@@ -211,7 +211,13 @@ router.get('/history', async (req, res) => {
     const history = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
     req.log?.info('Upload history listed', { count: history.length });
-    res.json({ data: history });
+    res.json({
+      data: history,
+      total: history.length,
+      page: 1,
+      pageSize: history.length,
+      totalPages: 1,
+    });
   } catch (err) {
     req.log?.error('Failed to list upload history', formatError(err));
     res.status(500).json({ error: 'Failed to list upload history', detail: String(err) });

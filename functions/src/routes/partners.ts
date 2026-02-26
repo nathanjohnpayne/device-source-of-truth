@@ -3,6 +3,7 @@ import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
+import { safeNumber } from '../services/safeNumber.js';
 import type { Partner, PartnerWithStats } from '../types/index.js';
 
 const router = Router();
@@ -51,7 +52,7 @@ router.get('/', async (req, res) => {
             const devSnap = await db.collection('devices').where('partnerKeyId', 'in', batch).get();
             deviceCount += devSnap.size;
             for (const doc of devSnap.docs) {
-              activeDeviceCount += doc.data().activeDeviceCount ?? 0;
+              activeDeviceCount += safeNumber(doc.data().activeDeviceCount);
             }
           }
         }
@@ -97,13 +98,21 @@ router.get('/:id', async (req, res) => {
     const partnerKeys = keysSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
     const keyIds = keysSnap.docs.map((d) => d.id);
-    let devices: admin.firestore.DocumentData[] = [];
+    let devices: Record<string, unknown>[] = [];
     if (keyIds.length > 0) {
       const batchSize = 30;
       for (let i = 0; i < keyIds.length; i += batchSize) {
         const batch = keyIds.slice(i, i + batchSize);
         const devSnap = await db.collection('devices').where('partnerKeyId', 'in', batch).get();
-        devices = devices.concat(devSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        devices = devices.concat(devSnap.docs.map((d) => {
+          const data = d.data();
+          return {
+            ...data,
+            id: d.id,
+            activeDeviceCount: safeNumber(data.activeDeviceCount),
+            specCompleteness: safeNumber(data.specCompleteness),
+          };
+        }));
       }
     }
 

@@ -6,18 +6,23 @@ import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
-import type { HardwareTier, DeviceWithRelations } from '../lib/types';
+import type { HardwareTier } from '../lib/types';
 
 const CODEC_OPTIONS = [
-  'AVC',
-  'HEVC',
-  'E-AC-3',
-  'Atmos',
-  'HDR10',
-  'Dolby Vision',
-  'Widevine L1',
-  'PlayReady SL3000',
+  { value: 'avc', label: 'AVC (H.264)' },
+  { value: 'hevc', label: 'HEVC (H.265)' },
+  { value: 'av1', label: 'AV1' },
+  { value: 'vp9', label: 'VP9' },
+  { value: 'eac3', label: 'E-AC-3' },
+  { value: 'ac4', label: 'AC-4' },
+  { value: 'dolbyAtmos', label: 'Dolby Atmos' },
+  { value: 'aac', label: 'AAC' },
+  { value: 'opus', label: 'Opus' },
 ];
+
+const CODEC_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  CODEC_OPTIONS.map((c) => [c.value, c.label]),
+);
 
 interface TierFormData {
   tierName: string;
@@ -155,16 +160,30 @@ export default function TierConfigPage() {
     setPreviewing(true);
     setPreview(null);
     try {
-      const res = await api.tiers.preview(form as Partial<HardwareTier>);
-      const devices = (res.devices ?? []) as DeviceWithRelations[];
-      const counts = (res.counts ?? {}) as Record<string, number>;
+      const draftTier: HardwareTier = {
+        id: editingTier ?? 'draft',
+        tierName: form.tierName,
+        tierRank: form.tierRank,
+        ramMin: form.ramMin,
+        gpuMin: form.gpuMin,
+        cpuSpeedMin: form.cpuSpeedMin,
+        cpuCoresMin: form.cpuCoresMin,
+        requiredCodecs: form.requiredCodecs,
+        require64Bit: form.require64Bit,
+        version: 0,
+        createdAt: '',
+        updatedAt: '',
+      };
 
-      const results: PreviewResult[] = Object.entries(counts).map(([name, count]) => ({
-        tierName: name,
-        deviceCount: count,
-        activeDeviceCount: devices
-          .filter((d) => d.tierName === name)
-          .reduce((s, d) => s + d.activeDeviceCount, 0),
+      const previewTiers = editingTier
+        ? tiers.map((t) => (t.id === editingTier ? draftTier : t))
+        : [...tiers, draftTier];
+
+      const res = await api.tiers.preview(previewTiers);
+      const results: PreviewResult[] = Object.values(res).map((entry) => ({
+        tierName: entry.tierName,
+        deviceCount: entry.count,
+        activeDeviceCount: 0,
       }));
 
       setPreview(results);
@@ -243,7 +262,7 @@ export default function TierConfigPage() {
                   {tier.cpuCoresMin != null && <span>Cores ≥ {tier.cpuCoresMin}</span>}
                   {tier.require64Bit && <span>64-bit</span>}
                   {tier.requiredCodecs.length > 0 && (
-                    <span>Codecs: {tier.requiredCodecs.join(', ')}</span>
+                    <span>Codecs: {tier.requiredCodecs.map((c) => CODEC_LABEL_MAP[c] ?? c).join(', ')}</span>
                   )}
                 </div>
               </div>
@@ -409,14 +428,14 @@ export default function TierConfigPage() {
             </label>
             <div className="flex flex-wrap gap-x-4 gap-y-2">
               {CODEC_OPTIONS.map((codec) => (
-                <label key={codec} className="flex items-center gap-1.5 text-sm text-gray-700">
+                <label key={codec.value} className="flex items-center gap-1.5 text-sm text-gray-700">
                   <input
                     type="checkbox"
-                    checked={form.requiredCodecs.includes(codec)}
-                    onChange={() => toggleCodec(codec)}
+                    checked={form.requiredCodecs.includes(codec.value)}
+                    onChange={() => toggleCodec(codec.value)}
                     className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  {codec}
+                  {codec.label}
                 </label>
               ))}
             </div>

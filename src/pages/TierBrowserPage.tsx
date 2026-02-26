@@ -19,6 +19,22 @@ import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
 import type { HardwareTier, DeviceWithRelations } from '../lib/types';
 
+const CODEC_OPTIONS = [
+  { value: 'avc', label: 'AVC (H.264)' },
+  { value: 'hevc', label: 'HEVC (H.265)' },
+  { value: 'av1', label: 'AV1' },
+  { value: 'vp9', label: 'VP9' },
+  { value: 'eac3', label: 'E-AC-3' },
+  { value: 'ac4', label: 'AC-4' },
+  { value: 'dolbyAtmos', label: 'Dolby Atmos' },
+  { value: 'aac', label: 'AAC' },
+  { value: 'opus', label: 'Opus' },
+];
+
+const CODEC_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  CODEC_OPTIONS.map((c) => [c.value, c.label]),
+);
+
 const TIER_COLORS = [
   '#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b',
   '#ef4444', '#ec4899', '#64748b',
@@ -85,7 +101,7 @@ function TierCard({
                   key={c}
                   className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
                 >
-                  {c}
+                  {CODEC_LABEL_MAP[c] ?? c}
                 </span>
               ))}
             </div>
@@ -145,14 +161,15 @@ function TierQualifier() {
   const [cpuSpeed, setCpuSpeed] = useState('');
   const [cpuCores, setCpuCores] = useState('');
   const [codecs, setCodecs] = useState<Record<string, boolean>>({
-    AVC: false,
-    HEVC: false,
-    'E-AC-3': false,
-    Atmos: false,
-    HDR10: false,
-    'Dolby Vision': false,
-    'Widevine L1': false,
-    'PlayReady SL3000': false,
+    avc: false,
+    hevc: false,
+    av1: false,
+    vp9: false,
+    eac3: false,
+    ac4: false,
+    dolbyAtmos: false,
+    aac: false,
+    opus: false,
   });
   const [result, setResult] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -171,7 +188,7 @@ function TierQualifier() {
       if (selectedCodecs.length) requirements.requiredCodecs = selectedCodecs;
 
       const res = await api.tiers.simulate(requirements);
-      setResult(res.tier || 'Uncategorized');
+      setResult(res.eligibleCount > 0 ? `${res.eligibleCount} eligible devices` : 'No eligible devices');
     } catch {
       setResult('Unable to determine tier');
     } finally {
@@ -240,17 +257,17 @@ function TierQualifier() {
           <div className="mt-4">
             <label className="mb-2 block text-xs font-medium text-gray-600">Codecs</label>
             <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {Object.keys(codecs).map((codec) => (
-                <label key={codec} className="flex items-center gap-1.5 text-sm text-gray-700">
+              {CODEC_OPTIONS.map(({ value, label }) => (
+                <label key={value} className="flex items-center gap-1.5 text-sm text-gray-700">
                   <input
                     type="checkbox"
-                    checked={codecs[codec]}
+                    checked={codecs[value] ?? false}
                     onChange={(e) =>
-                      setCodecs((prev) => ({ ...prev, [codec]: e.target.checked }))
+                      setCodecs((prev) => ({ ...prev, [value]: e.target.checked }))
                     }
                     className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  {codec}
+                  {label}
                 </label>
               ))}
             </div>

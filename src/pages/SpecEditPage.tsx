@@ -11,7 +11,7 @@ import {
   SelectInput,
   DateInput,
 } from '../components/specs/SpecFormFields';
-import type { DeviceSpec, SpecCategory } from '../lib/types';
+import type { DeviceSpec, DeviceWithRelations, SpecCategory } from '../lib/types';
 import { SPEC_CATEGORIES, SPEC_CATEGORY_LABELS } from '../lib/types';
 
 type FieldType = 'text' | 'number' | 'checkbox' | 'select' | 'date';
@@ -346,14 +346,10 @@ export default function SpecEditPage() {
     setError(null);
 
     try {
-      if (specId) {
-        await api.deviceSpecs.update(specId, formData as Partial<DeviceSpec>);
-      } else {
-        await api.deviceSpecs.create({ deviceId, ...formData } as Partial<DeviceSpec>);
-      }
+      await api.deviceSpecs.save(deviceId, formData as Partial<DeviceSpec>);
 
       if (questionnaireUrl || questionnaireFile) {
-        await api.devices.update(deviceId, { questionnaireUrl: questionnaireUrl || null } as never);
+        await api.devices.update(deviceId, { questionnaireUrl: questionnaireUrl || null } as Partial<DeviceWithRelations>);
       }
 
       trackEvent('spec_form_save', { device_id: deviceId, category: 'all' });

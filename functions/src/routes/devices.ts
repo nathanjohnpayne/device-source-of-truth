@@ -3,6 +3,7 @@ import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
+import { safeNumber } from '../services/safeNumber.js';
 import type { Device, DeviceWithRelations } from '../types/index.js';
 
 const router = Router();
@@ -34,7 +35,15 @@ router.get('/', async (req, res) => {
     if (tierId) query = query.where('tierId', '==', tierId);
 
     const snap = await query.get();
-    let devices = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Device);
+    let devices = snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        ...data,
+        id: d.id,
+        activeDeviceCount: safeNumber(data.activeDeviceCount),
+        specCompleteness: safeNumber(data.specCompleteness),
+      } as Device;
+    });
     req.log?.debug('Firestore device query returned', { rawCount: devices.length });
 
     if (partnerId) {
@@ -135,14 +144,20 @@ router.get('/:id', async (req, res) => {
       return;
     }
 
-    const device = { id: doc.id, ...doc.data() } as Device;
+    const rawData = doc.data()!;
+    const device = {
+      ...rawData,
+      id: doc.id,
+      activeDeviceCount: safeNumber(rawData.activeDeviceCount),
+      specCompleteness: safeNumber(rawData.specCompleteness),
+    } as Device;
     req.log?.debug('Fetching device relations', { deviceId: device.deviceId, partnerKeyId: device.partnerKeyId, tierId: device.tierId });
 
     const [pkSnap, specSnap, tierSnap, deploySnap, telSnap, auditSnap] = await Promise.all([
       db.collection('partnerKeys').doc(device.partnerKeyId).get(),
       db.collection('deviceSpecs').where('deviceId', '==', device.id).limit(1).get(),
       device.tierId ? db.collection('hardwareTiers').doc(device.tierId).get() : Promise.resolve(null),
-      db.collection('deployments').where('deviceId', '==', device.id).get(),
+      db.collection('deviceDeployments').where('deviceId', '==', device.id).get(),
       db.collection('telemetrySnapshots').where('deviceId', '==', device.id).orderBy('snapshotDate', 'desc').limit(20).get(),
       db.collection('auditLog').where('entityType', '==', 'device').where('entityId', '==', device.id).orderBy('timestamp', 'desc').limit(50).get(),
     ]);

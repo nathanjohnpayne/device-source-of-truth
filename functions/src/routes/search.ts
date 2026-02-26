@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import admin from 'firebase-admin';
 import { formatError } from '../services/logger.js';
+import { safeNumber } from '../services/safeNumber.js';
 
 const router = Router();
 
@@ -30,14 +31,19 @@ router.get('/', async (req, res) => {
     });
 
     const devices = devicesSnap.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .filter((d) => {
-        const data = d as Record<string, unknown>;
-        return (
-          (data.displayName as string)?.toLowerCase().includes(q) ||
-          (data.deviceId as string)?.toLowerCase().includes(q)
-        );
+      .map((d) => {
+        const data = d.data();
+        return {
+          ...data,
+          id: d.id,
+          activeDeviceCount: safeNumber(data.activeDeviceCount),
+          specCompleteness: safeNumber(data.specCompleteness),
+        } as Record<string, unknown> & { id: string };
       })
+      .filter((d) =>
+        (d.displayName as string)?.toLowerCase().includes(q) ||
+        (d.deviceId as string)?.toLowerCase().includes(q),
+      )
       .slice(0, 10);
 
     const partners = partnersSnap.docs

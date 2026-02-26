@@ -18,7 +18,7 @@ declare global {
   }
 }
 
-const ALLOWED_DOMAINS = ['@disney.com', '@disneystreaming.com', '@nathanpayne.com'];
+const ALLOWED_DOMAINS = ['@disney.com', '@disneystreaming.com'];
 
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const rlog = req.log;
@@ -68,15 +68,15 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       const now = new Date().toISOString();
       const newUserRef = await db.collection('users').add({
         email,
-        role: 'admin',
+        role: 'viewer',
         displayName: decoded.name ?? email,
         photoUrl: decoded.picture ?? null,
         lastLogin: now,
       });
       uid = newUserRef.id;
-      role = 'admin';
+      role = 'viewer';
       displayName = decoded.name ?? email;
-      rlog?.info('Auth success: new user auto-provisioned', { uid, email, role });
+      rlog?.info('Auth success: new user auto-provisioned as viewer', { uid, email, role });
     }
 
     req.user = { uid, email, role, displayName };

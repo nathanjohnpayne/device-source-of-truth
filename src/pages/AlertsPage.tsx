@@ -94,10 +94,7 @@ export default function AlertsPage() {
     if (!dismissTarget) return;
     setDismissing(true);
     try {
-      const updated = await api.alerts.update(dismissTarget.id, {
-        status: 'dismissed',
-        dismissReason,
-      } as Partial<Alert>);
+      const updated = await api.alerts.dismiss(dismissTarget.id, dismissReason);
       setAlerts((prev) =>
         prev.map((a) => (a.id === dismissTarget.id ? { ...a, ...updated } : a)),
       );

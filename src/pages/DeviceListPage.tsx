@@ -67,8 +67,8 @@ export default function DeviceListPage() {
     if (filters.deviceType) params.deviceType = filters.deviceType as string;
     if (filters.certificationStatus) params.certificationStatus = filters.certificationStatus as string;
     if (filters.tier) params.tierId = filters.tier as string;
-    if (filters.specStatus === 'has_specs') params.hasSpecs = 'true';
-    if (filters.specStatus === 'missing_specs') params.hasSpecs = 'false';
+    if (filters.specStatus === 'has_specs') params.specCompleteness = 'has_specs';
+    if (filters.specStatus === 'missing_specs') params.specCompleteness = 'missing_specs';
 
     api.devices.list(params)
       .then((res) => {
