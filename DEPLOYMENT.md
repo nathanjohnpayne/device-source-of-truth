@@ -63,7 +63,37 @@ If Cloud Functions or Analytics fail to deploy, ensure these APIs are enabled in
 - Cloud Functions API
 - Cloud Build API
 - Artifact Registry API
+- Cloud Run API
+- Eventarc API
 - Google Analytics Data API
+
+### Cloud Functions Build Service Account (Critical)
+
+2nd gen Cloud Functions use the **default compute service account** as the build service account. This service account must have the following IAM roles or the function deploy will fail with "Could not build the function due to a missing permission on the build service account":
+
+```bash
+PROJECT_NUMBER=$(gcloud projects describe device-source-of-truth --format='value(projectNumber)')
+
+gcloud projects add-iam-policy-binding device-source-of-truth \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/cloudbuild.builds.builder"
+
+gcloud projects add-iam-policy-binding device-source-of-truth \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/artifactregistry.writer"
+
+gcloud projects add-iam-policy-binding device-source-of-truth \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/logging.logWriter"
+
+gcloud projects add-iam-policy-binding device-source-of-truth \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/storage.objectViewer"
+```
+
+IAM changes can take 1-2 minutes to propagate before retrying the deploy.
+
+For this project, the project number is `492056482296`, so the build service account is `492056482296-compute@developer.gserviceaccount.com`.
 
 ---
 
@@ -100,7 +130,7 @@ Domain restriction is enforced in application code (not at the Firebase level). 
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/your-org/device-source-of-truth.git
+git clone https://github.com/nathanjohnpayne/device-source-of-truth.git
 cd device-source-of-truth
 
 # Install frontend dependencies
@@ -479,7 +509,15 @@ Error: Missing permissions required for functions deploy.
 
 **Fix:** Ensure your Firebase account has the `Firebase Admin` or `Editor` role on the GCP project. Run `firebase login --reauth`.
 
-### Functions deploy fails with "Build failed"
+### Functions deploy fails with "Could not build the function due to a missing permission"
+
+```
+Build failed with status: FAILURE. Could not build the function due to a missing permission on the build service account.
+```
+
+**Fix:** This is the most common deployment issue. 2nd gen Cloud Functions use the default compute service account as the build SA, and it needs explicit IAM roles. Run the `gcloud` commands in the [Cloud Functions Build Service Account](#cloud-functions-build-service-account-critical) section, wait 1-2 minutes for IAM propagation, then retry `firebase deploy --only functions`.
+
+### Functions deploy fails with "Build failed" (other)
 
 ```
 Error: Failed to create function api

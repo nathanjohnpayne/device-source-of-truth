@@ -30,7 +30,7 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 
 ```bash
 # Clone
-git clone https://github.com/your-org/device-source-of-truth.git
+git clone https://github.com/nathanjohnpayne/device-source-of-truth.git
 cd device-source-of-truth
 
 # Install dependencies (frontend + backend)
