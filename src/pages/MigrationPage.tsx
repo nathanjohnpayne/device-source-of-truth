@@ -19,7 +19,10 @@ const COLUMN_MAPPINGS = [
 ] as const;
 
 interface MigrationResult {
-  success: number;
+  success: boolean;
+  created: number;
+  duplicates: number;
+  errored: number;
   errors: string[];
 }
 
@@ -67,7 +70,7 @@ export default function MigrationPage() {
     try {
       const res = await api.upload.migration(file);
       setResult(res);
-      trackEvent('migration_run', { row_count: res.success });
+      trackEvent('migration_run', { row_count: res.created });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Migration failed');
     } finally {
@@ -211,7 +214,7 @@ export default function MigrationPage() {
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                 <span className="text-sm font-medium text-emerald-800">Records Imported</span>
               </div>
-              <p className="mt-2 text-2xl font-bold text-emerald-900">{result.success}</p>
+              <p className="mt-2 text-2xl font-bold text-emerald-900">{result.created}</p>
             </div>
 
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">

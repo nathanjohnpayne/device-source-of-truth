@@ -290,7 +290,6 @@ export default function SpecEditPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState('');
-  const [specId, setSpecId] = useState<string | null>(null);
   const [formData, setFormData] = useState(emptySpec());
   const [questionnaireUrl, setQuestionnaireUrl] = useState('');
   const [questionnaireFile, setQuestionnaireFile] = useState<File | null>(null);
@@ -306,7 +305,6 @@ export default function SpecEditPage() {
         setQuestionnaireUrl(device.questionnaireUrl ?? '');
 
         if (device.spec) {
-          setSpecId(device.spec.id);
           const { id: _id, deviceId: _did, updatedAt: _u, ...rest } = device.spec;
           setFormData({ ...emptySpec(), ...rest });
         }

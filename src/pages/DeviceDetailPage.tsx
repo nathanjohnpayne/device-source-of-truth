@@ -279,19 +279,9 @@ export default function DeviceDetailPage() {
 
   const handleAddDeployment = async () => {
     if (!id || !deployForm.countryIso2) return;
-    try {
-      await api.deviceSpecs.create({
-        deviceId: id,
-        ...deployForm,
-        countryIso2: deployForm.countryIso2.toUpperCase(),
-      } as Record<string, unknown>);
-      const refreshed = await api.devices.get(id);
-      setDevice(refreshed);
-      setDeployModalOpen(false);
-      setDeployForm({ countryIso2: '', deploymentStatus: 'Active', deployedAdkVersion: '' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add deployment');
-    }
+    // TODO: add a backend POST /device-deployments endpoint
+    setError('Deployment creation is not yet supported by the API');
+    void deployForm;
   };
 
   if (loading) return <LoadingSpinner />;

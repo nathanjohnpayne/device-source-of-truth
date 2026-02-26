@@ -161,7 +161,7 @@ export default function TierConfigPage() {
     setPreview(null);
     try {
       const draftTier: HardwareTier = {
-        id: editingTier ?? 'draft',
+        id: editingId ?? 'draft',
         tierName: form.tierName,
         tierRank: form.tierRank,
         ramMin: form.ramMin,
@@ -175,8 +175,8 @@ export default function TierConfigPage() {
         updatedAt: '',
       };
 
-      const previewTiers = editingTier
-        ? tiers.map((t) => (t.id === editingTier ? draftTier : t))
+      const previewTiers = editingId
+        ? tiers.map((t) => (t.id === editingId ? draftTier : t))
         : [...tiers, draftTier];
 
       const res = await api.tiers.preview(previewTiers);

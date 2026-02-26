@@ -108,7 +108,7 @@ export default function SimulatorPage() {
         totalActiveDevices: allDevices.reduce((s, d) => s + d.activeDeviceCount, 0),
       });
 
-      trackEvent('simulator_run', { eligible_count: simRes.eligibleCount });
+      trackEvent('simulator_run', { result_tier: `${simRes.eligibleCount} eligible` });
     } catch {
       setError('Simulation failed. Please try again.');
     } finally {
