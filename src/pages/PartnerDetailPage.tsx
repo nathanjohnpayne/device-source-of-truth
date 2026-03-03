@@ -87,8 +87,8 @@ export default function PartnerDetailPage() {
         setDevices(devs.data);
         setFormData({
           displayName: p.displayName,
-          regions: p.regions,
-          countriesIso2: p.countriesIso2.join(', '),
+          regions: p.regions ?? [],
+          countriesIso2: (p.countriesIso2 ?? []).join(', '),
         });
       })
       .catch((err) => setError(err.message))
@@ -159,10 +159,10 @@ export default function PartnerDetailPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{partner.displayName}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {partner.regions.map((r) => (
+              {(partner.regions ?? []).map((r) => (
                 <Badge key={r} variant="info">{r}</Badge>
               ))}
-              {partner.countriesIso2.map((c) => (
+              {(partner.countriesIso2 ?? []).map((c) => (
                 <span key={c} className="text-sm text-gray-600">
                   {countryFlag(c)} {c}
                 </span>
