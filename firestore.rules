@@ -73,5 +73,10 @@ service cloud.firestore {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser();
     }
+
+    match /fieldOptions/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
   }
 }

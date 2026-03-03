@@ -79,7 +79,7 @@ src/                          React frontend
 ├── components/               Shared UI (DataTable, Badge, Modal, FilterPanel, etc.)
 ├── hooks/
 │   ├── useAuth.tsx          Auth context provider + useAuth() hook
-│   └── useVersionCheck.ts   Polls version.json for new deploys
+│   └── useAppUpdate.ts      Dual-path update detection (SW + version polling)
 └── lib/
     ├── types.ts              All TypeScript interfaces (408 lines, single source of truth)
     ├── api.ts                Typed HTTP client for /api/* endpoints

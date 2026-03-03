@@ -8,6 +8,7 @@ import {
   CheckCircle,
   Layers,
   RefreshCw,
+  ListChecks,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import Badge from '../components/shared/Badge';
@@ -53,6 +54,12 @@ const ADMIN_CARDS: AdminCard[] = [
     description: 'Track Phase 1 readiness criteria',
     icon: <CheckCircle className="h-6 w-6" />,
     path: '/admin/readiness',
+  },
+  {
+    title: 'Reference Data',
+    description: 'Manage dropdown options for questionnaire fields',
+    icon: <ListChecks className="h-6 w-6" />,
+    path: '/admin/reference-data',
   },
   {
     title: 'Tier Configuration',

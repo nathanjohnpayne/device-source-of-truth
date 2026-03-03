@@ -35,7 +35,8 @@ export type AuditEntityType =
   | 'deployment'
   | 'hardwareTier'
   | 'alert'
-  | 'user';
+  | 'user'
+  | 'fieldOption';
 
 // ── Firestore Timestamp (serialized as ISO string in API responses) ──
 
@@ -98,178 +99,376 @@ export interface Device {
   updatedAt: Timestamp;
 }
 
-// ── Device Specs (90 fields across 12 categories) ──
+// ── Device Specs (STB Questionnaire — 16 sections, ~170 fields) ──
 
-export interface DeviceSpecIdentity {
-  deviceModel: string | null;
-  manufacturer: string | null;
-  brandName: string | null;
-  modelYear: number | null;
-  deviceCategory: string | null;
+export interface QuestionnaireGeneral {
+  modelName: string | null;
+  modelNumber: string | null;
+  dateDeployed: string | null;
+  dateDeliveriesStopped: string | null;
+  activeDevicesMonthly: string | null;
+  totalInstalledBase: string | null;
+  forecastedGrowth: string | null;
+  countriesDeployed: string | null;
+  thirdPartyApps: string | null;
+  connectionType: string | null;
+  connectionTypeOther: string | null;
 }
 
-export interface DeviceSpecSoc {
-  socVendor: SocVendor | null;
-  socModel: string | null;
-  cpuArchitecture: string | null;
-  cpuCores: number | null;
-  cpuSpeedMhz: number | null;
-  cpuBenchmarkDmips: number | null;
-  is64Bit: boolean | null;
-}
-
-export interface DeviceSpecOs {
-  osName: string | null;
+export interface QuestionnaireHardware {
+  socVendor: string | null;
+  socVendorOther: string | null;
+  socModelChipset: string | null;
+  softwareArchitecture: string | null;
+  softwareArchitectureOther: string | null;
+  socBaseRefVersion: string | null;
+  socCustomizations: string | null;
+  socCustomizationsDesc: string | null;
+  socSupportContract: string | null;
+  socSupportExpiration: string | null;
+  cpuClockRateGhz: number | null;
+  cpuDmips: string | null;
+  cpuCores: string | null;
+  cpuCoresOther: string | null;
+  stbManufacturer: string | null;
+  operatingSystem: string | null;
+  operatingSystemOther: string | null;
   osVersion: string | null;
-  browserEngine: string | null;
-  browserVersion: string | null;
-  jsEngineVersion: string | null;
-}
-
-export interface DeviceSpecMemory {
-  totalRamMb: number | null;
-  appAvailableRamMb: number | null;
-  totalStorageGb: number | null;
-  appAvailableStorageMb: number | null;
-  swapMemoryMb: number | null;
-}
-
-export interface DeviceSpecGpu {
-  gpuModel: string | null;
-  gpuVendor: string | null;
-  gpuMemoryMb: number | null;
-  openGlVersion: string | null;
-  openGlEsVersion: string | null;
-  vulkanSupport: boolean | null;
-  gpuBenchmark: number | null;
-}
-
-export interface DeviceSpecStreaming {
-  adkVersion: string | null;
-  adkBuildType: string | null;
-  htmlVersion: string | null;
-  cssVersion: string | null;
-  playerType: string | null;
-  mseSupport: boolean | null;
-  emeSupport: boolean | null;
-}
-
-export interface DeviceSpecVideoOutput {
-  maxResolution: string | null;
+  osCustomization: string | null;
+  osCustomizationDesc: string | null;
+  middlewareProvider: string | null;
+  middlewareProviderOther: string | null;
+  middlewareVersion: string | null;
+  middlewareContract: string | null;
+  middlewareContractExpiration: string | null;
+  middlewareIntegrationCompany: string | null;
+  videoDelivery: string | null;
+  videoDeliveryOther: string | null;
+  memoryTotalGb: number | null;
+  memoryType: string | null;
+  memoryTypeOther: string | null;
+  ramAvailableGb: number | null;
+  linuxMemoryAvailableMb: number | null;
+  gpuMemoryAvailableMb: number | null;
+  gpuTextureMemoryMb: number | null;
+  gpuMemorySharing: string | null;
+  gpuMemorySharingOther: string | null;
+  gpuMemoryReservedMb: number | null;
+  storageTotalGb: number | null;
+  storageType: string | null;
+  storageTypeOther: string | null;
+  storageAvailableMb: number | null;
+  nonPersistentStorageMb: number | null;
+  maxAppBinarySizeMb: number | null;
+  filesystemType: string | null;
+  filesystemTypeOther: string | null;
+  storageLimitations: string | null;
+  storageLimitationsDesc: string | null;
+  gpuAvailability: string | null;
+  gpuAvailableForApp: string | null;
+  gpuGraphicsLibrary: string | null;
+  gpuGraphicsLibraryOther: string | null;
+  openglEs2Apps: string | null;
+  openglEs2AppsNames: string | null;
+  streamingInterface: string | null;
+  streamingInterfaceOther: string | null;
+  ethernetPort: string | null;
+  wifiStandards: string | null;
+  wifiBands: string | null;
+  mocaPresent: string | null;
+  maxStreamingThroughputMbps: number | null;
+  hdmiCapabilitiesRetrieval: string | null;
   hdmiVersion: string | null;
-  hdcpVersion: string | null;
-  hdrSupport: boolean | null;
-  hdr10Support: boolean | null;
-  hdr10PlusSupport: boolean | null;
-  hlgSupport: boolean | null;
-  dolbyVisionSupport: boolean | null;
-  dolbyVisionProfiles: string | null;
-  displayRefreshRate: number | null;
+  hdmiVersionOther: string | null;
+  digitalVideoOutputModes: string | null;
+  analogVideoOutputModes: string | null;
+  uiNativeResolution: string | null;
+  uiNativeResolutionOther: string | null;
+  ottAppRestrictions: string | null;
 }
 
-export interface DeviceSpecFirmware {
-  firmwareVersion: string | null;
-  firmwareUpdateMethod: string | null;
-  lastFirmwareDate: Timestamp | null;
-  nextPlannedFirmwareDate: Timestamp | null;
-  firmwareAutoUpdate: boolean | null;
-  eolDate: Timestamp | null;
+export interface QuestionnaireFirmware {
+  firmwareSupported: string | null;
+  firmwareFrequency: string | null;
+  firmwareFrequencyOther: string | null;
+  internalLeadTime: string | null;
+  rolloutDuration: string | null;
+  emergencyUpdate: string | null;
+  emergencyUpdateTime: string | null;
+  codeSigning: string | null;
+  codeSigningDesc: string | null;
 }
 
-export interface DeviceSpecCodecs {
-  avcSupport: boolean | null;
-  avcMaxProfile: string | null;
-  avcMaxLevel: string | null;
-  hevcSupport: boolean | null;
-  hevcMaxProfile: string | null;
-  hevcMaxLevel: string | null;
-  av1Support: boolean | null;
-  vp9Support: boolean | null;
-  eac3Support: boolean | null;
-  ac4Support: boolean | null;
-  dolbyAtmosSupport: boolean | null;
-  aacSupport: boolean | null;
-  opusSupport: boolean | null;
+export interface QuestionnaireMediaCodec {
+  avcH264: string | null;
+  hevcH265: string | null;
+  eac3DolbyDigitalPlus: string | null;
+  eac3Atmos: string | null;
+  hdr10: string | null;
+  hdr10Plus: string | null;
+  av1: string | null;
+  dolbyVisionSupported: string | null;
+  dolbyVisionVersion: string | null;
 }
 
-export interface DeviceSpecFrameRate {
-  maxFrameRate: number | null;
-  supports24fps: boolean | null;
-  supports30fps: boolean | null;
-  supports60fps: boolean | null;
-  supportsAdaptiveFps: boolean | null;
-  trickPlaySupport: boolean | null;
+export interface QuestionnaireFrameRates {
+  outputRefreshRates: string | null;
+  userRefreshRateSettings: string | null;
+  frameRateAdjust: string | null;
+  frameRateAdjustOther: string | null;
+  frameRateConvert: string | null;
+  frameRateConvertFixed: string | null;
+  appDetermineRefreshRate: string | null;
+  appSetRefreshRate: string | null;
 }
 
-export interface DeviceSpecDrm {
-  widevineLevel: string | null;
-  widevineVersion: string | null;
-  playreadyLevel: string | null;
+export interface QuestionnaireContentProtection {
+  drmSystem: string | null;
+  encryptionScheme: string | null;
+  playreadySupported: string | null;
   playreadyVersion: string | null;
-  fairplaySupport: boolean | null;
-  hdcpSupport: boolean | null;
-  hdcp2xSupport: boolean | null;
-  secureMediaPipeline: boolean | null;
-  attestationType: string | null;
+  playreadySecurityLevel: string | null;
+  playreadyEncryption: string | null;
+  widevineSupported: string | null;
+  widevineSecurityLevel: string | null;
+  widevineVersion: string | null;
+  widevineEncryption: string | null;
+  drmHwLevel: string | null;
+  cbcsSupport: string | null;
+  multiKeyCtr: string | null;
+  multiKeyCtrMax: number | null;
+  digitalVideoOutput: string | null;
+  hdcpVersion: string | null;
+  hdcpType: string | null;
+  otherDrms: string | null;
+  broadcomSage: string | null;
+  secureFirmwareDownload: string | null;
+  signedFirmwareSecureBoot: string | null;
+  hardwareRootOfTrust: string | null;
+  tamperResistantCode: string | null;
+  tee: string | null;
+  secureVideoPath: string | null;
+  rootedDeviceProtection: string | null;
+  appCodeSigning: string | null;
+  sideloadingRestricted: string | null;
+  digitalOutputProtection: string | null;
+  encryptedAudio: string | null;
+  secureBootJtag: string | null;
 }
 
-export interface DeviceSpecSecurity {
-  secureBootSupport: boolean | null;
-  teeType: string | null;
-  teeVersion: string | null;
-  hardwareRootOfTrust: boolean | null;
-  secureStorageSupport: boolean | null;
-  tamperDetection: boolean | null;
+export interface QuestionnaireNative {
+  adkPortPossible: string | null;
+  ursrModification: string | null;
+  ursrModificationOther: string | null;
+  nexusVideoApis: string | null;
+  sageApiAccess: string | null;
+  audioDetectionApi: string | null;
+  drmBroadcomRefApi: string | null;
+}
+
+export interface QuestionnaireVideoPlayback {
+  avcBitrateLimitations: string | null;
+  avcFrameRateLimitations: string | null;
+  hevcBitrateLimitations: string | null;
+  hevcFrameRateLimitations: string | null;
+  eac3BitrateLimitations: string | null;
+  playbackEncryption: string | null;
+  playbackEncryptionOther: string | null;
+  eac3MseCmaf: string | null;
+  eac3DecodeMode: string | null;
+  atmosSupported: string | null;
+  dolbyVisionProfiles: string | null;
+  dolbyVisionIdkSdkVersion: string | null;
+  playreadyCdmVersion: string | null;
+  playreadyCbcsConfirmed: string | null;
+  widevineCdmVersion: string | null;
+  widevineCdmCategory: string | null;
+  widevineCbcsConfirmed: string | null;
+  securitySecureBoot: string | null;
+  securityHwRootOfTrust: string | null;
+  securitySecureKeyStorage: string | null;
+  securitySecureDecryption: string | null;
+  securitySecureVideoPath: string | null;
+  securityHdcp: string | null;
+  html5CapabilityDetection: string | null;
+}
+
+export interface QuestionnaireUhdHdr {
+  hdrTechnologies: string | null;
+  uhdSubscriberPercent: number | null;
+  hdrNativeUi: string | null;
+  displayRangeApi: string | null;
+  displayRangeApiDesc: string | null;
+  hdrTransform: string | null;
+  hdrTransformOther: string | null;
+  hdrModeSwitch: string | null;
+  hdrModeSwitchOther: string | null;
+  videoRangeRender: string | null;
+  videoRangeRenderOther: string | null;
+  hdrHelpResources: string | null;
+  hdrUserSettings: string | null;
+  colorSpace: string | null;
+  colorSpaceOther: string | null;
+  existingHdrApps: string | null;
+  existingHdrAppsNames: string | null;
+  publicHdrResources: string | null;
+  hdrCompositing: string | null;
+  graphicsPlaneResolution: string | null;
+  graphicsPlaneResolutionOther: string | null;
+}
+
+export interface QuestionnaireAVOutput {
+  displayOutputSettings: string | null;
+  videoDecodeSettings: string | null;
+  audioDecodeSettings: string | null;
+  aspectRatioSettings: string | null;
+  uiResolutionSettings: string | null;
+  alternateAudioPath: string | null;
+  audioSyncSettings: string | null;
+  audioSyncRange: string | null;
+}
+
+export interface QuestionnaireOther {
+  voltageRange: string | null;
+  voltageRangeOther: string | null;
+  rcuType: string | null;
+  bluetoothPresent: string | null;
+  bluetoothVersion: string | null;
+  bluetoothVersionOther: string | null;
+  bluetoothProfiles: string | null;
+  bluetoothUsedFor: string | null;
+  otherVideoOutputs: string | null;
+  otherAudioOutputs: string | null;
+  otherVideoOutputProtection: string | null;
+  otherVideoOutputDisney: string | null;
+}
+
+export interface QuestionnaireAppRuntime {
+  webEngine: string | null;
+  webEngineVersion: string | null;
+  adkVersion: string | null;
+  mseSupport: string | null;
+  mseLimitations: string | null;
+  emeSupport: string | null;
+  emeLimitations: string | null;
+  jsEngine: string | null;
+  jsEngineVersion: string | null;
+  jsEngineLimitations: string | null;
+  wasmSupport: string | null;
+  webglSupport: string | null;
+  webCryptoSupport: string | null;
+}
+
+export interface QuestionnaireAudio {
+  pcmChannels: string | null;
+  pcmChannelsOther: string | null;
+  audioSampleRates: string | null;
+  audioBitDepths: string | null;
+  dolbyAudio: string | null;
+  dolbyAudioOther: string | null;
+  dtsAudio: string | null;
+  dtsAudioOther: string | null;
+  btAudio: string | null;
+  btAudioOther: string | null;
+  audioBackgroundBehavior: string | null;
+  audioBackgroundOther: string | null;
+}
+
+export interface QuestionnaireAccessibility {
+  ttsApi: string | null;
+  ttsApiDesc: string | null;
+  captionFormats: string | null;
+  captionRendering: string | null;
+  adTrackSupport: string | null;
+  focusManagementApi: string | null;
+}
+
+export interface QuestionnairePlatform {
+  deepLinkSupport: string | null;
+  deepLinkDesc: string | null;
+  voiceAssistant: string | null;
+  homeScreenIntegration: string | null;
+  homeScreenDesc: string | null;
+  continueWatching: string | null;
+  continueWatchingDesc: string | null;
+  universalSearch: string | null;
+  universalSearchDesc: string | null;
+  recommendationsTiles: string | null;
+  appAutostart: string | null;
+}
+
+export interface QuestionnaireBenchmarks {
+  coldStartTime: string | null;
+  warmStartTime: string | null;
+  ttff: string | null;
+  uiFrameRate: string | null;
+  uiFrameRateOther: string | null;
+  concurrentStreams: string | null;
+  concurrentStreamsDesc: string | null;
+  memoryBackground: string | null;
+  benchmarkAvailable: string | null;
 }
 
 export interface DeviceSpec {
   id: string;
   deviceId: string;
-  identity: DeviceSpecIdentity;
-  soc: DeviceSpecSoc;
-  os: DeviceSpecOs;
-  memory: DeviceSpecMemory;
-  gpu: DeviceSpecGpu;
-  streaming: DeviceSpecStreaming;
-  videoOutput: DeviceSpecVideoOutput;
-  firmware: DeviceSpecFirmware;
-  codecs: DeviceSpecCodecs;
-  frameRate: DeviceSpecFrameRate;
-  drm: DeviceSpecDrm;
-  security: DeviceSpecSecurity;
+  general: QuestionnaireGeneral;
+  hardware: QuestionnaireHardware;
+  firmwareUpdates: QuestionnaireFirmware;
+  mediaCodec: QuestionnaireMediaCodec;
+  frameRates: QuestionnaireFrameRates;
+  contentProtection: QuestionnaireContentProtection;
+  native: QuestionnaireNative;
+  videoPlayback: QuestionnaireVideoPlayback;
+  uhdHdr: QuestionnaireUhdHdr;
+  audioVideoOutput: QuestionnaireAVOutput;
+  other: QuestionnaireOther;
+  appRuntime: QuestionnaireAppRuntime;
+  audioCapabilities: QuestionnaireAudio;
+  accessibility: QuestionnaireAccessibility;
+  platformIntegration: QuestionnairePlatform;
+  performanceBenchmarks: QuestionnaireBenchmarks;
   updatedAt: Timestamp;
 }
 
 export const SPEC_CATEGORIES = [
-  'identity',
-  'soc',
-  'os',
-  'memory',
-  'gpu',
-  'streaming',
-  'videoOutput',
-  'firmware',
-  'codecs',
-  'frameRate',
-  'drm',
-  'security',
+  'general',
+  'hardware',
+  'firmwareUpdates',
+  'mediaCodec',
+  'frameRates',
+  'contentProtection',
+  'native',
+  'videoPlayback',
+  'uhdHdr',
+  'audioVideoOutput',
+  'other',
+  'appRuntime',
+  'audioCapabilities',
+  'accessibility',
+  'platformIntegration',
+  'performanceBenchmarks',
 ] as const;
 
 export type SpecCategory = (typeof SPEC_CATEGORIES)[number];
 
 export const SPEC_CATEGORY_LABELS: Record<SpecCategory, string> = {
-  identity: 'Device Identity',
-  soc: 'SoC & Hardware',
-  os: 'OS & Middleware',
-  memory: 'Memory & Storage',
-  gpu: 'GPU & Graphics',
-  streaming: 'Streaming & Platform',
-  videoOutput: 'Video Output & Display',
-  firmware: 'Firmware & Update Lifecycle',
-  codecs: 'Media Codecs',
-  frameRate: 'Frame Rate & Playback',
-  drm: 'Content Protection / DRM',
-  security: 'Hardware Security',
+  general: '1 — General',
+  hardware: '2 — Hardware',
+  firmwareUpdates: '3 — Firmware Updates',
+  mediaCodec: '4 — Media Codec Support',
+  frameRates: '5 — Supported Output Frame Rates',
+  contentProtection: '6 — Content Protection & Security',
+  native: '7 — Native (ADK / Broadcom-Specific)',
+  videoPlayback: '8 — Video Playback',
+  uhdHdr: '9 — UHD HDR',
+  audioVideoOutput: '10 — Global Device Audio/Video Output Control',
+  other: '11 — Other',
+  appRuntime: '12 — App Runtime / Web Engine',
+  audioCapabilities: '13 — Audio Capabilities',
+  accessibility: '14 — Accessibility',
+  platformIntegration: '15 — Platform & Home Screen Integration',
+  performanceBenchmarks: '16 — Performance Benchmarks',
 };
 
 // ── Device Deployments ──
@@ -398,6 +597,30 @@ export interface PartnerWithStats extends Partner {
   partnerKeyCount: number;
   deviceCount: number;
   activeDeviceCount: number;
+}
+
+// ── Field Options (DST-036) ──
+
+export interface FieldOption {
+  id: string;
+  dropdownKey: string;
+  displayLabel: string;
+  displayValue: string;
+  sortOrder: number;
+  isActive: boolean;
+  isOtherTrigger: boolean;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
+export interface FieldOptionKeyInfo {
+  dropdownKey: string;
+  displayLabel: string;
+  optionCount: number;
+  activeCount: number;
+  updatedAt: Timestamp;
 }
 
 // ── Config ──

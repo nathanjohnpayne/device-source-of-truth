@@ -11,6 +11,8 @@ import type {
   AuditLogEntry,
   UploadHistory,
   PaginatedResponse,
+  FieldOption,
+  FieldOptionKeyInfo,
 } from './types';
 
 class ApiError extends Error {
@@ -207,6 +209,29 @@ export const api = {
         summary: { totalDevices: number; fullSpecs: number; partialSpecs: number; noSpecs: number; weightedCoverage: number };
         devices: { id: string; displayName: string; partnerName: string; activeDeviceCount: number; specCompleteness: number; questionnaireStatus: string; region: string }[];
       }>(`/reports/spec-coverage${qs(params)}`),
+  },
+
+  fieldOptions: {
+    listKeys: () => apiFetch<{ data: FieldOptionKeyInfo[] }>('/field-options'),
+    getOptions: (dropdownKey: string) =>
+      apiFetch<{ data: FieldOption[] }>(`/field-options/key/${dropdownKey}`),
+    getAll: () => apiFetch<{ data: Record<string, FieldOption[]> }>('/field-options/all'),
+    createOption: (data: { dropdownKey: string; displayLabel?: string; displayValue: string; isOtherTrigger?: boolean }) =>
+      apiFetch<FieldOption>('/field-options', { method: 'POST', body: JSON.stringify(data) }),
+    updateOption: (id: string, data: Partial<FieldOption>) =>
+      apiFetch<FieldOption>(`/field-options/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    reorder: (dropdownKey: string, orderedIds: string[]) =>
+      apiFetch<{ success: boolean }>(`/field-options/reorder/${dropdownKey}`, {
+        method: 'PUT',
+        body: JSON.stringify({ orderedIds }),
+      }),
+    deleteOption: (id: string) =>
+      apiFetch<{ success: boolean }>(`/field-options/${id}`, { method: 'DELETE' }),
+    getUsage: (id: string) =>
+      apiFetch<{ usageCount: number; displayValue: string; dropdownKey: string }>(
+        `/field-options/${id}/usage`,
+      ),
+    seed: () => apiFetch<{ created: number; skipped: number }>('/field-options/seed', { method: 'POST' }),
   },
 
   upload: {

@@ -136,7 +136,7 @@ BrowserRouter
       └─ AppRoutes
           ├─ PageViewTracker (fires GA4 page_view on route change)
           ├─ OnboardingGate (shows WelcomeModal on first login)
-          ├─ UpdateToast (polls version.json, prompts refresh on new deploy)
+          ├─ UpdateBanner (service worker + version polling, prompts refresh on new deploy)
           └─ Suspense (loading fallback for lazy-loaded pages)
               └─ Routes
                   ├─ /login → LoginPage
@@ -188,7 +188,12 @@ This is intentional for a POC/internal tool. If the application grows, consider 
 
 ### Auto-Update Notification
 
-The `useVersionCheck` hook polls `/version.json` every 60 seconds after the user authenticates. Each production build generates a unique version hash in `version.json` via a Vite plugin (`versionJsonPlugin` in `vite.config.ts`). When the fetched version differs from the one captured at page load, the `UpdateToast` component slides up from the bottom of the screen, prompting the user to refresh. Once shown, polling stops to avoid repeated notifications. The user can dismiss the toast or click Refresh to reload.
+Update detection uses two independent paths via the `useAppUpdate` hook (`src/hooks/useAppUpdate.ts`):
+
+1. **Service worker (Workbox):** `vite-plugin-pwa` registers a Workbox service worker with `registerType: "prompt"`. When a new SW is waiting to activate, the hook flags an update. Clicking Refresh calls `skipWaiting()` then reloads.
+2. **Version polling:** A Vite build plugin writes a unique hash to `public/version.json` at build time. The hook captures the hash on boot, then polls every 5 minutes. If the hash differs, it flags an update.
+
+When either path fires, the `UpdateBanner` component (`src/components/UpdateBanner.tsx`) renders a fixed banner at the top of the viewport. The user can click Refresh to reload or dismiss the banner for the session.
 
 ### Analytics Integration
 

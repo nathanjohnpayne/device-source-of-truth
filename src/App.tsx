@@ -9,7 +9,7 @@ import {
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { trackPageView } from './lib/analytics';
 import LoadingSpinner from './components/shared/LoadingSpinner';
-import UpdateToast from './components/shared/UpdateToast';
+import UpdateBanner from './components/UpdateBanner';
 import AppShell from './components/layout/AppShell';
 import WelcomeModal from './components/onboarding/WelcomeModal';
 
@@ -87,6 +87,7 @@ const AlertsPage = lazyRetry(() => import('./pages/AlertsPage'));
 const AuditLogPage = lazyRetry(() => import('./pages/AuditLogPage'));
 const MigrationPage = lazyRetry(() => import('./pages/MigrationPage'));
 const ReadinessPage = lazyRetry(() => import('./pages/ReadinessPage'));
+const ReferenceDataPage = lazyRetry(() => import('./pages/ReferenceDataPage'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -168,7 +169,7 @@ function AppRoutes() {
     <>
       <PageViewTracker />
       <OnboardingGate />
-      <UpdateToast />
+      <UpdateBanner />
       <Suspense fallback={<LoadingSpinner className="min-h-screen" />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -257,6 +258,14 @@ function AppRoutes() {
               element={
                 <AdminRoute>
                   <ReadinessPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/reference-data"
+              element={
+                <AdminRoute>
+                  <ReferenceDataPage />
                 </AdminRoute>
               }
             />

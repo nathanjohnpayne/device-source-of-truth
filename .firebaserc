@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "device-source-of-truth"
-  }
+  },
+  "targets": {
+    "device-source-of-truth": {
+      "hosting": {
+        "device-source-of-truth": [
+          "device-source-of-truth"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

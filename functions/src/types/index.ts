@@ -35,7 +35,8 @@ export type AuditEntityType =
   | 'deployment'
   | 'hardwareTier'
   | 'alert'
-  | 'user';
+  | 'user'
+  | 'fieldOption';
 
 export type Timestamp = string;
 
@@ -96,179 +97,50 @@ export interface Device {
   updatedAt: Timestamp;
 }
 
-// ── Device Specs ──
-
-export interface DeviceSpecIdentity {
-  deviceModel: string | null;
-  manufacturer: string | null;
-  brandName: string | null;
-  modelYear: number | null;
-  deviceCategory: string | null;
-}
-
-export interface DeviceSpecSoc {
-  socVendor: SocVendor | null;
-  socModel: string | null;
-  cpuArchitecture: string | null;
-  cpuCores: number | null;
-  cpuSpeedMhz: number | null;
-  cpuBenchmarkDmips: number | null;
-  is64Bit: boolean | null;
-}
-
-export interface DeviceSpecOs {
-  osName: string | null;
-  osVersion: string | null;
-  browserEngine: string | null;
-  browserVersion: string | null;
-  jsEngineVersion: string | null;
-}
-
-export interface DeviceSpecMemory {
-  totalRamMb: number | null;
-  appAvailableRamMb: number | null;
-  totalStorageGb: number | null;
-  appAvailableStorageMb: number | null;
-  swapMemoryMb: number | null;
-}
-
-export interface DeviceSpecGpu {
-  gpuModel: string | null;
-  gpuVendor: string | null;
-  gpuMemoryMb: number | null;
-  openGlVersion: string | null;
-  openGlEsVersion: string | null;
-  vulkanSupport: boolean | null;
-  gpuBenchmark: number | null;
-}
-
-export interface DeviceSpecStreaming {
-  adkVersion: string | null;
-  adkBuildType: string | null;
-  htmlVersion: string | null;
-  cssVersion: string | null;
-  playerType: string | null;
-  mseSupport: boolean | null;
-  emeSupport: boolean | null;
-}
-
-export interface DeviceSpecVideoOutput {
-  maxResolution: string | null;
-  hdmiVersion: string | null;
-  hdcpVersion: string | null;
-  hdrSupport: boolean | null;
-  hdr10Support: boolean | null;
-  hdr10PlusSupport: boolean | null;
-  hlgSupport: boolean | null;
-  dolbyVisionSupport: boolean | null;
-  dolbyVisionProfiles: string | null;
-  displayRefreshRate: number | null;
-}
-
-export interface DeviceSpecFirmware {
-  firmwareVersion: string | null;
-  firmwareUpdateMethod: string | null;
-  lastFirmwareDate: Timestamp | null;
-  nextPlannedFirmwareDate: Timestamp | null;
-  firmwareAutoUpdate: boolean | null;
-  eolDate: Timestamp | null;
-}
-
-export interface DeviceSpecCodecs {
-  avcSupport: boolean | null;
-  avcMaxProfile: string | null;
-  avcMaxLevel: string | null;
-  hevcSupport: boolean | null;
-  hevcMaxProfile: string | null;
-  hevcMaxLevel: string | null;
-  av1Support: boolean | null;
-  vp9Support: boolean | null;
-  eac3Support: boolean | null;
-  ac4Support: boolean | null;
-  dolbyAtmosSupport: boolean | null;
-  aacSupport: boolean | null;
-  opusSupport: boolean | null;
-}
-
-export interface DeviceSpecFrameRate {
-  maxFrameRate: number | null;
-  supports24fps: boolean | null;
-  supports30fps: boolean | null;
-  supports60fps: boolean | null;
-  supportsAdaptiveFps: boolean | null;
-  trickPlaySupport: boolean | null;
-}
-
-export interface DeviceSpecDrm {
-  widevineLevel: string | null;
-  widevineVersion: string | null;
-  playreadyLevel: string | null;
-  playreadyVersion: string | null;
-  fairplaySupport: boolean | null;
-  hdcpSupport: boolean | null;
-  hdcp2xSupport: boolean | null;
-  secureMediaPipeline: boolean | null;
-  attestationType: string | null;
-}
-
-export interface DeviceSpecSecurity {
-  secureBootSupport: boolean | null;
-  teeType: string | null;
-  teeVersion: string | null;
-  hardwareRootOfTrust: boolean | null;
-  secureStorageSupport: boolean | null;
-  tamperDetection: boolean | null;
-}
+// ── Device Specs (STB Questionnaire — 16 sections, ~170 fields) ──
 
 export interface DeviceSpec {
   id: string;
   deviceId: string;
-  identity: DeviceSpecIdentity;
-  soc: DeviceSpecSoc;
-  os: DeviceSpecOs;
-  memory: DeviceSpecMemory;
-  gpu: DeviceSpecGpu;
-  streaming: DeviceSpecStreaming;
-  videoOutput: DeviceSpecVideoOutput;
-  firmware: DeviceSpecFirmware;
-  codecs: DeviceSpecCodecs;
-  frameRate: DeviceSpecFrameRate;
-  drm: DeviceSpecDrm;
-  security: DeviceSpecSecurity;
-  updatedAt: Timestamp;
+  general: Record<string, unknown>;
+  hardware: Record<string, unknown>;
+  firmwareUpdates: Record<string, unknown>;
+  mediaCodec: Record<string, unknown>;
+  frameRates: Record<string, unknown>;
+  contentProtection: Record<string, unknown>;
+  native: Record<string, unknown>;
+  videoPlayback: Record<string, unknown>;
+  uhdHdr: Record<string, unknown>;
+  audioVideoOutput: Record<string, unknown>;
+  other: Record<string, unknown>;
+  appRuntime: Record<string, unknown>;
+  audioCapabilities: Record<string, unknown>;
+  accessibility: Record<string, unknown>;
+  platformIntegration: Record<string, unknown>;
+  performanceBenchmarks: Record<string, unknown>;
+  updatedAt: string;
 }
 
 export const SPEC_CATEGORIES = [
-  'identity',
-  'soc',
-  'os',
-  'memory',
-  'gpu',
-  'streaming',
-  'videoOutput',
-  'firmware',
-  'codecs',
-  'frameRate',
-  'drm',
-  'security',
+  'general',
+  'hardware',
+  'firmwareUpdates',
+  'mediaCodec',
+  'frameRates',
+  'contentProtection',
+  'native',
+  'videoPlayback',
+  'uhdHdr',
+  'audioVideoOutput',
+  'other',
+  'appRuntime',
+  'audioCapabilities',
+  'accessibility',
+  'platformIntegration',
+  'performanceBenchmarks',
 ] as const;
 
 export type SpecCategory = (typeof SPEC_CATEGORIES)[number];
-
-export const SPEC_CATEGORY_LABELS: Record<SpecCategory, string> = {
-  identity: 'Device Identity',
-  soc: 'SoC & Hardware',
-  os: 'OS & Middleware',
-  memory: 'Memory & Storage',
-  gpu: 'GPU & Graphics',
-  streaming: 'Streaming & Platform',
-  videoOutput: 'Video Output & Display',
-  firmware: 'Firmware & Update Lifecycle',
-  codecs: 'Media Codecs',
-  frameRate: 'Frame Rate & Playback',
-  drm: 'Content Protection / DRM',
-  security: 'Hardware Security',
-};
 
 // ── Device Deployments ──
 
@@ -396,6 +268,30 @@ export interface PartnerWithStats extends Partner {
   partnerKeyCount: number;
   deviceCount: number;
   activeDeviceCount: number;
+}
+
+// ── Field Options (DST-036) ──
+
+export interface FieldOption {
+  id: string;
+  dropdownKey: string;
+  displayLabel: string;
+  displayValue: string;
+  sortOrder: number;
+  isActive: boolean;
+  isOtherTrigger: boolean;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface FieldOptionKeyInfo {
+  dropdownKey: string;
+  displayLabel: string;
+  optionCount: number;
+  activeCount: number;
+  updatedAt: string;
 }
 
 // ── Config ──

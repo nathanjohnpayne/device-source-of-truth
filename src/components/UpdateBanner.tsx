@@ -1,0 +1,50 @@
+import { useState } from 'react';
+import { useAppUpdate } from '../hooks/useAppUpdate';
+
+/**
+ * Sticks to the top of the viewport when a new version is available.
+ * Dismissible for the session (banner hides, update still applies on next reload).
+ */
+export default function UpdateBanner() {
+  const { updateAvailable, applyUpdate } = useAppUpdate();
+  const [dismissed, setDismissed] = useState(false);
+
+  if (!updateAvailable || dismissed) return null;
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-4 bg-white border-b border-neutral-200 shadow-sm px-4 py-3 text-sm text-neutral-800"
+    >
+      <span className="font-medium">
+        A new version of Device Source of Truth is available.
+      </span>
+
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={applyUpdate}
+          className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500 active:bg-indigo-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+        >
+          Refresh
+        </button>
+
+        <button
+          onClick={() => setDismissed(true)}
+          aria-label="Dismiss update notification"
+          className="rounded p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="size-4"
+            aria-hidden="true"
+          >
+            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}

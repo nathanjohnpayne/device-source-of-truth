@@ -16,6 +16,7 @@ import auditRouter from './routes/audit.js';
 import searchRouter from './routes/search.js';
 import reportsRouter from './routes/reports.js';
 import uploadRouter from './routes/upload.js';
+import fieldOptionsRouter from './routes/fieldOptions.js';
 
 admin.initializeApp();
 
@@ -55,6 +56,7 @@ app.use('/api/audit', auditRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/field-options', fieldOptionsRouter);
 
 app.use(
   (

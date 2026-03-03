@@ -41,7 +41,7 @@ Firebase Hosting (static SPA)
 │   │   └── onboarding/           ← WelcomeModal (first-login wizard)
 │   ├── hooks/
 │   │   ├── useAuth.tsx           ← AuthProvider + useAuth() hook
-│   │   └── useVersionCheck.ts    ← Polls version.json, detects new deployments
+│   │   └── useAppUpdate.ts      ← Dual-path update detection (SW + version polling)
 │   └── lib/
 │       ├── firebase.ts           ← Firebase client SDK init (Auth, Firestore, Analytics)
 │       ├── api.ts                ← Typed fetch wrapper for /api/* endpoints
@@ -150,7 +150,8 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 - **Styling:** Tailwind CSS utility classes only. No CSS modules, no styled-components.
 - **Icons:** `lucide-react` exclusively.
 - **Charts:** `recharts` for all data visualizations.
-- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `UpdateToast` in `src/components/shared/`.
+- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip` in `src/components/shared/`.
+- **Update banner:** `UpdateBanner` in `src/components/UpdateBanner.tsx` detects new versions via service worker (Workbox/PWA) and version polling, shows a dismissible top-of-viewport banner.
 - **Analytics:** Use `trackEvent()` from `src/lib/analytics.ts`. Events are no-ops in development mode.
 - **Exports:** Use `exportToCsv()` and `exportToPdf()` from `src/lib/export.ts`.
 

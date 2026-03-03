@@ -11,6 +11,7 @@ import {
   History,
   Database,
   CheckCircle,
+  ListChecks,
   LogOut,
   ChevronRight,
 } from 'lucide-react';
@@ -82,6 +83,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Migration',
         path: '/admin/migration',
         icon: <Database className="h-5 w-5" />,
+        adminOnly: true,
+      },
+      {
+        label: 'Reference Data',
+        path: '/admin/reference-data',
+        icon: <ListChecks className="h-5 w-5" />,
         adminOnly: true,
       },
       {
