@@ -141,7 +141,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
 router.put('/:id', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const { id } = req.params;
+    const id = req.params.id as string;
     req.log?.info('Updating field option', { id });
 
     const docRef = db.collection(COLLECTION).doc(id);
@@ -167,7 +167,7 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
 
     for (const [field, newVal] of Object.entries(updates)) {
       if (field === 'updatedAt' || field === 'updatedBy') continue;
-      const oldVal = (oldData as Record<string, unknown>)[field];
+      const oldVal = (oldData as unknown as Record<string, unknown>)[field];
       if (String(oldVal) !== String(newVal)) {
         await logAuditEntry({
           entityType: 'fieldOption',
@@ -182,7 +182,7 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
     }
 
     req.log?.info('Field option updated', { id });
-    res.json({ id, ...oldData, ...updates });
+    res.json({ ...oldData, ...updates, id });
   } catch (err) {
     req.log?.error('Failed to update field option', formatError(err));
     res.status(500).json({ error: 'Failed to update field option', detail: String(err) });
@@ -192,7 +192,7 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
 router.put('/reorder/:dropdownKey', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const { dropdownKey } = req.params;
+    const dropdownKey = req.params.dropdownKey as string;
     const { orderedIds } = req.body as { orderedIds: string[] };
     req.log?.info('Reordering options', { dropdownKey, count: orderedIds?.length });
 
@@ -234,7 +234,7 @@ router.put('/reorder/:dropdownKey', requireRole('admin'), async (req, res) => {
 router.delete('/:id', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const { id } = req.params;
+    const id = req.params.id as string;
     req.log?.info('Soft-deleting field option', { id });
 
     const docRef = db.collection(COLLECTION).doc(id);
@@ -273,7 +273,7 @@ router.delete('/:id', requireRole('admin'), async (req, res) => {
 router.get('/:id/usage', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const { id } = req.params;
+    const id = req.params.id as string;
     req.log?.debug('Getting usage count for field option', { id });
 
     const doc = await db.collection(COLLECTION).doc(id).get();

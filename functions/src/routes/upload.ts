@@ -280,7 +280,7 @@ router.post('/bulk-specs', requireRole('editor', 'admin'), async (req, res) => {
           await db.collection('deviceSpecs').doc(existingSpec.docs[0].id).set(specData);
         }
 
-        const completeness = calculateSpecCompleteness(specData as unknown as import('../types/index.js').DeviceSpec);
+        const completeness = calculateSpecCompleteness(specData as Record<string, unknown>);
         await db.collection('devices').doc(docId).update({
           specCompleteness: completeness,
           updatedAt: new Date().toISOString(),

@@ -40,6 +40,7 @@ import type {
   DeploymentStatus,
 } from '../lib/types';
 import { SPEC_CATEGORIES, SPEC_CATEGORY_LABELS } from '../lib/types';
+import { QUESTIONNAIRE_SECTIONS, SPEC_FIELD_UNITS } from '../lib/questionnaireFields';
 
 const CERT_VARIANT: Record<CertificationStatus, 'success' | 'warning' | 'info' | 'default' | 'danger'> = {
   Certified: 'success',
@@ -65,27 +66,17 @@ function formatDate(iso: string | null): string {
   });
 }
 
-const SPEC_FIELD_UNITS: Record<string, string> = {
-  totalRamMb: 'MB',
-  appAvailableRamMb: 'MB',
-  totalStorageGb: 'GB',
-  appAvailableStorageMb: 'MB',
-  swapMemoryMb: 'MB',
-  cpuSpeedMhz: 'MHz',
-  cpuBenchmarkDmips: 'DMIPS',
-  gpuMemoryMb: 'MB',
-  gpuBenchmark: 'pts',
-  displayRefreshRate: 'Hz',
-  maxFrameRate: 'fps',
-};
-
 function getSpecFieldLabel(field: string): string {
+  const sectionDef = QUESTIONNAIRE_SECTIONS.find((s) =>
+    s.fields.some((f) => f.key === field),
+  );
+  if (sectionDef) {
+    const fieldDef = sectionDef.fields.find((f) => f.key === field);
+    if (fieldDef) return fieldDef.label;
+  }
   return field
     .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (s) => s.toUpperCase())
-    .replace(/ Mb$/, ' (MB)')
-    .replace(/ Gb$/, ' (GB)')
-    .replace(/ Mhz$/, ' (MHz)');
+    .replace(/^./, (s) => s.toUpperCase());
 }
 
 function SpecCategorySection({
@@ -99,7 +90,7 @@ function SpecCategorySection({
 
   const fields = data ? Object.entries(data) : [];
   const totalFields = fields.length;
-  const completedFields = fields.filter(([, v]) => v !== null && v !== undefined).length;
+  const completedFields = fields.filter(([, v]) => v !== null && v !== undefined && v !== '').length;
 
   return (
     <div className="border-b border-gray-100 last:border-b-0">
@@ -141,7 +132,7 @@ function SpecCategorySection({
                 {getSpecFieldLabel(key)}
               </p>
               <div className="mt-0.5">
-                {value === null || value === undefined ? (
+                {value === null || value === undefined || value === '' ? (
                   <span className="text-sm text-amber-500">—</span>
                 ) : typeof value === 'boolean' ? (
                   value ? (

@@ -29,7 +29,11 @@ export type AnalyticsEvent =
   | 'readiness_declare'
   | 'onboarding_start'
   | 'onboarding_complete'
-  | 'help_tooltip_view';
+  | 'help_tooltip_view'
+  | 'field_option_reorder'
+  | 'field_option_update'
+  | 'field_option_delete'
+  | 'field_option_create';
 
 export interface AnalyticsParams {
   page_view: { page_title: string; page_path: string };
@@ -61,6 +65,10 @@ export interface AnalyticsParams {
   onboarding_start: Record<string, never>;
   onboarding_complete: Record<string, never>;
   help_tooltip_view: { tooltip_id: string };
+  field_option_reorder: { dropdown_key: string };
+  field_option_update: { dropdown_key: string; option_id: string };
+  field_option_delete: { dropdown_key: string; option_id: string };
+  field_option_create: { dropdown_key: string };
 }
 
 export function trackEvent<E extends AnalyticsEvent>(

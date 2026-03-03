@@ -5,7 +5,7 @@ import { diffAndLog } from '../services/audit.js';
 import { calculateSpecCompleteness } from '../services/specCompleteness.js';
 import { assignTierToDevice } from '../services/tierEngine.js';
 import { formatError } from '../services/logger.js';
-import type { DeviceSpec } from '../types/index.js';
+import { SPEC_CATEGORIES } from '../types/index.js';
 
 const router = Router();
 
@@ -49,22 +49,14 @@ router.put('/:deviceId', requireRole('editor', 'admin'), async (req, res) => {
       return;
     }
 
-    const specData = {
+    const specData: Record<string, unknown> = {
       deviceId,
-      identity: req.body.identity ?? {},
-      soc: req.body.soc ?? {},
-      os: req.body.os ?? {},
-      memory: req.body.memory ?? {},
-      gpu: req.body.gpu ?? {},
-      streaming: req.body.streaming ?? {},
-      videoOutput: req.body.videoOutput ?? {},
-      firmware: req.body.firmware ?? {},
-      codecs: req.body.codecs ?? {},
-      frameRate: req.body.frameRate ?? {},
-      drm: req.body.drm ?? {},
-      security: req.body.security ?? {},
       updatedAt: new Date().toISOString(),
     };
+
+    for (const key of SPEC_CATEGORIES) {
+      specData[key] = req.body[key] ?? {};
+    }
 
     const existingSnap = await db
       .collection('deviceSpecs')
@@ -86,8 +78,7 @@ router.put('/:deviceId', requireRole('editor', 'admin'), async (req, res) => {
       req.log?.info('Device specs updated (existing)', { deviceId, specId });
     }
 
-    const fullSpec = { id: specId, ...specData } as DeviceSpec;
-    const completeness = calculateSpecCompleteness(fullSpec);
+    const completeness = calculateSpecCompleteness(specData);
     req.log?.debug('Spec completeness calculated', { deviceId, completeness });
 
     await db.collection('devices').doc(deviceId).update({

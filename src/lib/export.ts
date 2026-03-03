@@ -1,3 +1,6 @@
+import { QUESTIONNAIRE_SECTIONS } from './questionnaireFields';
+import type { DeviceSpec, SpecCategory } from './types';
+
 function escapeCell(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -73,4 +76,26 @@ export function exportToPdf(
     win.document.write(html);
     win.document.close();
   }
+}
+
+export function getSpecCsvHeaders(): string[] {
+  const headers: string[] = [];
+  for (const section of QUESTIONNAIRE_SECTIONS) {
+    for (const field of section.fields) {
+      headers.push(`${section.title} - ${field.label}`);
+    }
+  }
+  return headers;
+}
+
+export function getSpecCsvRow(spec: DeviceSpec | null): string[] {
+  const row: string[] = [];
+  for (const section of QUESTIONNAIRE_SECTIONS) {
+    const sectionData = spec?.[section.key as SpecCategory] as Record<string, unknown> | undefined;
+    for (const field of section.fields) {
+      const val = sectionData?.[field.key];
+      row.push(val != null && val !== '' ? String(val) : '');
+    }
+  }
+  return row;
 }

@@ -2,28 +2,47 @@ import admin from 'firebase-admin';
 import type { DeviceSpec, HardwareTier } from '../types/index.js';
 import { log } from './logger.js';
 
-const CODEC_FIELD_MAP: Record<string, keyof DeviceSpec['codecs']> = {
-  avc: 'avcSupport',
-  hevc: 'hevcSupport',
-  av1: 'av1Support',
-  vp9: 'vp9Support',
-  eac3: 'eac3Support',
-  ac4: 'ac4Support',
-  dolbyAtmos: 'dolbyAtmosSupport',
-  aac: 'aacSupport',
-  opus: 'opusSupport',
+const CODEC_FIELD_MAP: Record<string, string> = {
+  avc: 'avcH264',
+  hevc: 'hevcH265',
+  av1: 'av1',
+  eac3: 'eac3DolbyDigitalPlus',
+  dolbyatmos: 'eac3Atmos',
+  hdr10: 'hdr10',
+  'hdr10+': 'hdr10Plus',
+  dolbyvision: 'dolbyVisionSupported',
 };
 
-function deviceMeetsTier(spec: DeviceSpec, tier: HardwareTier): boolean {
-  if (tier.ramMin != null && (spec.memory.appAvailableRamMb ?? 0) < tier.ramMin) return false;
-  if (tier.gpuMin != null && (spec.gpu.gpuMemoryMb ?? 0) < tier.gpuMin) return false;
-  if (tier.cpuSpeedMin != null && (spec.soc.cpuSpeedMhz ?? 0) < tier.cpuSpeedMin) return false;
-  if (tier.cpuCoresMin != null && (spec.soc.cpuCores ?? 0) < tier.cpuCoresMin) return false;
-  if (tier.require64Bit && !spec.soc.is64Bit) return false;
+function getHw(spec: DeviceSpec, field: string): unknown {
+  return (spec.hardware as Record<string, unknown>)?.[field];
+}
 
+function deviceMeetsTier(spec: DeviceSpec, tier: HardwareTier): boolean {
+  if (tier.ramMin != null) {
+    const ramGb = Number(getHw(spec, 'ramAvailableGb')) || 0;
+    if (ramGb * 1024 < tier.ramMin) return false;
+  }
+  if (tier.gpuMin != null) {
+    const gpuMb = Number(getHw(spec, 'gpuMemoryAvailableMb')) || 0;
+    if (gpuMb < tier.gpuMin) return false;
+  }
+  if (tier.cpuSpeedMin != null) {
+    const ghz = Number(getHw(spec, 'cpuClockRateGhz')) || 0;
+    if (ghz * 1000 < tier.cpuSpeedMin) return false;
+  }
+  if (tier.cpuCoresMin != null) {
+    const cores = parseInt(String(getHw(spec, 'cpuCores') ?? '0'), 10) || 0;
+    if (cores < tier.cpuCoresMin) return false;
+  }
+  if (tier.require64Bit) {
+    const arch = String(getHw(spec, 'softwareArchitecture') ?? '').toLowerCase();
+    if (!arch.includes('64')) return false;
+  }
+
+  const mc = spec.mediaCodec as Record<string, unknown> ?? {};
   for (const codec of tier.requiredCodecs) {
     const fieldName = CODEC_FIELD_MAP[codec.toLowerCase()];
-    if (fieldName && !spec.codecs[fieldName]) return false;
+    if (fieldName && !mc[fieldName]) return false;
   }
 
   return true;

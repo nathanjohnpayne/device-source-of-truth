@@ -1,191 +1,176 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Save, X, Upload, LinkIcon } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { ChevronDown, ChevronRight, Save, X, Upload, LinkIcon, Pencil, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { useAuth } from '../hooks/useAuth';
+import { FieldOptionsProvider, useFieldOptions } from '../hooks/useFieldOptions';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import Modal from '../components/shared/Modal';
 import {
   TextInput,
-  NumberInput,
-  CheckboxInput,
-  SelectInput,
+  NumberInputWithUnit,
+  DropdownInput,
   DateInput,
+  DateOrTextInput,
+  CodecGrid,
+  SecurityChecklist,
 } from '../components/specs/SpecFormFields';
-import type { DeviceSpec, DeviceWithRelations, SpecCategory } from '../lib/types';
-import { SPEC_CATEGORIES, SPEC_CATEGORY_LABELS } from '../lib/types';
-
-type FieldType = 'text' | 'number' | 'checkbox' | 'select' | 'date';
-
-interface FieldDef {
-  key: string;
-  label: string;
-  type: FieldType;
-  options?: { value: string; label: string }[];
-  min?: number;
-  integer?: boolean;
-}
-
-const SOC_VENDOR_OPTIONS = [
-  { value: 'Broadcom', label: 'Broadcom' },
-  { value: 'Novatek', label: 'Novatek' },
-  { value: 'MediaTek', label: 'MediaTek' },
-  { value: 'Amlogic', label: 'Amlogic' },
-  { value: 'Realtek', label: 'Realtek' },
-  { value: 'Other', label: 'Other' },
-];
-
-const CATEGORY_FIELDS: Record<SpecCategory, FieldDef[]> = {
-  identity: [
-    { key: 'deviceModel', label: 'Device Model', type: 'text' },
-    { key: 'manufacturer', label: 'Manufacturer', type: 'text' },
-    { key: 'brandName', label: 'Brand Name', type: 'text' },
-    { key: 'modelYear', label: 'Model Year', type: 'number', integer: true },
-    { key: 'deviceCategory', label: 'Device Category', type: 'text' },
-  ],
-  soc: [
-    { key: 'socVendor', label: 'SoC Vendor', type: 'select', options: SOC_VENDOR_OPTIONS },
-    { key: 'socModel', label: 'SoC Model', type: 'text' },
-    { key: 'cpuArchitecture', label: 'CPU Architecture', type: 'text' },
-    { key: 'cpuCores', label: 'CPU Cores', type: 'number', integer: true, min: 0 },
-    { key: 'cpuSpeedMhz', label: 'CPU Speed (MHz)', type: 'number', min: 0 },
-    { key: 'cpuBenchmarkDmips', label: 'CPU Benchmark (DMIPS)', type: 'number', min: 0 },
-    { key: 'is64Bit', label: '64-bit', type: 'checkbox' },
-  ],
-  os: [
-    { key: 'osName', label: 'OS Name', type: 'text' },
-    { key: 'osVersion', label: 'OS Version', type: 'text' },
-    { key: 'browserEngine', label: 'Browser Engine', type: 'text' },
-    { key: 'browserVersion', label: 'Browser Version', type: 'text' },
-    { key: 'jsEngineVersion', label: 'JS Engine Version', type: 'text' },
-  ],
-  memory: [
-    { key: 'totalRamMb', label: 'Total RAM (MB)', type: 'number', min: 0 },
-    { key: 'appAvailableRamMb', label: 'App Available RAM (MB)', type: 'number', min: 0 },
-    { key: 'totalStorageGb', label: 'Total Storage (GB)', type: 'number', min: 0 },
-    { key: 'appAvailableStorageMb', label: 'App Available Storage (MB)', type: 'number', min: 0 },
-    { key: 'swapMemoryMb', label: 'Swap Memory (MB)', type: 'number', min: 0 },
-  ],
-  gpu: [
-    { key: 'gpuModel', label: 'GPU Model', type: 'text' },
-    { key: 'gpuVendor', label: 'GPU Vendor', type: 'text' },
-    { key: 'gpuMemoryMb', label: 'GPU Memory (MB)', type: 'number', min: 0 },
-    { key: 'openGlVersion', label: 'OpenGL Version', type: 'text' },
-    { key: 'openGlEsVersion', label: 'OpenGL ES Version', type: 'text' },
-    { key: 'vulkanSupport', label: 'Vulkan Support', type: 'checkbox' },
-    { key: 'gpuBenchmark', label: 'GPU Benchmark', type: 'number', min: 0 },
-  ],
-  streaming: [
-    { key: 'adkVersion', label: 'ADK Version', type: 'text' },
-    { key: 'adkBuildType', label: 'ADK Build Type', type: 'text' },
-    { key: 'htmlVersion', label: 'HTML Version', type: 'text' },
-    { key: 'cssVersion', label: 'CSS Version', type: 'text' },
-    { key: 'playerType', label: 'Player Type', type: 'text' },
-    { key: 'mseSupport', label: 'MSE Support', type: 'checkbox' },
-    { key: 'emeSupport', label: 'EME Support', type: 'checkbox' },
-  ],
-  videoOutput: [
-    { key: 'maxResolution', label: 'Max Resolution', type: 'text' },
-    { key: 'hdmiVersion', label: 'HDMI Version', type: 'text' },
-    { key: 'hdcpVersion', label: 'HDCP Version', type: 'text' },
-    { key: 'hdrSupport', label: 'HDR Support', type: 'checkbox' },
-    { key: 'hdr10Support', label: 'HDR10 Support', type: 'checkbox' },
-    { key: 'hdr10PlusSupport', label: 'HDR10+ Support', type: 'checkbox' },
-    { key: 'hlgSupport', label: 'HLG Support', type: 'checkbox' },
-    { key: 'dolbyVisionSupport', label: 'Dolby Vision Support', type: 'checkbox' },
-    { key: 'dolbyVisionProfiles', label: 'Dolby Vision Profiles', type: 'text' },
-    { key: 'displayRefreshRate', label: 'Display Refresh Rate (Hz)', type: 'number', min: 0 },
-  ],
-  firmware: [
-    { key: 'firmwareVersion', label: 'Firmware Version', type: 'text' },
-    { key: 'firmwareUpdateMethod', label: 'Firmware Update Method', type: 'text' },
-    { key: 'lastFirmwareDate', label: 'Last Firmware Date', type: 'date' },
-    { key: 'nextPlannedFirmwareDate', label: 'Next Planned Firmware Date', type: 'date' },
-    { key: 'firmwareAutoUpdate', label: 'Firmware Auto-Update', type: 'checkbox' },
-    { key: 'eolDate', label: 'End of Life Date', type: 'date' },
-  ],
-  codecs: [
-    { key: 'avcSupport', label: 'AVC (H.264)', type: 'checkbox' },
-    { key: 'avcMaxProfile', label: 'AVC Max Profile', type: 'text' },
-    { key: 'avcMaxLevel', label: 'AVC Max Level', type: 'text' },
-    { key: 'hevcSupport', label: 'HEVC (H.265)', type: 'checkbox' },
-    { key: 'hevcMaxProfile', label: 'HEVC Max Profile', type: 'text' },
-    { key: 'hevcMaxLevel', label: 'HEVC Max Level', type: 'text' },
-    { key: 'av1Support', label: 'AV1 Support', type: 'checkbox' },
-    { key: 'vp9Support', label: 'VP9 Support', type: 'checkbox' },
-    { key: 'eac3Support', label: 'E-AC-3 (Dolby Digital Plus)', type: 'checkbox' },
-    { key: 'ac4Support', label: 'AC-4 Support', type: 'checkbox' },
-    { key: 'dolbyAtmosSupport', label: 'Dolby Atmos', type: 'checkbox' },
-    { key: 'aacSupport', label: 'AAC Support', type: 'checkbox' },
-    { key: 'opusSupport', label: 'Opus Support', type: 'checkbox' },
-  ],
-  frameRate: [
-    { key: 'maxFrameRate', label: 'Max Frame Rate (fps)', type: 'number', min: 0 },
-    { key: 'supports24fps', label: '24 fps', type: 'checkbox' },
-    { key: 'supports30fps', label: '30 fps', type: 'checkbox' },
-    { key: 'supports60fps', label: '60 fps', type: 'checkbox' },
-    { key: 'supportsAdaptiveFps', label: 'Adaptive Frame Rate', type: 'checkbox' },
-    { key: 'trickPlaySupport', label: 'Trick Play', type: 'checkbox' },
-  ],
-  drm: [
-    { key: 'widevineLevel', label: 'Widevine Level', type: 'text' },
-    { key: 'widevineVersion', label: 'Widevine Version', type: 'text' },
-    { key: 'playreadyLevel', label: 'PlayReady Level', type: 'text' },
-    { key: 'playreadyVersion', label: 'PlayReady Version', type: 'text' },
-    { key: 'fairplaySupport', label: 'FairPlay Support', type: 'checkbox' },
-    { key: 'hdcpSupport', label: 'HDCP Support', type: 'checkbox' },
-    { key: 'hdcp2xSupport', label: 'HDCP 2.x Support', type: 'checkbox' },
-    { key: 'secureMediaPipeline', label: 'Secure Media Pipeline', type: 'checkbox' },
-    { key: 'attestationType', label: 'Attestation Type', type: 'text' },
-  ],
-  security: [
-    { key: 'secureBootSupport', label: 'Secure Boot', type: 'checkbox' },
-    { key: 'teeType', label: 'TEE Type', type: 'text' },
-    { key: 'teeVersion', label: 'TEE Version', type: 'text' },
-    { key: 'hardwareRootOfTrust', label: 'Hardware Root of Trust', type: 'checkbox' },
-    { key: 'secureStorageSupport', label: 'Secure Storage', type: 'checkbox' },
-    { key: 'tamperDetection', label: 'Tamper Detection', type: 'checkbox' },
-  ],
-};
-
-function emptySpec(): Omit<DeviceSpec, 'id' | 'deviceId' | 'updatedAt'> {
-  return {
-    identity: { deviceModel: null, manufacturer: null, brandName: null, modelYear: null, deviceCategory: null },
-    soc: { socVendor: null, socModel: null, cpuArchitecture: null, cpuCores: null, cpuSpeedMhz: null, cpuBenchmarkDmips: null, is64Bit: null },
-    os: { osName: null, osVersion: null, browserEngine: null, browserVersion: null, jsEngineVersion: null },
-    memory: { totalRamMb: null, appAvailableRamMb: null, totalStorageGb: null, appAvailableStorageMb: null, swapMemoryMb: null },
-    gpu: { gpuModel: null, gpuVendor: null, gpuMemoryMb: null, openGlVersion: null, openGlEsVersion: null, vulkanSupport: null, gpuBenchmark: null },
-    streaming: { adkVersion: null, adkBuildType: null, htmlVersion: null, cssVersion: null, playerType: null, mseSupport: null, emeSupport: null },
-    videoOutput: { maxResolution: null, hdmiVersion: null, hdcpVersion: null, hdrSupport: null, hdr10Support: null, hdr10PlusSupport: null, hlgSupport: null, dolbyVisionSupport: null, dolbyVisionProfiles: null, displayRefreshRate: null },
-    firmware: { firmwareVersion: null, firmwareUpdateMethod: null, lastFirmwareDate: null, nextPlannedFirmwareDate: null, firmwareAutoUpdate: null, eolDate: null },
-    codecs: { avcSupport: null, avcMaxProfile: null, avcMaxLevel: null, hevcSupport: null, hevcMaxProfile: null, hevcMaxLevel: null, av1Support: null, vp9Support: null, eac3Support: null, ac4Support: null, dolbyAtmosSupport: null, aacSupport: null, opusSupport: null },
-    frameRate: { maxFrameRate: null, supports24fps: null, supports30fps: null, supports60fps: null, supportsAdaptiveFps: null, trickPlaySupport: null },
-    drm: { widevineLevel: null, widevineVersion: null, playreadyLevel: null, playreadyVersion: null, fairplaySupport: null, hdcpSupport: null, hdcp2xSupport: null, secureMediaPipeline: null, attestationType: null },
-    security: { secureBootSupport: null, teeType: null, teeVersion: null, hardwareRootOfTrust: null, secureStorageSupport: null, tamperDetection: null },
-  };
-}
+import { QUESTIONNAIRE_SECTIONS, buildEmptySpec } from '../lib/questionnaireFields';
+import type { QuestionnaireFieldDef, QuestionnaireSectionDef } from '../lib/questionnaireFields';
+import type { DeviceSpec, SpecCategory } from '../lib/types';
 
 function countFilledFields(obj: Record<string, unknown>): number {
-  return Object.values(obj).filter((v) => v !== null && v !== undefined).length;
+  return Object.values(obj).filter((v) => v !== null && v !== undefined && v !== '').length;
 }
 
 function SpecSection({
-  category,
-  label,
+  section,
   data,
-  fields,
+  allFormData,
   onChange,
   defaultOpen,
 }: {
-  category: SpecCategory;
-  label: string;
+  section: QuestionnaireSectionDef;
   data: Record<string, unknown>;
-  fields: FieldDef[];
-  onChange: (category: SpecCategory, key: string, value: unknown) => void;
+  allFormData: Record<string, Record<string, unknown>>;
+  onChange: (section: SpecCategory, key: string, value: unknown) => void;
   defaultOpen: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const { getActiveOptions, isOtherTrigger } = useFieldOptions();
+  const { isAdmin } = useAuth();
+
   const filled = countFilledFields(data);
-  const total = fields.length;
+  const total = section.fields.length;
+
+  const isFieldVisible = useCallback(
+    (field: QuestionnaireFieldDef): boolean => {
+      if (field.parentField) {
+        const parentValue = data[field.parentField] as string | null;
+        if (!parentValue) return false;
+        const parentDef = section.fields.find((f) => f.key === field.parentField);
+        if (parentDef?.dropdownKey) {
+          return isOtherTrigger(parentDef.dropdownKey, parentValue);
+        }
+        return parentValue === 'Yes';
+      }
+      if (field.conditionalOn) {
+        const { section: condSection, field: condField, operator, value } = field.conditionalOn;
+        const condSectionData = allFormData[condSection] as Record<string, unknown> | undefined;
+        const condValue = condSectionData?.[condField] as string | null;
+        if (!condValue) return false;
+        if (operator === 'notEquals') return condValue !== value;
+        if (operator === 'equals') return condValue === value;
+      }
+      return true;
+    },
+    [data, allFormData, section.fields, isOtherTrigger],
+  );
+
+  const compactGridFields = section.fields.filter((f) => f.compactGrid && f.dropdownKey);
+  const checklistFields = compactGridFields.length > 0 && section.key === 'contentProtection'
+    ? section.fields.filter((f) => f.compactGrid)
+    : [];
+  const codecGridFields = compactGridFields.length > 0 && section.key === 'mediaCodec'
+    ? section.fields.filter((f) => f.compactGrid)
+    : [];
+  const regularFields = section.fields.filter((f) => !f.compactGrid);
+
+  const handleFieldChange = (key: string, value: unknown) => {
+    onChange(section.key, key, value);
+    const field = section.fields.find((f) => f.key === key);
+    if (field?.dropdownKey) {
+      const childFields = section.fields.filter((f) => f.parentField === key);
+      for (const child of childFields) {
+        if (!isOtherTrigger(field.dropdownKey, value as string | null)) {
+          onChange(section.key, child.key, null);
+        }
+      }
+    }
+  };
+
+  const renderField = (field: QuestionnaireFieldDef) => {
+    if (!isFieldVisible(field)) return null;
+    const val = data[field.key];
+
+    switch (field.type) {
+      case 'text':
+        return (
+          <TextInput
+            key={field.key}
+            label={field.label}
+            value={val as string | null}
+            onChange={(v) => handleFieldChange(field.key, v)}
+          />
+        );
+      case 'number':
+        if (field.unit) {
+          return (
+            <NumberInputWithUnit
+              key={field.key}
+              label={field.label}
+              value={val as number | null}
+              onChange={(v) => handleFieldChange(field.key, v)}
+              unit={field.unit}
+            />
+          );
+        }
+        return (
+          <NumberInputWithUnit
+            key={field.key}
+            label={field.label}
+            value={val as number | null}
+            onChange={(v) => handleFieldChange(field.key, v)}
+            unit=""
+          />
+        );
+      case 'dropdown':
+        if (!field.dropdownKey) return null;
+        return (
+          <div key={field.key}>
+            <div className="flex items-center gap-1.5">
+              <DropdownInput
+                label={field.label}
+                value={val as string | null}
+                onChange={(v) => handleFieldChange(field.key, v)}
+                fieldOptions={getActiveOptions(field.dropdownKey)}
+              />
+              {isAdmin && (
+                <a
+                  href={`/admin/reference-data`}
+                  className="mt-5 text-gray-400 hover:text-indigo-600"
+                  title={`Edit ${field.dropdownKey} options`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      case 'date':
+        return (
+          <DateInput
+            key={field.key}
+            label={field.label}
+            value={val as string | null}
+            onChange={(v) => handleFieldChange(field.key, v)}
+          />
+        );
+      case 'dateOrText':
+        return (
+          <DateOrTextInput
+            key={field.key}
+            label={field.label}
+            value={val as string | null}
+            onChange={(v) => handleFieldChange(field.key, v)}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -200,17 +185,31 @@ function SpecSection({
           ) : (
             <ChevronRight className="h-4 w-4 text-gray-400" />
           )}
-          <h3 className="text-sm font-semibold text-gray-900">{label}</h3>
+          <h3 className="text-sm font-semibold text-gray-900">
+            {section.number}. {section.title}
+          </h3>
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`text-xs font-medium ${filled === total ? 'text-emerald-600' : filled > 0 ? 'text-amber-600' : 'text-gray-400'}`}
+            className={`text-xs font-medium ${
+              filled === total
+                ? 'text-emerald-600'
+                : filled > 0
+                  ? 'text-amber-600'
+                  : 'text-gray-400'
+            }`}
           >
             {filled}/{total} fields
           </span>
           <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200">
             <div
-              className={`h-full rounded-full transition-all ${filled === total ? 'bg-emerald-500' : filled > 0 ? 'bg-amber-500' : 'bg-gray-300'}`}
+              className={`h-full rounded-full transition-all ${
+                filled === total
+                  ? 'bg-emerald-500'
+                  : filled > 0
+                    ? 'bg-amber-500'
+                    : 'bg-gray-300'
+              }`}
               style={{ width: `${total ? (filled / total) * 100 : 0}%` }}
             />
           </div>
@@ -218,71 +217,61 @@ function SpecSection({
       </button>
 
       {open && (
-        <div className="border-t border-gray-100 px-5 py-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {fields.map((field) => {
-              const val = data[field.key];
-              const handleChange = (v: unknown) => onChange(category, field.key, v);
+        <div className="border-t border-gray-100 px-5 py-4 space-y-6">
+          {codecGridFields.length > 0 && (
+            <CodecGrid
+              fields={codecGridFields}
+              data={data}
+              fieldOptions={getActiveOptions(codecGridFields[0].dropdownKey!)}
+              onChange={(key, value) => handleFieldChange(key, value)}
+            />
+          )}
 
-              switch (field.type) {
-                case 'text':
-                  return (
-                    <TextInput
-                      key={field.key}
-                      label={field.label}
-                      value={val as string | null}
-                      onChange={handleChange as (v: string | null) => void}
-                    />
-                  );
-                case 'number':
-                  return (
-                    <NumberInput
-                      key={field.key}
-                      label={field.label}
-                      value={val as number | null}
-                      onChange={handleChange as (v: number | null) => void}
-                      min={field.min}
-                      integer={field.integer}
-                    />
-                  );
-                case 'checkbox':
-                  return (
-                    <CheckboxInput
-                      key={field.key}
-                      label={field.label}
-                      value={val as boolean | null}
-                      onChange={handleChange as (v: boolean | null) => void}
-                    />
-                  );
-                case 'select':
-                  return (
-                    <SelectInput
-                      key={field.key}
-                      label={field.label}
-                      value={val as string | null}
-                      onChange={handleChange as (v: string | null) => void}
-                      options={field.options!}
-                    />
-                  );
-                case 'date':
-                  return (
-                    <DateInput
-                      key={field.key}
-                      label={field.label}
-                      value={val as string | null}
-                      onChange={handleChange as (v: string | null) => void}
-                    />
-                  );
-              }
-            })}
-          </div>
+          {checklistFields.length > 0 && (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {regularFields
+                  .filter((f) => !f.compactGrid)
+                  .slice(0, regularFields.findIndex((f) => f.fieldId === '6.15'))
+                  .map(renderField)}
+              </div>
+              <SecurityChecklist
+                fields={checklistFields}
+                data={data}
+                fieldOptions={getActiveOptions(checklistFields[0].dropdownKey!)}
+                onChange={(key, value) => handleFieldChange(key, value)}
+              />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {regularFields
+                  .filter(
+                    (f) =>
+                      !f.compactGrid &&
+                      regularFields.indexOf(f) >=
+                        regularFields.findIndex((rf) => rf.fieldId === '6.22'),
+                  )
+                  .map(renderField)}
+              </div>
+            </>
+          )}
+
+          {codecGridFields.length === 0 && checklistFields.length === 0 && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {regularFields.map(renderField)}
+            </div>
+          )}
+
+          {codecGridFields.length > 0 && checklistFields.length === 0 && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {regularFields.filter((f) => !f.compactGrid).map(renderField)}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-export default function SpecEditPage() {
+function SpecEditForm() {
   const { id: deviceId } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -290,9 +279,23 @@ export default function SpecEditPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState('');
-  const [formData, setFormData] = useState(emptySpec());
+  const [formData, setFormData] = useState<Record<string, Record<string, unknown>>>(buildEmptySpec());
   const [questionnaireUrl, setQuestionnaireUrl] = useState('');
   const [questionnaireFile, setQuestionnaireFile] = useState<File | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const initialData = useRef<string>('');
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isDirty && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      setShowLeaveModal(true);
+    }
+  }, [blocker.state]);
 
   useEffect(() => {
     if (!deviceId) return;
@@ -306,7 +309,20 @@ export default function SpecEditPage() {
 
         if (device.spec) {
           const { id: _id, deviceId: _did, updatedAt: _u, ...rest } = device.spec;
-          setFormData({ ...emptySpec(), ...rest });
+          const merged: Record<string, Record<string, unknown>> = { ...buildEmptySpec() };
+          for (const sectionKey of Object.keys(merged)) {
+            const section = (rest as Record<string, unknown>)[sectionKey];
+            if (section && typeof section === 'object') {
+              merged[sectionKey] = {
+                ...merged[sectionKey],
+                ...(section as Record<string, unknown>),
+              };
+            }
+          }
+          setFormData(merged);
+          initialData.current = JSON.stringify(merged);
+        } else {
+          initialData.current = JSON.stringify(buildEmptySpec());
         }
       } catch {
         setError('Failed to load device specifications.');
@@ -317,11 +333,15 @@ export default function SpecEditPage() {
   }, [deviceId]);
 
   const handleFieldChange = useCallback(
-    (category: SpecCategory, key: string, value: unknown) => {
-      setFormData((prev) => ({
-        ...prev,
-        [category]: { ...prev[category], [key]: value },
-      }));
+    (section: SpecCategory, key: string, value: unknown) => {
+      setFormData((prev) => {
+        const updated = {
+          ...prev,
+          [section]: { ...prev[section], [key]: value },
+        };
+        setIsDirty(JSON.stringify(updated) !== initialData.current);
+        return updated;
+      });
     },
     [],
   );
@@ -329,13 +349,16 @@ export default function SpecEditPage() {
   const { filledTotal, totalFields, completionPct } = useMemo(() => {
     let filled = 0;
     let total = 0;
-    for (const cat of SPEC_CATEGORIES) {
-      const catData = formData[cat] as unknown as Record<string, unknown>;
-      const fields = CATEGORY_FIELDS[cat];
-      total += fields.length;
+    for (const section of QUESTIONNAIRE_SECTIONS) {
+      const catData = formData[section.key] ?? {};
+      total += section.fields.length;
       filled += countFilledFields(catData);
     }
-    return { filledTotal: filled, totalFields: total, completionPct: total ? Math.round((filled / total) * 100) : 0 };
+    return {
+      filledTotal: filled,
+      totalFields: total,
+      completionPct: total ? Math.round((filled / total) * 100) : 0,
+    };
   }, [formData]);
 
   const handleSave = async () => {
@@ -344,12 +367,14 @@ export default function SpecEditPage() {
     setError(null);
 
     try {
-      await api.deviceSpecs.save(deviceId, formData as Partial<DeviceSpec>);
+      await api.deviceSpecs.save(deviceId, formData as unknown as Partial<DeviceSpec>);
 
       if (questionnaireUrl || questionnaireFile) {
-        await api.devices.update(deviceId, { questionnaireUrl: questionnaireUrl || null } as Partial<DeviceWithRelations>);
+        await api.devices.update(deviceId, { questionnaireUrl: questionnaireUrl || null } as Record<string, unknown>);
       }
 
+      setIsDirty(false);
+      initialData.current = JSON.stringify(formData);
       trackEvent('spec_form_save', { device_id: deviceId, category: 'all' });
       navigate(`/devices/${deviceId}`);
     } catch {
@@ -363,9 +388,16 @@ export default function SpecEditPage() {
 
   return (
     <div className="space-y-6">
+      {isDirty && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          You have unsaved changes. Save before navigating away.
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Edit Device Specs</h1>
+          <h1 className="text-2xl font-bold text-gray-900">STB Questionnaire</h1>
           <p className="mt-1 text-sm text-gray-500">
             {deviceName} <span className="font-mono text-gray-400">({deviceId})</span>
           </p>
@@ -404,7 +436,15 @@ export default function SpecEditPage() {
         </div>
         <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
           <div
-            className={`h-full rounded-full transition-all ${completionPct === 100 ? 'bg-emerald-500' : completionPct > 50 ? 'bg-indigo-500' : completionPct > 0 ? 'bg-amber-500' : 'bg-gray-300'}`}
+            className={`h-full rounded-full transition-all ${
+              completionPct === 100
+                ? 'bg-emerald-500'
+                : completionPct > 50
+                  ? 'bg-indigo-500'
+                  : completionPct > 0
+                    ? 'bg-amber-500'
+                    : 'bg-gray-300'
+            }`}
             style={{ width: `${completionPct}%` }}
           />
         </div>
@@ -445,16 +485,15 @@ export default function SpecEditPage() {
       </div>
 
       <div className="space-y-3">
-        {SPEC_CATEGORIES.map((cat) => {
-          const catData = formData[cat] as unknown as Record<string, unknown>;
+        {QUESTIONNAIRE_SECTIONS.map((section) => {
+          const catData = (formData[section.key] ?? {}) as Record<string, unknown>;
           const hasData = countFilledFields(catData) > 0;
           return (
             <SpecSection
-              key={cat}
-              category={cat}
-              label={SPEC_CATEGORY_LABELS[cat]}
+              key={section.key}
+              section={section}
               data={catData}
-              fields={CATEGORY_FIELDS[cat]}
+              allFormData={formData}
               onChange={handleFieldChange}
               defaultOpen={hasData}
             />
@@ -478,6 +517,50 @@ export default function SpecEditPage() {
           {saving ? 'Saving…' : 'Save Specifications'}
         </button>
       </div>
+
+      <Modal
+        open={showLeaveModal}
+        onClose={() => {
+          setShowLeaveModal(false);
+          if (blocker.state === 'blocked') blocker.reset();
+        }}
+        title="Unsaved Changes"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            You have unsaved changes. Are you sure you want to leave this page?
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => {
+                setShowLeaveModal(false);
+                if (blocker.state === 'blocked') blocker.reset();
+              }}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Stay
+            </button>
+            <button
+              onClick={() => {
+                setShowLeaveModal(false);
+                setIsDirty(false);
+                if (blocker.state === 'blocked') blocker.proceed();
+              }}
+              className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Leave
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
+  );
+}
+
+export default function SpecEditPage() {
+  return (
+    <FieldOptionsProvider>
+      <SpecEditForm />
+    </FieldOptionsProvider>
   );
 }
