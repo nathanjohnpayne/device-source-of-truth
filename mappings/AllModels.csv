@@ -1,0 +1,214 @@
+﻿Device,Device ID,Vendor,Region,Country,Device Type,Live ADK Version,64 bit,DRM,Tech Questionnaire,Partner
+Nintendo Switch Classic,,,GLOBAL,,ADK,,,,,Nintendo
+Nintendo Switch Lite,,,GLOBAL,,ADK,,,,,Nintendo
+Echo Show,,,GLOBAL,,ADK,,,,,Amazon
+VIP Commscope 1st HD: 4242,,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Vivo
+VIP Commscope 1st UHD: 5242,,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Vivo
+HP4CH,,,LATAM,🇦🇷 Argentina,ADK,,,,https://docs.google.com/spreadsheets/d/1SnUjfdWMusO47pCGLaytxxHX74tIGOjP/edit?gid=1043032294#gid=1043032294 ,Cablevisión
+Polsat Box 4K D61,4k_d61,cyfrowy_polsat,EMEA,🇵🇱 Poland,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/17_-0ScpcMA4dHL8dUK2HNuubmVXVXz_b/edit?gid=103435649#gid=103435649,Polsat
+Polsat Box 4K Lite D63,4klite_d63,cyfrowy_polsat,EMEA,🇵🇱 Poland,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/17_-0ScpcMA4dHL8dUK2HNuubmVXVXz_b/edit?gid=103435649#gid=103435649,Polsat
+97xx_high,97xx_high,broadcom,GLOBAL,,ADK,ADK 3.1.1,,Playready SL3000,,Broadcom
+97xx_low,97xx_low,broadcom,GLOBAL,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL2000,,Broadcom
+97xx_mid,97xx_mid,broadcom,GLOBAL,,ADK,ADK 3.1.0,,Playready SL3000,,Broadcom
+EOSv2,2008c-stb,humax,EMEA,🇳🇱 Netherlands,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,VodafoneZiggo
+EOSv2,2008c-stb,humax,EMEA,🇬🇧 United Kingdom,ADK,,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media O2
+EOSv2,2008c-stb,humax,EMEA,🇧🇪 Belgium,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Telenet
+EOSv2,2008c-stb,humax,EMEA,🇨🇭 Switzerland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Sunrise
+EOSv2,2008c-stb,humax,EMEA,🇮🇪 Ireland,ADK,,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media
+ARRIS-VIP5242: Ethernet Only,5242,arris,EMEA,🇪🇸 Spain,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1bUHYk7AhtD4V2VBeLsLHJM1CkBu1Gsla/edit?gid=274371817#gid=274371817,Movistar 
+ARRIS-VIP5242W: Ethernet + Quantenna Wi-Fi,5242w,arris,EMEA,🇪🇸 Spain,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1bUHYk7AhtD4V2VBeLsLHJM1CkBu1Gsla/edit?gid=274371817#gid=274371817,Movistar 
+ARRIS-VIP5342: DolbyVision and Ethernet Only (launched EOY2020),5342,arris,EMEA,🇪🇸 Spain,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1bUHYk7AhtD4V2VBeLsLHJM1CkBu1Gsla/edit?gid=274371817#gid=274371817,Movistar 
+4K,CDNE5-5751-VEC-LIGHT,ADB,EMEA,🇵🇱 Poland,ADK,,,"Playready SL3000,Widevine L1",https://drive.google.com/drive/folders/1kZw0rG-5CejMimgFeMoWkfGUZpqmXdWI,Vectra
+Technicolor Zapper,DCI747TL3,technicolor,LATAM,🇲🇽 Mexico,ADK,,,Playready SL2000,,Izzi
+EOSv1 (TV 360),dcx960,commscope,EMEA,🇳🇱 Netherlands,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,VodafoneZiggo
+EOSv1 (TV 360),dcx960,commscope,EMEA,🇬🇧 United Kingdom,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media O2
+EOSv1 (TV 360),dcx960,commscope,EMEA,🇧🇪 Belgium,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Telenet
+EOSv1 (TV 360),dcx960,commscope,EMEA,🇨🇭 Switzerland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Sunrise
+EOSv1 (TV 360),dcx960,commscope,EMEA,🇬🇧 United Kingdom,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media O2
+Delta,Delta,freebox,EMEA,🇫🇷 France,ADK,ADK 3.1.1,checked,Widevine L1,https://docs.google.com/spreadsheets/d/1EWQ2Spx4cas5qnIwi3Vpf5TEYy9MGLMP/edit?gid=76169333#gid=76169333,Free
+Sagemcom DIW362,diw362,sagemcom,LATAM,🇲🇽 Mexico,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1dSYTSNYeoJXW42nDYWZwXGUSMFlrnl6d/edit?gid=565769322#gid=565769322,Totalplay
+DIW377V,diw377v,sagemcom,LATAM,🇲🇽 Mexico,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1dSYTSNYeoJXW42nDYWZwXGUSMFlrnl6d/edit?gid=565769322#gid=565769322,Totalplay
+IP Box,DIW3930BT,Sagemcom,EMEA,🇬🇧 United Kingdom,ADK,,,Playready SL3000,https://docs.google.com/spreadsheets/d/1SxiIpEI3NYDg4UJ4PUj6daRifCLWJuMV/edit?gid=245856534#gid=245856534,BT
+Pace PVR        ,DPC5003,pace,LATAM,🇲🇽 Mexico,ADK,,,Playready SL2000,,Izzi
+Gen2 Premium / DxIW387,dxiw387,sagemcom,EMEA,"🇩🇪 Germany,🇵🇹 Portugal,🇬🇷 Greece",ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1fhGXwP2pqBkJmqywj7hzYp3DT-l5WCnf/edit?gid=1619717592#gid=1619717592,Vodafone
+Gen 2 Entry Dxi362,dxl362,sagemcom,EMEA,"🇵🇹 Portugal,🇷🇴 Romania",ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1fhGXwP2pqBkJmqywj7hzYp3DT-l5WCnf/edit?gid=1619717592#gid=1619717592,Vodafone
+VTV Gen 1 Legacy,dxl384	,sagemcom,EMEA,🇪🇸 Spain,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1fhGXwP2pqBkJmqywj7hzYp3DT-l5WCnf/edit?gid=1619717592#gid=1619717592,Vodafone
+Sagemcom SXI393,dxlw393,sagemcom,EMEA,🇪🇸 Spain,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1fhGXwP2pqBkJmqywj7hzYp3DT-l5WCnf/edit?gid=1619717592#gid=1619717592,Vodafone
+EOSv1 (TV 360),eos-1008c,humax,EMEA,🇬🇧 United Kingdom,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media O2
+EOSv1 (TV 360),eos-1008c,humax,EMEA,🇳🇱 Netherlands,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,VodafoneZiggo
+EOSv1 Telenet TV Box,eos-1008c,humax,EMEA,🇧🇪 Belgium,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Telenet
+EOSv1 (TV 360),eos-1008c,humax,EMEA,🇨🇭 Switzerland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Sunrise
+EOSv1,eos-1008c,humax,EMEA,🇮🇪 Ireland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media
+EOSv1 (Tivo),eos-1008r,humax,EMEA,🇬🇧 United Kingdom,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Virgin Media O2
+EOSv1 (Tivo),eos-1008r,humax,EMEA,🇧🇪 Belgium,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Telenet
+EOSv1 (Tivo),eos-1008r,humax,EMEA,🇨🇭 Switzerland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Sunrise
+4K EVOBOX D63,evobox_d63,cyfrowy_polsat,EMEA,🇵🇱 Poland,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/17_-0ScpcMA4dHL8dUK2HNuubmVXVXz_b/edit?gid=103435649#gid=103435649,Polsat
+EVOBOX 4Kv2 D62,evoboxv2_d62,cyfrowy_polsat,EMEA,🇵🇱 Poland,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/17_-0ScpcMA4dHL8dUK2HNuubmVXVXz_b/edit?gid=103435649#gid=103435649,Polsat
+EVOBOX 4Kv2 D64,evoboxv2_d64,cyfrowy_polsat	,EMEA,🇵🇱 Poland,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/17_-0ScpcMA4dHL8dUK2HNuubmVXVXz_b/edit?gid=103435649#gid=103435649,Polsat
+DG4 (MediaReceiver) - MR 601 Sat G4,G4,tatung,EMEA,🇩🇪 Germany,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1_w1_btEYx0Nk-B-CiIIBc-faM5KY7pzg/edit?gid=585158761#gid=585158761,DT
+G4 (MediaReceiver) - MR 401A,g4,tatung,EMEA,🇩🇪 Germany,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1_w1_btEYx0Nk-B-CiIIBc-faM5KY7pzg/edit?gid=585158761#gid=585158761,DT
+G4 (MediaReceiver) - MR 401B,g4,tatung,EMEA,🇩🇪 Germany,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1_w1_btEYx0Nk-B-CiIIBc-faM5KY7pzg/edit?gid=585158761#gid=585158761,DT
+MagentaTV Box G5,G5,tatung,EMEA,🇩🇪 Germany,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1_w1_btEYx0Nk-B-CiIIBc-faM5KY7pzg/edit?gid=585158761#gid=585158761,DT
+MagentaTV Box Play G5,G5,tatung,EMEA,🇩🇪 Germany,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1_w1_btEYx0Nk-B-CiIIBc-faM5KY7pzg/edit?gid=585158761#gid=585158761,DT
+G9,g9,broadcom,EMEA,🇫🇷 France,ADK,ADK 2.1.1,,,https://docs.google.com/spreadsheets/d/1XKKoF1HzhSEETS8_FvFRA-tw_yiZTMJn/edit?gid=754792584#gid=754792584,Canal+
+G10,g10,broadcom,EMEA,🇫🇷 France,ADK,ADK 2.1.1,,,https://docs.google.com/spreadsheets/d/1XKKoF1HzhSEETS8_FvFRA-tw_yiZTMJn/edit?gid=754792584#gid=754792584,Canal+
+G11,g11,broadcom,EMEA,🇫🇷 France,ADK,ADK 2.1.1,,,https://docs.google.com/spreadsheets/d/1XKKoF1HzhSEETS8_FvFRA-tw_yiZTMJn/edit?gid=754792584#gid=754792584,Canal+
+Mini: h626t,h626t,hybroad,APAC,🇦🇺 Australia,ADK,ADK 3.1.0,,Playready SL2500,https://docs.google.com/spreadsheets/d/1Wx65b_oLGZIaxDL2EKqHDdo6R6Oz81bU/edit?gid=1270541411#gid=1270541411,Fetch
+4K Mini,h671t,hybroad,APAC,🇦🇺 Australia,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Wx65b_oLGZIaxDL2EKqHDdo6R6Oz81bU/edit?gid=1270541411#gid=1270541411,Fetch
+hp4500,HP4500-BR,skyworth,LATAM,"🇧🇷 Brazil,🇦🇷 Argentina,🇨🇱 Chile,🇨🇴 Colombia,🇵🇪 Peru",ADK,ADK 3.0.1+plugin-4.2.21,checked,,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Temis
+hp4501,HP4501,skyworth,LATAM,"🇦🇷 Argentina,🇧🇷 Brazil,🇨🇱 Chile,🇨🇴 Colombia,🇵🇪 Peru",ADK,ADK 3.0.1+plugin-4.2.21,checked,,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Temis
+hp4619,HP4619,skyworth,LATAM,"🇦🇷 Argentina,🇧🇷 Brazil,🇨🇴 Colombia",ADK,ADK 3.0.1+plugin-4.2.21,checked,,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Temis
+HUMAX-PTT1000_ES: DolbyVision and Ethernet Only,HUMAX PTT1000 (Spain),humax,EMEA,🇪🇸 Spain,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1bUHYk7AhtD4V2VBeLsLHJM1CkBu1Gsla/edit?gid=274371817#gid=274371817,Movistar 
+Skyworth HY4001,hy4001	,amlogic,EMEA,🇫🇷 France,ADK,,,Playready SL3000,,Canal+
+Gen5 Mini,hy4424,skyworth,APAC,🇦🇺 Australia,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Wx65b_oLGZIaxDL2EKqHDdo6R6Oz81bU/edit?gid=1270541411#gid=1270541411,Fetch
+iQ3 DGS7000NF,iq3,broadcom,APAC,🇦🇺 Australia,ADK,ADK 3.1.1,,Playready SL2000,https://drive.google.com/file/d/18LJ1YwoaRS7YOhNFrfVGPz3gBb8jeQEu/view,Foxtel
+iQ4 (MS6505NF15),iq4,broadcom,APAC,🇦🇺 Australia,ADK,ADK 3.1.1,,Playready SL3000,https://drive.google.com/file/d/18LJ1YwoaRS7YOhNFrfVGPz3gBb8jeQEu/view,Foxtel
+iQ5 (QH5515ZF),iq5,broadcom,APAC,🇦🇺 Australia,ADK,ADK 3.1.1,,Playready SL3000,https://drive.google.com/file/d/18LJ1YwoaRS7YOhNFrfVGPz3gBb8jeQEu/view,Foxtel
+K4KCW5,k4kcw5,KaonMedia,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+Cable (Labox) V3: EGCI384,Labox V3,sagemcom,EMEA,🇫🇷 France,ADK,ADK 3.0.1+plugin-4.2.21,,,https://docs.google.com/spreadsheets/d/1_7pvHoIuRDwbD9aEDMjyuXYQXqvo6BwL/edit?gid=1016007578#gid=1016007578,SFR
+LT-XXCT250-JVC HKC NT72690-2k_2k25,ltxxct250_2k25,jvc,EMEA,UK,ADK,ADK 3.1.1,,Playready SL3000,,Titan - Novatek
+LT-XXCT350-JVC HKC NT72690-2k_2k25,ltxxct350_2k25,jvc,EMEA,UK,ADK,ADK 3.1.1,,Playready SL3000,,Titan - Novatek
+LT-XXCT550-JVC HKC NT72690-4k_2k25,ltxxct550_2k25,jvc,EMEA,UK,ADK,ADK 3.1.1,,Playready SL3000,,Titan - Novatek
+DIW3930,m393gena_w,Sagemcom,EMEA,🇩🇰 Denmark,ADK,,,"Playready SL3000,Widevine L1",https://docs.google.com/spreadsheets/d/17oeDKzP-CFcU1vboppupPpvS_Z_RnGbs/edit?gid=1909975696#gid=1909975696,Waoo
+Mighty,m616t,hybroad,APAC,🇦🇺 Australia,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Wx65b_oLGZIaxDL2EKqHDdo6R6Oz81bU/edit?gid=1270541411#gid=1270541411,Fetch
+G4 Mighty: m681t,m681t,hybroad,APAC,🇦🇺 Australia,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Wx65b_oLGZIaxDL2EKqHDdo6R6Oz81bU/edit?gid=1270541411#gid=1270541411,Fetch
+MB180 - QUI G31,mb180,mediatek,GLOBAL,,ADK,ADK 3.1.0,,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB180 - Tivo G32,mb180,mediatek,GLOBAL,,ADK,ADK 3.1.0,,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB180 - QUI G32,mb180,mediatek,GLOBAL,,ADK,ADK 3.1.0,,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB180R,mb180,mediatek,GLOBAL,,ADK,ADK 3.1.0,,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB180E G31,mb180e,mediatek,GLOBAL,,ADK,ADK 3.0.1+plugin-4.2.21,,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB181 G36,mb181,mediatek,GLOBAL,,ADK,ADK 3.1.1,,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB181R,mb181,mediatek,GLOBAL,,ADK,ADK 3.1.0,,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB181 - QUI G36,mb181,mediatek,GLOBAL,,ADK,ADK 3.1.0,,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB190,mb190,mediatek,EMEA,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?usp=sharing&ouid=100752347104228415140&rtpof=true&sd=true,Vestel
+MB190R,mb190,mediatek,EMEA,,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB190 - Titan,mb190_titan ,mediatek,EMEA,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1bil6nY5U1law85vK5TKuJXRVjRISkmGW/edit?usp=sharing&ouid=115217691988279784375&rtpof=true&sd=true,Vestel
+MB191,mb191,mediatek,EMEA,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/15E3jdC9ipfdGr9-BB2qaFdyjWK--pJj6/edit?gid=1865632636#gid=1865632636,Vestel
+MB191 - Titan,mb191_titan,mediatek,EMEA,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1bil6nY5U1law85vK5TKuJXRVjRISkmGW/edit?usp=sharing&ouid=115217691988279784375&rtpof=true&sd=true,Vestel
+MB281,mb281,mediatek,GLOBAL,,ADK,ADK 3.0.1+plugin-4.2.21,,"Playready SL3000,Widevine L3",,Vestel
+G4 (MediaReceiver) - MR 201,Media Receiver 201 DEV,tatung,EMEA,🇩🇪 Germany,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1_w1_btEYx0Nk-B-CiIIBc-faM5KY7pzg/edit?gid=585158761#gid=585158761,DT
+MIB4 (WHD93) ,MIB4,sagemcom,EMEA,🇫🇷 France,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL2000,https://drive.google.com/file/d/1HnJ17qkdYxjJaq1szy3ZKgGCAiAWsM62/view,Orange
+OLED951 OLED911 OLED851 OLED821 OLED811 MLED981 MLED911 PUS90x1 ,mt9620_4k_phl_2k26,philips,EMEA,NL,ADK,,,Playready SL3000,,Titan - Mediatek
+MT9676-2K,mt9676_2k,Mediatek,LATAM,"🇦🇷 Argentina,🇧🇷 Brazil,🇵🇾 Paraguay,🇺🇾 Uruguay,🇨🇱 Chile,🇵🇪 Peru,🇨🇴 Colombia,🇨🇷 Costa Rica,🇪🇨 Ecuador,🇸🇻 El Salvador,🇬🇹 Guatemala,🇭🇳 Honduras,🇳🇮 Nicaragua",ADK,ADK 3.1.1,,,https://docs.google.com/spreadsheets/d/1eVcZcmJ8SWsyb3vsYfW57V2PQBrTcM_P/edit?gid=1504578258#gid=1504578258,Titan - Mediatek
+MT9676-2K-2k25 AOC,mt9676_2k-2k25-AOC,Mediatek,EMEA,🇪🇸 Spain,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1vblkJVWOwqigTT6L5_B21I_wfL4cA56XEKGzHq8TxcE/edit?gid=153215889#gid=153215889,Titan - Mediatek
+PUS7001,mt9676_4k_phl_2k26,philips,EMEA,NL,ADK,,,Playready SL3000,,Titan - Mediatek
+Philips 50PUG8100/78,mt9676-4k-2k25,Philips,LATAM,🇧🇷 Brazil,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1eVcZcmJ8SWsyb3vsYfW57V2PQBrTcM_P/edit?gid=1504578258#gid=1504578258,Titan - Mediatek
+NCP-3670SF,ncp3670sf,mediatek,EMEA,🇫🇷 France,ADK,,,Playready SL3000,,Canal+
+NCP-4740SF,ncp4740sf,broadcom,EMEA,🇫🇷 France,ADK,,,Playready SL2000,,Canal+
+Kaon Zapper,NS1410,KaonMedia,LATAM,🇲🇽 Mexico,ADK,,,Playready SL2000,,Izzi
+NT72671_pus75xx_2k20,NT72671_pus75xx_2k20,philips,GLOBAL,,ADK,ADK 3.1.0,,,https://docs.google.com/spreadsheets/d/1tj0HTVlN4-tXGgxIA7Syp74Kb1OK7lCP/edit?gid=652773880#gid=652773880,Titan - Novatek
+OLED711 OLED761 - NT72676 4k 2k26,nt72676_4k_phl_2k26,philips,EMEA,🇳🇱 Netherlands,ADK,ADK 4.0,,Playready SL3000,,Titan - Novatek
+Titan JVC NT72690 2K 2K25,NT72690_2K_2K25,JVC,EMEA,,ADK,ADK 3.1.0,,,https://docs.google.com/spreadsheets/d/1Hr64ULODW-zbVpIfHW-DgrWnjkWiaRnPnysNdovrmW8/edit?gid=94085807#gid=94085807,Titan - Novatek
+Titan AOC NT72690 4K 2k24,NT72690_4K_2k24,AOC,LATAM,,ADK,ADK 3.1.0,,,https://docs.google.com/spreadsheets/d/1Hr64ULODW-zbVpIfHW-DgrWnjkWiaRnPnysNdovrmW8/edit?gid=94085807#gid=94085807,Titan - Novatek
+Titan JVC NT72690 4K 2K25,NT72690_4K_2K25,JVC,EMEA,,ADK,ADK 3.1.0,,,https://docs.google.com/spreadsheets/d/1Hr64ULODW-zbVpIfHW-DgrWnjkWiaRnPnysNdovrmW8/edit?gid=94085807#gid=94085807,Titan - Novatek
+Titan Sharp NT72690-2K-2025,NT72690-2K-2025,,EMEA,"🇩🇪 Germany,🇬🇧 United Kingdom,🇮🇹 Italy,🇪🇸 Spain,🇫🇷 France,🇳🇱 Netherlands",ADK,,,,https://docs.google.com/spreadsheets/d/1rM0jN5Ngi8gS4e3_rA355PHKVPlcRNxXFEaUWi7uSGM/edit?gid=2139976809#gid=2139976809,Titan - Novatek
+PUS86x1 PUS85x1 PUS80x1 PUS78x1-NT72690e-4k_2k26,nt72690e_4k_phl_2k26,philips,EMEA,🇳🇱 Netherlands,ADK,,checked,Playready SL3000,,Titan - Novatek
+One,One,freebox,EMEA,🇫🇷 France,ADK,ADK 3.1.1,checked,Widevine L1,https://docs.google.com/spreadsheets/d/1EWQ2Spx4cas5qnIwi3Vpf5TEYy9MGLMP/edit?gid=76169333#gid=76169333,Free
+NT72690_2K_2k25-Philips,pfs69xx_2k25,Novatek,GLOBAL,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KP5ua_9GQD0WwnCtzZv-LS9GuLNkXeRQQ03WqJL8QmA/edit?gid=430420140#gid=430420140,Titan - Novatek
+NT72690_4K_2k25-Philips,pfs69xx_2k25,Novatek,GLOBAL,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KP5ua_9GQD0WwnCtzZv-LS9GuLNkXeRQQ03WqJL8QmA/edit?gid=202487473#gid=202487473,Titan - Novatek
+PTT HUMAX HD: 100,ptt100,humax,LATAM,"🇧🇷 Brazil,🇦🇷 Argentina,🇨🇱 Chile,🇨🇴 Colombia,🇵🇪 Peru",ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Vivo
+PTT100,ptt100,humax,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+ptt100,ptt100	,humax,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+PTT HUMAX HD: 100W,ptt100w,humax,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Vivo
+ptt100w,ptt100w,humax,LATAM,,ADK,ADK 2.1.1,,Playready SL3000,,Movistar HispAm
+ptt100w,ptt100w,humax,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+PTT HUMAX UHD: 1000,ptt1000,humax,LATAM,"🇧🇷 Brazil,🇦🇷 Argentina,🇨🇱 Chile,🇨🇴 Colombia,🇵🇪 Peru",ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Vivo
+Proteus 2 UHD PTT1000W,PTT1000/CL,humax,LATAM,,ADK,ADK 2.1.1,,Playready SL3000,,Movistar HispAm
+PTT HUMAX UHD: 1000W,ptt1000w,humax,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Vivo
+PTT1000W,ptt1000w,humax,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+NT72676-4k_2k25,pus9xx0_2k24,novatek,GLOBAL,,ADK,,,"Playready SL3000,Widevine L1",https://docs.google.com/spreadsheets/d/1YWCmWiMoDn10AR1S5gQ86i7ewobXVpG-/edit?gid=1440240056#gid=1440240056,Titan - Novatek
+pus60xx_2k24,pus60xx_2k24,novatek,GLOBAL,,ADK,ADK 3.1.0,,,,Titan - Novatek
+pus68xx_2k23,pus68xx_2k23,novatek,GLOBAL,,ADK,ADK 3.1.0,,,,Titan - Novatek
+NT72690-2k_2k23,pus69xx_2k23,novatek,GLOBAL,,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1eVcZcmJ8SWsyb3vsYfW57V2PQBrTcM_P/edit?gid=1504578258#gid=1504578258,Titan - Novatek
+NT72690-2k_2k24,pus69xx_2k24,novatek,GLOBAL,,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1tj0HTVlN4-tXGgxIA7Syp74Kb1OK7lCP/edit?gid=652773880#gid=652773880,Titan - Novatek
+NT72671_2k21,pus75xx_2k21,novatek,GLOBAL,,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1tj0HTVlN4-tXGgxIA7Syp74Kb1OK7lCP/edit?gid=652773880#gid=652773880,Titan - Novatek
+NT72690-4k_2k22,pus76xx_2k22,novatek,GLOBAL,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1tj0HTVlN4-tXGgxIA7Syp74Kb1OK7lCP/edit?gid=652773880#gid=652773880,Titan - Novatek
+NT72690-4k_2k23,pus76xx_2k23,novatek,GLOBAL,,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1tj0HTVlN4-tXGgxIA7Syp74Kb1OK7lCP/edit?gid=652773880#gid=652773880,Titan - Novatek
+pus76xx_2k24,pus76xx_2k24,novatek,GLOBAL,,ADK,ADK 3.1.0,,,,Titan - Novatek
+pus80xx_2k24,pus80xx_2k24,novatek,GLOBAL,,ADK,ADK 3.1.0,,,,Titan - Novatek
+pus81xx_2k23,pus81xx_2k23,novatek,GLOBAL,,ADK,ADK 3.1.0,,,,Titan - Novatek
+pus81xx_2k24,pus81xx_2k24,novatek,GLOBAL,,ADK,ADK 3.1.0,,,,Titan - Novatek
+NT72690-4k_2k24,pus83xx_2k24,novatek,GLOBAL,,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Hr64ULODW-zbVpIfHW-DgrWnjkWiaRnPnysNdovrmW8/edit?gid=94085807#gid=94085807,Titan - Novatek
+pus89xx_2k23,pus89xx_2k23,novatek,GLOBAL,,ADK,ADK 3.1.0,,,,Titan - Novatek
+NT72676_2k24,pus89xx_2k24,novatek,GLOBAL,,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/1tj0HTVlN4-tXGgxIA7Syp74Kb1OK7lCP/edit?gid=652773880#gid=652773880,Titan - Novatek
+NT72676_2k23,pus90xx_2k23,novatek,GLOBAL,,ADK,ADK 3.1.0,,Playready SL3000,,Titan - Novatek
+pus90xx_2k24,pus90xx_2k24,novatek,GLOBAL,,ADK,ADK 3.1.0,,,,Titan - Novatek
+pus97xx_2k23,pus97xx_2k23,novatek,GLOBAL,,ADK,,,,,Titan - Novatek
+pus97xx_2k24,pus97xx_2k24,novatek,GLOBAL,,ADK,,,,,Titan - Novatek
+4K PVR,QDNE5-5751-VEC-FULL,ADB,EMEA,🇵🇱 Poland,ADK,,,"Playready SL3000,Widevine L1",https://drive.google.com/drive/folders/1kZw0rG-5CejMimgFeMoWkfGUZpqmXdWI,Vectra
+"TV Box Pro ""F1""",RTIW387 ,Sagemcom,EMEA,🇬🇧 United Kingdom,ADK,,,Playready SL3000,https://docs.google.com/spreadsheets/d/1SxiIpEI3NYDg4UJ4PUj6daRifCLWJuMV/edit?gid=245856534#gid=245856534,BT
+S4KCW4S,s4kcw4s,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+S4KCW5,s4kcw5,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+S4KW1,s4kw1,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+S4KW2,s4kw2,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+S4KW3,s4kw3,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+S4KW4S,s4kw4s,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+S4KW5,s4kw5,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+Android Box,S905x4," SHENZHEN JIUZHOU ELECTRIC CO.,LTD. ",APAC,🇹🇼 Taiwan,ADK,,,,,KBRO
+BM201,S905X5M,,GLOBAL,🇺🇲 United States,ADK,ADK 4.0 Beta ,checked,"Playready SL3000,Widevine L3",https://docs.google.com/spreadsheets/d/1p3pXqiI0svKsUUQQYEE4rUtMthVuPuLkgY5jIN5pDZE/edit?gid=1108891507#gid=1108891507,  Amlogic
+TiVo Evolution 4K S905Y5,s905y5,Evolution,EMEA,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Ol8ewlSOupQWQ2yyLx1zmNRGl-t9XjcJi62JQULRtZE/edit?gid=1091468976#gid=1091468976,TiVo
+SAG4KC362,sag4kc362,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+SAG4KC363,sag4kc363,sagemcom,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+Stellar STB5 (WHD94) / DTIW385,STB5,sagemcom,EMEA,🇫🇷 France,ADK,ADK 3.0.1+plugin-4.2.21,,,https://drive.google.com/file/d/1HnJ17qkdYxjJaq1szy3ZKgGCAiAWsM62/view,Orange
+STB 7: SGC DTIW384,STB7,sfr,EMEA,🇫🇷 France,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1_7pvHoIuRDwbD9aEDMjyuXYQXqvo6BwL/edit?gid=1016007578#gid=1016007578,SFR
+STB 8: SGC DTIW387 / Arris DCX936,STB8,sfr,EMEA,🇫🇷 France,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL2000,https://docs.google.com/spreadsheets/d/1_7pvHoIuRDwbD9aEDMjyuXYQXqvo6BwL/edit?gid=1016007578#gid=1016007578,SFR
+TiVo Sharp 2K T950D5,t950d5,Sharp,DOMESTIC,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1GMouV6o-zNs_ZRQJfZFIsvQQcxXIGaSnyNHqwzU2m4s/edit?gid=1898786682#gid=1898786682,TiVo
+TiVo Thomson 2K T950D5,t950d5,Thomson,EMEA,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1GMouV6o-zNs_ZRQJfZFIsvQQcxXIGaSnyNHqwzU2m4s/edit?gid=1898786682#gid=1898786682,TiVo
+TiVo Element 2k T950D5 MTC,t950d5,element,DOMESTIC,,ADK,,,Playready SL3000,,TiVo
+Tivo Element 2k T950D5 MTC,t950d5,,DOMESTIC,,ADK,,,Playready SL3000,,TiVo
+TiVo SmartTech 2K T950D5,t950d5,SmartTech,EMEA,UK,ADK,,,Playready SL3000,https://docs.google.com/spreadsheets/d/1GMouV6o-zNs_ZRQJfZFIsvQQcxXIGaSnyNHqwzU2m4s/edit?gid=1898786682#gid=1898786682,TiVo
+TiVo Skyworth 2K T950D5,t950d5,Skyworth,EMEA,🇬🇧 United Kingdom,ADK,ADK 3.1.1,,,https://docs.google.com/spreadsheets/d/1ZcpCd0laYR7yYHJMYOL-9IwIqhir9obFRqUuJ9Frjas/edit?gid=16195018#gid=16195018,TiVo
+TiVo Element 2k T950D5 Vestel,t950d5_vestel,element,DOMESTIC,,ADK,,,Playready SL3000,,TiVo
+TiVo Element 2k T950D5 Vestel,t950d5_vestel,element,DOMESTIC,,ADK,,,Playready SL3000,,TiVo
+TiVo Sharp 4K T962D4,t962d4,Sharp,DOMESTIC,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Ol8ewlSOupQWQ2yyLx1zmNRGl-t9XjcJi62JQULRtZE/edit?gid=1091468976#gid=1091468976,TiVo
+TiVo Skyworth 4K T962D4,t962d4,Skyworth,EMEA,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Ol8ewlSOupQWQ2yyLx1zmNRGl-t9XjcJi62JQULRtZE/edit?gid=1091468976#gid=1091468976,TiVo
+TiVo Element 4K T962D4,t962d4,Skyworth,DOMESTIC,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Ol8ewlSOupQWQ2yyLx1zmNRGl-t9XjcJi62JQULRtZE/edit?gid=1091468976#gid=1091468976,TiVo
+TiVo Thomson 4K T962D4,t962d4,Thomson,EMEA,,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1Ol8ewlSOupQWQ2yyLx1zmNRGl-t9XjcJi62JQULRtZE/edit?gid=1091468976#gid=1091468976,TiVo
+TiVo SmartTech 4K T962D4,t962d4,SmartTech,EMEA,UK,ADK,,,Playready SL3000,https://docs.google.com/spreadsheets/d/1ZcpCd0laYR7yYHJMYOL-9IwIqhir9obFRqUuJ9Frjas/edit?usp=sharing,TiVo
+TBD,TBD,,EMEA,🇸🇪 Sweden,ADK,,,,,Tele2
+UMAv1 zd4500zno,UMAv1,commscope,EMEA,🇵🇹 Portugal,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/16MhwHj0YdJR0juiCAS9kLYE_oAvvxtnD/edit?gid=1236368873#gid=1236368873,NOS
+UMAv2 zc4430kno,UMAv2,commscope,EMEA,🇵🇹 Portugal,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/16MhwHj0YdJR0juiCAS9kLYE_oAvvxtnD/edit?gid=1236368873#gid=1236368873,NOS
+UMAv2.1 zc4431kno,UMAv2.1,commscope,EMEA,🇵🇹 Portugal,ADK,ADK 3.1.0,,Playready SL3000,https://docs.google.com/spreadsheets/d/16MhwHj0YdJR0juiCAS9kLYE_oAvvxtnD/edit?gid=1236368873#gid=1236368873,NOS
+USW4001NCP,usw4001ncp	,broadcom,EMEA,🇫🇷 France,ADK,,,Playready SL3000,,Canal+
+Freebox V6 Revolution,V6 Revolution,Freebox,EMEA,🇫🇷 France,ADK,,,Widevine L3,https://docs.google.com/spreadsheets/d/1EWQ2Spx4cas5qnIwi3Vpf5TEYy9MGLMP/edit#gid=76169333,Free
+VIP Commscope Proteus 1 HD: 4242H,vip4242h,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Vivo
+VIP Commscope 1st HD: 4242W,vip4242w,arris,LATAM,🇦🇷 Argentina,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Vivo
+Proteus 1 HD 4242W,vip4242w,arris,LATAM,,ADK,ADK 2.1.1,,Playready SL3000,,Movistar HispAm
+vip4242w,vip4242w,arris,LATAM,🇦🇷 Argentina,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+VIP Commscope 2nd HD: 4342,vip4342,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Vivo
+vip4342,vip4342,arris,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+4342,vip4342,arris,LATAM,,ADK,ADK 2.1.1,,Playready SL3000,,Movistar HispAm
+vip4342,vip4342,arris,LATAM,,ADK,ADK 2.1.1,,Playready SL3000,,Movistar HispAm
+VIP Commscope 2nd HD: 4342W,vip4342w,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Vivo
+vip4342w,vip4342w,arris,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+Apollo,vip5002w,commscope,EMEA,🇳🇱 Netherlands,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,VodafoneZiggo
+Apollo (TV2.0/Stream),vip5002w,commscope,EMEA,🇬🇧 United Kingdom,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media O2
+Apollo (TV2.0/Stream),vip5002w,commscope,EMEA,🇨🇭 Switzerland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Sunrise
+Apollo,vip5002w,commscope,EMEA,🇮🇪 Ireland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media
+Commscope VIP5202,vip5202,commscope,EMEA,🇳🇱 Netherlands,ADK,,,Playready SL3000,,KPN
+VIP Commscope 1st UHD: 5242W,vip5242w,arris,LATAM,"🇧🇷 Brazil,🇦🇷 Argentina,🇨🇱 Chile,🇨🇴 Colombia,🇵🇪 Peru",ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Vivo
+Proteus 1 UHD 5242W,vip5242w,arris,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+5242W,vip5242w,arris,LATAM,,ADK,ADK 2.1.1,,Playready SL3000,,Movistar HispAm
+VIP Commscope 1st UHD: 5262 (PVR),vip5262,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1F5yrvsI4E7-yxm7J54NBrOZzHRhGzzA4/edit?gid=700450489#gid=700450489,Vivo
+5262,vip5262,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+VIP Commscope 2nd UHD: 5342,vip5342,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Vivo
+5342,vip5342,arris,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+VIP Commscope 2nd UHD: 5342W,vip5342w,arris,LATAM,🇧🇷 Brazil,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Vivo
+5342W,vip5342w,arris,LATAM,,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,,Movistar HispAm
+5342W,vip5342w,arris,LATAM,,ADK,,,Playready SL3000,,Movistar HispAm
+Proteus III,vip5642,Commscope,LATAM,🇦🇷 Argentina,ADK,ADK 3.0.1+plugin-4.2.21,,"Playready SL3000,Widevine L1",https://docs.google.com/spreadsheets/d/1jHhRdA9Ar-dFVi85aOHOOhMxQLJyxGmWQxjKvVx7Q7M/edit?gid=109110623#gid=109110623,Movistar HispAm
+Proteus III,vip5642,Commscope,LATAM,🇨🇱 Chile,ADK,ADK 3.0.1+plugin-4.2.21,,"Playready SL3000,Widevine L1",https://docs.google.com/spreadsheets/d/1jHhRdA9Ar-dFVi85aOHOOhMxQLJyxGmWQxjKvVx7Q7M/edit?gid=109110623#gid=109110623,Movistar HispAm
+Proteus III,vip5642,Commscope,LATAM,🇨🇴 Colombia,ADK,ADK 3.0.1+plugin-4.2.21,,"Playready SL3000,Widevine L1",https://docs.google.com/spreadsheets/d/1jHhRdA9Ar-dFVi85aOHOOhMxQLJyxGmWQxjKvVx7Q7M/edit?gid=109110623#gid=109110623,Movistar HispAm
+Proteus III,vip5642,Commscope,LATAM,🇵🇪 Peru,ADK,ADK 3.0.1+plugin-4.2.21,,"Playready SL3000,Widevine L1",https://docs.google.com/spreadsheets/d/1jHhRdA9Ar-dFVi85aOHOOhMxQLJyxGmWQxjKvVx7Q7M/edit?gid=109110623#gid=109110623,Movistar HispAm
+Proteus III,vip5642,Commscope,LATAM,"🇧🇷 Brazil,🇦🇷 Argentina,🇨🇱 Chile,🇨🇴 Colombia,🇵🇪 Peru",ADK,ADK 3.0.1+plugin-4.2.21,checked,"Playready SL3000,Widevine L1",https://docs.google.com/spreadsheets/d/1jHhRdA9Ar-dFVi85aOHOOhMxQLJyxGmWQxjKvVx7Q7M/edit?gid=109110623#gid=109110623,Vivo
+Apollo V1+,vip7002w,commscope,EMEA,🇧🇪 Belgium,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Telenet
+Apollo V1+,vip7002w,commscope,EMEA,🇬🇧 United Kingdom,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media O2
+Apollo V1+,vip7002w,commscope,EMEA,🇳🇱 Netherlands,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,VodafoneZiggo
+Apollo V1+,vip7002w,commscope,EMEA,🇨🇭 Switzerland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Sunrise
+Apollo V1+,vip7002w,commscope,EMEA,🇮🇪 Ireland,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1KcFu7YW8BO4OlNzFk32wTqVGfxkQkiw9/edit?gid=2015029956#gid=2015029956,Virgin Media
+Sagemcom VSB3940,vsb3940,sagemcom,LATAM,🇲🇽 Mexico,ADK,ADK 3.0.1+plugin-4.2.21,,Widevine L1,https://docs.google.com/spreadsheets/d/1dSYTSNYeoJXW42nDYWZwXGUSMFlrnl6d/edit?gid=565769322#gid=565769322,Totalplay
+Manhattan (WHD95) / STB6,whd95,sagemcom,EMEA,🇫🇷 France,ADK,ADK 3.0.1+plugin-4.2.14,,Playready SL3000,https://docs.google.com/spreadsheets/d/13B-xsPhtJjptbT0Uauu0cGAl-TfAtYLp/edit?usp=drive_link&ouid=115928718216096707673&rtpof=true&sd=true,Orange
+YS-4000,youSee YS-4000,humax,EMEA,🇩🇰 Denmark,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL2000,https://docs.google.com/spreadsheets/d/1XE8RE6-dehHqDK9vnsJDw8Wcu7xUTT5R/edit?gid=246431494#gid=246431494,Nuuday
+YS-5000,ys-5000,humax,EMEA,🇩🇰 Denmark,ADK,ADK 3.0.1+plugin-4.2.21,,Playready SL3000,https://docs.google.com/spreadsheets/d/1XE8RE6-dehHqDK9vnsJDw8Wcu7xUTT5R/edit?gid=246431494#gid=246431494,Nuuday
+Z4KCW6,z4kcw6,ZTE,LATAM,🇧🇷 Brazil,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
+Z4KW6,z4kw6,ZTE,LATAM,🇧🇷 Brazil,ADK,ADK 3.1.1,,Playready SL3000,https://docs.google.com/spreadsheets/d/1IbsdnJjwin8TmoTBUe_QZYh62qBVF6hxyKgCd1X24gA/edit?gid=235588465#gid=235588465,Claro
