@@ -27,7 +27,7 @@ const columns: Column<PartnerWithStats>[] = [
     accessor: 'regions',
     render: (row) => (
       <div className="flex flex-wrap gap-1">
-        {row.regions.map((r) => (
+        {(row.regions ?? []).map((r) => (
           <Badge key={r} variant="info">{r}</Badge>
         ))}
       </div>
@@ -38,7 +38,7 @@ const columns: Column<PartnerWithStats>[] = [
     accessor: 'countriesIso2',
     render: (row) => (
       <div className="flex flex-wrap gap-1">
-        {row.countriesIso2.map((c) => (
+        {(row.countriesIso2 ?? []).map((c) => (
           <span key={c} className="text-sm">{countryFlag(c)} {c}</span>
         ))}
       </div>
@@ -92,7 +92,7 @@ export default function PartnerListPage() {
       result = result.filter((p) => p.displayName.toLowerCase().includes(q));
     }
     if (regionFilter) {
-      result = result.filter((p) => p.regions.includes(regionFilter as Region));
+      result = result.filter((p) => (p.regions ?? []).includes(regionFilter as Region));
     }
     return result;
   }, [partners, search, regionFilter]);
