@@ -30,7 +30,15 @@ interface AuthContextValue extends AuthState {
   isAdmin: boolean;
 }
 
-const ALLOWED_DOMAINS = ['disney.com', 'disneystreaming.com', 'nathanpayne.com'];
+const ALLOWED_DOMAINS = ['disney.com', 'disneystreaming.com'];
+
+const DOMAIN_DENIED_MESSAGE =
+  'Your email domain is not authorized to access Device Source of Truth.';
+
+function isDomainAllowed(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return !!domain && ALLOWED_DOMAINS.includes(domain);
+}
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -46,6 +54,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser || !fbUser.email) {
         setState({ firebaseUser: null, user: null, loading: false, error: null });
+        return;
+      }
+
+      if (!isDomainAllowed(fbUser.email)) {
+        await firebaseSignOut(auth);
+        trackEvent('login_failed', { reason: 'domain_rejected' });
+        setState({
+          firebaseUser: null,
+          user: null,
+          loading: false,
+          error: DOMAIN_DENIED_MESSAGE,
+        });
         return;
       }
 
@@ -103,14 +123,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const email = result.user.email || '';
-      const domain = email.split('@')[1]?.toLowerCase();
 
-      if (!ALLOWED_DOMAINS.includes(domain)) {
+      if (!isDomainAllowed(email)) {
         await firebaseSignOut(auth);
         trackEvent('login_failed', { reason: 'domain_rejected' });
         setState((s) => ({
           ...s,
-          error: 'Access restricted to Disney corporate accounts.',
+          firebaseUser: null,
+          user: null,
+          error: DOMAIN_DENIED_MESSAGE,
         }));
         return;
       }
@@ -118,7 +139,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       trackEvent('login', { method: 'google' });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign-in failed';
-      setState((s) => ({ ...s, error: message }));
+      const isDomainError =
+        message.includes('domain') ||
+        message.includes('permission-denied') ||
+        message.includes('PERMISSION_DENIED');
+      setState((s) => ({
+        ...s,
+        firebaseUser: null,
+        user: null,
+        error: isDomainError ? DOMAIN_DENIED_MESSAGE : message,
+      }));
     }
   };
 
