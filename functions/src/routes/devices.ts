@@ -158,7 +158,7 @@ router.get('/:id', async (req, res) => {
     } as Device;
     req.log?.debug('Fetching device relations', { deviceId: device.deviceId, partnerKeyId: device.partnerKeyId, tierId: device.tierId });
 
-    const [pkSnap, specSnap, tierSnap, deploySnap, telSnap, auditSnap] = await Promise.all([
+    const [pkResult, specResult, tierResult, deployResult, telResult, auditResult] = await Promise.allSettled([
       device.partnerKeyId ? db.collection('partnerKeys').doc(device.partnerKeyId).get() : Promise.resolve(null),
       db.collection('deviceSpecs').where('deviceId', '==', device.id).limit(1).get(),
       device.tierId ? db.collection('hardwareTiers').doc(device.tierId).get() : Promise.resolve(null),
@@ -166,6 +166,19 @@ router.get('/:id', async (req, res) => {
       db.collection('telemetrySnapshots').where('deviceId', '==', device.id).orderBy('snapshotDate', 'desc').limit(20).get(),
       db.collection('auditLog').where('entityType', '==', 'device').where('entityId', '==', device.id).orderBy('timestamp', 'desc').limit(50).get(),
     ]);
+
+    const pkSnap = pkResult.status === 'fulfilled' ? pkResult.value : null;
+    const specSnap = specResult.status === 'fulfilled' ? specResult.value : null;
+    const tierSnap = tierResult.status === 'fulfilled' ? tierResult.value : null;
+    const deploySnap = deployResult.status === 'fulfilled' ? deployResult.value : null;
+    const telSnap = telResult.status === 'fulfilled' ? telResult.value : null;
+    const auditSnap = auditResult.status === 'fulfilled' ? auditResult.value : null;
+
+    for (const [label, result] of [['telemetry', telResult], ['audit', auditResult], ['deployments', deployResult]] as const) {
+      if (result.status === 'rejected') {
+        req.log?.warn(`Failed to fetch ${label} for device`, { idParam, error: String(result.reason) });
+      }
+    }
 
     let partner = null;
     if (pkSnap && pkSnap.exists) {
@@ -178,22 +191,22 @@ router.get('/:id', async (req, res) => {
 
     req.log?.info('Device detail fetched', {
       idParam,
-      hasSpec: !specSnap.empty,
+      hasSpec: specSnap ? !specSnap.empty : false,
       hasTier: !!(tierSnap && tierSnap.exists),
-      deploymentCount: deploySnap.size,
-      telemetrySnapshotCount: telSnap.size,
-      auditEntryCount: auditSnap.size,
+      deploymentCount: deploySnap?.size ?? 0,
+      telemetrySnapshotCount: telSnap?.size ?? 0,
+      auditEntryCount: auditSnap?.size ?? 0,
     });
 
     res.json({
       ...device,
       partner,
       partnerKey: pkSnap && pkSnap.exists ? { id: pkSnap.id, ...pkSnap.data() } : null,
-      spec: specSnap.empty ? null : { id: specSnap.docs[0].id, ...specSnap.docs[0].data() },
+      spec: specSnap && !specSnap.empty ? { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } : null,
       tier: tierSnap && tierSnap.exists ? { id: tierSnap.id, ...tierSnap.data() } : null,
-      deployments: deploySnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-      telemetrySnapshots: telSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-      auditHistory: auditSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      deployments: deploySnap ? deploySnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
+      telemetrySnapshots: telSnap ? telSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
+      auditHistory: auditSnap ? auditSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
     });
   } catch (err) {
     req.log?.error('Failed to get device', formatError(err));
