@@ -404,6 +404,7 @@ export default function TelemetryUploadPage() {
                     <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Partner Key</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Device ID</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Core Version</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Friendly Version</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold uppercase text-gray-500">Unique Devices</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold uppercase text-gray-500">Events</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold uppercase text-gray-500">Notes</th>
@@ -431,6 +432,13 @@ export default function TelemetryUploadPage() {
                         <td className="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-900">{row.partner || '—'}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.device || '—'}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.coreVersion || '—'}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">
+                          {row.friendlyVersion ? (
+                            <span className="font-medium text-gray-900">{row.friendlyVersion}</span>
+                          ) : row.coreVersion ? (
+                            <Badge variant="warning">Unmapped</Badge>
+                          ) : '—'}
+                        </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{row.uniqueDevices.toLocaleString()}</td>
                         <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{row.eventCount.toLocaleString()}</td>
                         <td className="px-3 py-2 text-xs">

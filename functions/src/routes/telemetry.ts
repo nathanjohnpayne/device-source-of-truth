@@ -23,6 +23,7 @@ interface PreviewRowResult {
   partner: string;
   device: string;
   coreVersion: string;
+  friendlyVersion: string | null;
   uniqueDevices: number;
   eventCount: number;
   status: 'ready' | 'warning' | 'error';
@@ -32,12 +33,26 @@ interface PreviewRowResult {
   errors: string[];
 }
 
+async function loadVersionMappings(db: FirebaseFirestore.Firestore): Promise<Map<string, string>> {
+  const snap = await db.collection('coreVersionMappings')
+    .where('isActive', '==', true)
+    .get();
+  const map = new Map<string, string>();
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    map.set(data.coreVersion, data.friendlyVersion);
+  }
+  return map;
+}
+
 async function buildPreview(
   db: FirebaseFirestore.Firestore,
   rows: TelemetryRow[],
   snapshotDate: string,
 ): Promise<PreviewRowResult[]> {
   const existingMap = new Map<string, { snapshotDate: string; uniqueDevices: number; eventCount: number; coreVersion: string; docId: string }>();
+
+  const versionMap = await loadVersionMappings(db);
 
   const allKeys = new Set<string>();
   const parsedRows: { partnerKey: string; deviceId: string; coreVersion: string; uniqueDevices: number; eventCount: number }[] = [];
@@ -94,6 +109,11 @@ async function buildPreview(
     if (!parsed.deviceId) warnings.push('Missing device ID');
     if (parsed.uniqueDevices === 0 && parsed.eventCount === 0) warnings.push('Zero device count and event count');
 
+    const friendlyVersion = parsed.coreVersion ? (versionMap.get(parsed.coreVersion) ?? null) : null;
+    if (parsed.coreVersion && !friendlyVersion) {
+      warnings.push(`No version mapping for "${parsed.coreVersion}". The raw build string will be stored. Add a mapping in the Version Registry to display a friendly label.`);
+    }
+
     const key = `${parsed.partnerKey}|||${parsed.deviceId}`;
     const existing = existingMap.get(key);
 
@@ -128,6 +148,7 @@ async function buildPreview(
       partner: parsed.partnerKey,
       device: parsed.deviceId,
       coreVersion: parsed.coreVersion,
+      friendlyVersion,
       uniqueDevices: parsed.uniqueDevices,
       eventCount: parsed.eventCount,
       status,
@@ -224,6 +245,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
 
     const uploadBatchId = crypto.randomUUID();
     const now = new Date().toISOString();
+    const versionMap = await loadVersionMappings(db);
 
     let successCount = 0;
     let newCount = 0;
@@ -241,6 +263,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
         const coreVersion = (row.core_version ?? '').trim();
         const uniqueDevices = parseInt(row.count_unique_device_id) || 0;
         const eventCount = parseInt(row.count) || 0;
+        const friendlyVersion = coreVersion ? (versionMap.get(coreVersion) ?? null) : null;
 
         if (!partnerKey || !deviceId) {
           successCount++;
@@ -249,10 +272,12 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
             partnerKey,
             deviceId,
             coreVersion,
+            friendlyVersion,
             uniqueDevices,
             eventCount,
             snapshotDate,
             countUpdatedAt: snapshotDate,
+            versionUpdatedAt: snapshotDate,
             uploadedAt: now,
             uploadBatchId,
           });
@@ -275,10 +300,12 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
             partnerKey,
             deviceId,
             coreVersion,
+            friendlyVersion,
             uniqueDevices,
             eventCount,
             snapshotDate,
             countUpdatedAt: snapshotDate,
+            versionUpdatedAt: snapshotDate,
             uploadedAt: now,
             uploadBatchId,
           });
@@ -315,15 +342,22 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
             continue;
           }
 
-          await existingDoc.ref.update({
+          const versionChanged = existingData.coreVersion !== coreVersion;
+          const updateFields: Record<string, unknown> = {
             coreVersion,
+            friendlyVersion,
             uniqueDevices,
             eventCount,
             snapshotDate,
             countUpdatedAt: snapshotDate,
             uploadedAt: now,
             uploadBatchId,
-          });
+          };
+          if (versionChanged) {
+            updateFields.versionUpdatedAt = snapshotDate;
+          }
+
+          await existingDoc.ref.update(updateFields);
           updatedCount++;
         }
 

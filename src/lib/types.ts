@@ -548,10 +548,12 @@ export interface TelemetrySnapshot {
   partnerKey: string;
   deviceId: string;
   coreVersion: string;
+  friendlyVersion: string | null;
   uniqueDevices: number;
   eventCount: number;
   snapshotDate: Timestamp;
   countUpdatedAt: Timestamp | null;
+  versionUpdatedAt: Timestamp | null;
   uploadedAt: Timestamp | null;
   uploadBatchId: string | null;
 }
@@ -563,6 +565,7 @@ export interface TelemetryPreviewRow {
   partner: string;
   device: string;
   coreVersion: string;
+  friendlyVersion: string | null;
   uniqueDevices: number;
   eventCount: number;
   status: 'ready' | 'warning' | 'error';
@@ -571,6 +574,31 @@ export interface TelemetryPreviewRow {
   overwriteStale: boolean;
   warnings: string[];
   errors: string[];
+}
+
+// ── Core Version Mappings (DST-044) ──
+
+export type VersionPlatform = 'NCP' | 'ADK' | 'DEV' | 'UNKNOWN';
+
+export interface CoreVersionMapping {
+  id: string;
+  coreVersion: string;
+  friendlyVersion: string;
+  platform: VersionPlatform;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
+export interface UnmappedVersion {
+  coreVersion: string;
+  platform: VersionPlatform;
+  deviceCount: number;
+  partnerCount: number;
+  firstSeen: Timestamp | null;
 }
 
 // ── Hardware Tiers ──

@@ -176,12 +176,31 @@ export interface TelemetrySnapshot {
   partnerKey: string;
   deviceId: string;
   coreVersion: string;
+  friendlyVersion: string | null;
   uniqueDevices: number;
   eventCount: number;
   snapshotDate: Timestamp;
   countUpdatedAt: Timestamp | null;
+  versionUpdatedAt: Timestamp | null;
   uploadedAt: Timestamp | null;
   uploadBatchId: string | null;
+}
+
+// ── Core Version Mappings (DST-044) ──
+
+export type VersionPlatform = 'NCP' | 'ADK' | 'DEV' | 'UNKNOWN';
+
+export interface CoreVersionMapping {
+  id: string;
+  coreVersion: string;
+  friendlyVersion: string;
+  platform: VersionPlatform;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
 }
 
 // ── Hardware Tiers ──

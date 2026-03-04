@@ -303,8 +303,22 @@ export default function DeviceDetailPage() {
       ).countUpdatedAt
     : null;
 
+  const latestVersionUpdatedAt = telemetry.length
+    ? telemetry.reduce((latest, t) =>
+        (t.versionUpdatedAt ?? '') > (latest.versionUpdatedAt ?? '') ? t : latest,
+      ).versionUpdatedAt
+    : null;
+
+  const versionLookup = new Map<string, string | null>();
+  for (const t of telemetry) {
+    if (!versionLookup.has(t.coreVersion)) {
+      versionLookup.set(t.coreVersion, t.friendlyVersion ?? null);
+    }
+  }
+
   const versionBreakdown = telemetry.reduce<Record<string, number>>((acc, t) => {
-    acc[t.coreVersion] = (acc[t.coreVersion] || 0) + t.uniqueDevices;
+    const label = t.friendlyVersion || t.coreVersion;
+    acc[label] = (acc[label] || 0) + t.uniqueDevices;
     return acc;
   }, {});
 
@@ -544,7 +558,7 @@ export default function DeviceDetailPage() {
         <div className="p-4">
           {telemetry.length > 0 ? (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg bg-gray-50 p-4">
                   <p className="text-sm font-medium text-gray-500">Total Unique Devices</p>
                   <p className="mt-1 text-2xl font-bold text-gray-900">
@@ -563,6 +577,12 @@ export default function DeviceDetailPage() {
                     {latestCountUpdatedAt ? formatDate(latestCountUpdatedAt) : '—'}
                   </p>
                 </div>
+                <div className="rounded-lg bg-gray-50 p-4">
+                  <p className="text-sm font-medium text-gray-500">Version Updated</p>
+                  <p className="mt-1 text-2xl font-bold text-gray-900">
+                    {latestVersionUpdatedAt ? formatDate(latestVersionUpdatedAt) : '—'}
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -574,7 +594,7 @@ export default function DeviceDetailPage() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">
-                          ADK Version
+                          Core Version
                         </th>
                         <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">
                           Unique Devices

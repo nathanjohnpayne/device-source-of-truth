@@ -18,6 +18,7 @@ import uploadRouter from './routes/upload.js';
 import fieldOptionsRouter from './routes/fieldOptions.js';
 import intakeRouter from './routes/intake.js';
 import disambiguateRouter from './routes/disambiguate.js';
+import versionMappingsRouter from './routes/versionMappings.js';
 
 admin.initializeApp();
 log.info('Firebase Admin initialized');
@@ -43,6 +44,7 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/field-options', fieldOptionsRouter);
 app.use('/api/intake', intakeRouter);
 app.use('/api/import/disambiguate', disambiguateRouter);
+app.use('/api/version-mappings', versionMappingsRouter);
 
 app.use(
   (

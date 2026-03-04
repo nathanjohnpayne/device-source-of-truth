@@ -21,6 +21,8 @@ import type {
   IntakeImportResult,
   IntakeImportBatch,
   MigrationBatch,
+  CoreVersionMapping,
+  UnmappedVersion,
   ImportType,
   DisambiguationResponse,
   DisambiguationFieldResult,
@@ -382,6 +384,29 @@ export const api = {
           body: JSON.stringify({ importType, answers, originalFields, rows }),
         },
       ),
+  },
+
+  versionMappings: {
+    list: (params?: { platform?: string; active?: string }) =>
+      apiFetch<{ data: CoreVersionMapping[] }>(`/version-mappings${qs(params)}`),
+    create: (data: { coreVersion: string; friendlyVersion: string; notes?: string }) =>
+      apiFetch<CoreVersionMapping>('/version-mappings', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { friendlyVersion?: string; notes?: string; isActive?: boolean }) =>
+      apiFetch<CoreVersionMapping>(`/version-mappings/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    unmapped: () =>
+      apiFetch<{ data: UnmappedVersion[] }>('/version-mappings/unmapped'),
+    friendlyVersions: () =>
+      apiFetch<{ data: string[] }>('/version-mappings/friendly-versions'),
+    usage: (id: string) =>
+      apiFetch<{ usageCount: number }>(`/version-mappings/usage/${id}`),
+    seed: () =>
+      apiFetch<{ created: number; skipped: number }>('/version-mappings/seed', { method: 'POST' }),
   },
 
 };

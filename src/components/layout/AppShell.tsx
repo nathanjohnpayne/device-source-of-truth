@@ -17,6 +17,7 @@ import {
   LogOut,
   ChevronRight,
   Trash2,
+  GitBranch,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import Badge from '../shared/Badge';
@@ -112,6 +113,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Partner Keys',
         path: '/admin/partner-keys',
         icon: <Key className="h-5 w-5" />,
+        adminOnly: true,
+      },
+      {
+        label: 'Version Registry',
+        path: '/admin/version-registry',
+        icon: <GitBranch className="h-5 w-5" />,
         adminOnly: true,
       },
       {

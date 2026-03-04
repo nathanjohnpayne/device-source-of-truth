@@ -91,6 +91,7 @@ const ReferenceDataPage = lazyRetry(() => import('./pages/ReferenceDataPage'));
 const IntakeImportPage = lazyRetry(() => import('./pages/IntakeImportPage'));
 const PartnerKeyRegistryPage = lazyRetry(() => import('./pages/PartnerKeyRegistryPage'));
 const DangerZonePage = lazyRetry(() => import('./pages/DangerZonePage'));
+const VersionRegistryPage = lazyRetry(() => import('./pages/VersionRegistryPage'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -293,6 +294,14 @@ function AppRoutes() {
               element={
                 <AdminRoute>
                   <DangerZonePage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/version-registry"
+              element={
+                <AdminRoute>
+                  <VersionRegistryPage />
                 </AdminRoute>
               }
             />
