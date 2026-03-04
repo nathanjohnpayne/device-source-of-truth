@@ -22,8 +22,8 @@ Firebase Hosting (static SPA)
 
 - Frontend: React 19 + TypeScript + Tailwind CSS 4, built with Vite 7
 - Backend: Express 5 app exported as a single Firebase Cloud Function named `api`
-- Database: Firestore (18 collections)
-- AI: Anthropic Claude API (claude-sonnet-4-6) for import disambiguation (pre-production/testing)
+- Database: Firestore (23 collections)
+- AI: Anthropic Claude API (claude-sonnet-4-6) for import disambiguation and questionnaire field extraction
 - Auth: Firebase Auth with Google OAuth, domain-restricted to `@disney.com` and `@disneystreaming.com`
 
 ## Directory Structure
@@ -34,7 +34,7 @@ Firebase Hosting (static SPA)
 │   ├── App.tsx                   ← Router, auth guards, lazy-loaded routes
 │   ├── main.tsx                  ← Entry point
 │   ├── index.css                 ← Tailwind imports + global styles
-│   ├── pages/                    ← 21 route-level page components
+│   ├── pages/                    ← 25 route-level page components
 │   ├── components/
 │   │   ├── layout/               ← AppShell (sidebar + topbar), GlobalSearch
 │   │   ├── shared/               ← DataTable, Badge, Modal, FilterPanel, etc.
@@ -54,15 +54,16 @@ Firebase Hosting (static SPA)
 │   ├── src/
 │   │   ├── index.ts              ← Express app, route mounting, error handler
 │   │   ├── middleware/auth.ts    ← Token verification, domain check, role guard
-│   │   ├── routes/               ← 14 Express routers (partners, devices, disambiguate, etc.)
-│   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, seedFieldOptions)
+│   │   ├── routes/               ← 15 Express routers (partners, devices, disambiguate, questionnaireIntake, etc.)
+│   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, seedFieldOptions, questionnaireParser, questionnaireExtractor, storage)
 │   │   └── types/index.ts        ← Backend type definitions (mirrors src/lib/types.ts)
 │   ├── package.json              ← Separate deps (firebase-admin, express, xlsx, etc.)
 │   └── tsconfig.json
 │
 ├── specs/                        ← Product specs and feature stories
 ├── firebase.json                 ← Hosting rewrites + functions + firestore config
-├── firestore.rules               ← Firestore security rules (18 collections)
+├── firestore.rules               ← Firestore security rules (23 collections)
+├── storage.rules                 ← Firebase Storage security rules (questionnaire files)
 ├── firestore.indexes.json        ← Composite index definitions (currently empty)
 ├── .env / .env.example           ← Firebase API keys (3 vars, all VITE_ prefixed)
 └── vite.config.ts                ← Vite + Tailwind + code-split config
@@ -98,6 +99,11 @@ Firebase Hosting (static SPA)
 | `intakeRequests` | Airtable intake request records | requestType, partnerName, region, tamOwner, batchId |
 | `intakeRequestPartners` | Intake request → partner links | intakeRequestId, partnerId, matchType |
 | `intakeImportHistory` | Intake CSV import history | importedBy, fileName, rowCount, status |
+| `questionnaireIntakeJobs` | Questionnaire file upload/parse/extraction jobs | fileName, fileStoragePath, partnerId, questionnaireFormat, status, aiExtractionMode |
+| `questionnaireStagedDevices` | Devices detected from a questionnaire file | intakeJobId, rawHeaderLabel, platformType, matchedDeviceId, reviewStatus |
+| `questionnaireStagedFields` | Individual Q/A pairs extracted per device | stagedDeviceId, dstFieldKey, rawQuestionText, extractedValue, conflictStatus, resolution |
+| `deviceQuestionnaireSources` | Links devices to the questionnaire jobs that populated their specs | deviceId, intakeJobId, fieldsImported, fieldsOverridden |
+| `notifications` | In-app notifications for admins | recipientRole, title, body, link, read |
 
 ## API Routes
 
@@ -155,6 +161,22 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | DELETE | /intake/rollback/:batchId | admin | Rollback an intake import |
 | POST | /import/disambiguate | admin | AI disambiguation pass on parsed import rows (DST-039, pre-production) |
 | POST | /import/disambiguate/resolve | admin | Apply admin answers to AI clarification questions (DST-039, pre-production) |
+| POST | /questionnaire-intake | editor+ | Upload questionnaire file (base64), create job, parse, optionally trigger AI extraction |
+| GET | /questionnaire-intake | any | List questionnaire intake jobs (paginated, filterable) |
+| GET | /questionnaire-intake/:id | any | Get intake job detail with staged device summaries |
+| POST | /questionnaire-intake/:id/trigger-extraction | editor+ | Manually trigger AI extraction on an intake job |
+| GET | /questionnaire-intake/:id/staged-devices | any | All staged devices with their extracted fields |
+| GET | /questionnaire-intake/:id/download | any | Generate signed URL for source file download |
+| GET | /questionnaire-intake/:id/review | any | Full review state (devices + all fields with conflict info) |
+| PATCH | /questionnaire-intake/:id | admin | Update intake job (partner assignment) |
+| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId | admin | Update staged device (approve/reject, match, identity fields) |
+| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId/fields/:fieldId | admin | Update field resolution or override extracted value |
+| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId/resolve-all | admin | Bulk resolve all pending conflicts to use_new |
+| POST | /questionnaire-intake/:id/approve | admin | Commit approved devices to catalog (atomic transaction) |
+| POST | /questionnaire-intake/:id/reject | admin | Reject entire intake job |
+| GET | /questionnaire-intake/notifications/list | any | List in-app notifications |
+| PATCH | /questionnaire-intake/notifications/:id/read | any | Mark notification as read |
+| GET | /questionnaire-intake/device-sources/:deviceId | any | Get questionnaire sources for a device |
 
 ## Role System
 
@@ -164,7 +186,7 @@ Three roles, checked by `requireRole()` middleware on the backend and `useAuth()
 |---|---|
 | `viewer` | Read all data, run simulations, use search |
 | `editor` | Everything viewer can do + create/edit devices, specs, partners |
-| `admin` | Everything editor can do + manage tiers, upload telemetry, manage partner keys, import intake requests, run migrations, dismiss alerts, rollback imports |
+| `admin` | Everything editor can do + manage tiers, upload telemetry, manage partner keys, import intake requests, run migrations, dismiss alerts, rollback imports, review/approve/reject questionnaire imports |
 
 Roles are stored in the `users` Firestore collection. A user doc must exist with matching email for login to succeed. Users not in the collection get a default `viewer` role on the frontend but will fail backend writes.
 
@@ -231,6 +253,7 @@ npx firebase deploy
 npx firebase deploy --only hosting
 npx firebase deploy --only functions
 npx firebase deploy --only firestore:rules
+npx firebase deploy --only storage
 ```
 
 ## Environment Variables
@@ -249,9 +272,13 @@ Backend (in `functions/.env`, gitignored):
 
 1. **Two separate `package.json` files.** Root is for the frontend, `functions/package.json` is for the backend. Install deps in the right one.
 2. **Two separate `tsconfig` setups.** Frontend uses `tsconfig.app.json` (erasableSyntaxOnly, no class property syntax in constructors). Backend uses `functions/tsconfig.json` (standard ESNext).
-3. **Types are defined twice.** `src/lib/types.ts` is the source of truth. `functions/src/types/index.ts` has its own copy due to TypeScript `rootDir` constraints. Keep them in sync.
+3. **Types are defined in three places.** `packages/contracts/src/index.ts` is the canonical source for shared types. `src/lib/types.ts` and `functions/src/types/index.ts` re-export from `@dst/contracts` and add their own layer-specific types. Keep re-exports in sync when adding new contract types.
 4. **Device specs have 90 fields** across 12 categories. The `DeviceSpec` interface nests sub-interfaces (e.g., `DeviceSpecSoc`, `DeviceSpecMemory`). These are NOT flat — they're grouped objects.
 5. **The tier engine auto-runs** on spec save and tier definition save. Don't forget this side effect when modifying those flows.
 6. **Firestore has no joins.** The backend manually fetches related collections. Watch for N+1 query patterns.
 7. **The `api` Cloud Function handles ALL routes.** There is only one function exported. All Express routes are under `/api/*`.
 8. **AI disambiguation (DST-039) is pre-production/testing.** The Anthropic API key is stored in `functions/.env` (gitignored). If the key is missing or the API times out (5s), imports fall back to rule-based validation gracefully. The AI pass runs between CSV parsing and the validation preview.
+9. **Questionnaire intake (DST-047/048) uses Firebase Storage.** Uploaded questionnaire files are stored at `questionnaires/{jobId}/{filename}` via `admin.storage().bucket()`. The `storage.rules` file restricts reads to authenticated users; writes are admin-SDK only.
+10. **Questionnaire AI extraction is per-device.** Unlike DST-042's field-type batching, the questionnaire extractor sends one Anthropic call per device column (all Q/A pairs together) with a 15s timeout, bounded to 5 concurrent calls. Extraction runs asynchronously after upload.
+11. **The questionnaire review wizard has 4 steps.** Assign Partner → Review Devices → Resolve Conflicts → Sign Off. Nothing is committed to the catalog until the admin completes Step 4. The `POST /:id/approve` endpoint runs an atomic Firestore batch that writes specs, creates device records, logs audit entries, and triggers tier/completeness recalculation.
+12. **Notifications are admin-only for now.** The `notifications` collection stores in-app notifications written by the backend when intake jobs reach `pending_review`. The `NotificationBell` component in `AppShell.tsx` polls every 30 seconds.
