@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getAnalytics, logEvent as firebaseLogEvent } from 'firebase/analytics';
+import { normalizeAnalyticsParams } from './analyticsParams';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -27,8 +28,11 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export function logEvent(eventName: string, params?: Record<string, string | number>) {
+export function logEvent(
+  eventName: string,
+  params?: Record<string, string | number | boolean | undefined>,
+) {
   if (analytics) {
-    firebaseLogEvent(analytics, eventName, params);
+    firebaseLogEvent(analytics, eventName, normalizeAnalyticsParams(params));
   }
 }

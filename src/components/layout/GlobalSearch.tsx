@@ -33,7 +33,7 @@ export default function GlobalSearch() {
       setResults(res);
       setOpen(true);
       trackEvent('global_search', {
-        query: q,
+        query_length: q.length,
         result_count: res.devices.length + res.partners.length,
       });
     } catch {
