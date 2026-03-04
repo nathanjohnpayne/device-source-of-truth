@@ -7,6 +7,7 @@
     "build": "npm run build:contracts && tsc",
     "build:contracts": "cd ../packages/contracts && npm run build && cd ../../functions && mkdir -p .contracts/dist && cp ../packages/contracts/package.json .contracts/ && cp -r ../packages/contracts/dist/* .contracts/dist/",
     "dev": "tsc --watch",
+    "pretest": "npm run build:contracts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

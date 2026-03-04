@@ -3,7 +3,7 @@ import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
-import { coerceDeviceDoc, coerceTelemetrySnapshotDoc } from '../services/coercion.js';
+import { coerceDeviceDoc, coerceTelemetrySnapshotDoc, coerceDeviceSpecDoc } from '../services/coercion.js';
 import { CreateDeviceRequestSchema, UpdateDeviceRequestSchema } from '../types/index.js';
 import type { Device, DeviceWithRelations } from '../types/index.js';
 
@@ -191,7 +191,7 @@ router.get('/:id', async (req, res) => {
       ...device,
       partner,
       partnerKey: pkSnap && pkSnap.exists ? { id: pkSnap.id, ...pkSnap.data() } : null,
-      spec: specSnap && !specSnap.empty ? { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } : null,
+      spec: specSnap && !specSnap.empty ? coerceDeviceSpecDoc({ id: specSnap.docs[0].id, ...specSnap.docs[0].data() }) : null,
       tier: tierSnap && tierSnap.exists ? { id: tierSnap.id, ...tierSnap.data() } : null,
       deployments: deploySnap ? deploySnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
       telemetrySnapshots: telSnap ? telSnap.docs.map((d) =>

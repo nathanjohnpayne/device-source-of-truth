@@ -9,6 +9,7 @@
     "build:contracts": "cd packages/contracts && npm run build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "pretest": "npm run build:contracts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:all": "npm test && cd functions && npm test"
