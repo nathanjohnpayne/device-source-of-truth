@@ -34,7 +34,7 @@ const COLUMN_MAPPINGS = [
   { csv: '64 bit', field: 'is64Bit' },
   { csv: 'DRM', field: 'drm' },
   { csv: 'Tech Questionnaire URL', field: 'questionnaireUrl' },
-  { csv: 'Partner', field: 'partnerKey' },
+  { csv: 'Partner', field: 'partnerName' },
 ] as const;
 
 const COUNTRY_LOOKUP: Record<string, string> = {
@@ -132,6 +132,9 @@ export default function MigrationPage() {
 
   const [importResult, setImportResult] = useState<{
     importBatchId: string; created: number; duplicates: number; errored: number; errors: string[];
+    partnerMatched?: number; partnerUnmatched?: number;
+    matchBreakdown?: Record<string, number>;
+    warnings?: string[];
   } | null>(null);
 
   const [history, setHistory] = useState<MigrationBatch[]>([]);
@@ -530,12 +533,69 @@ export default function MigrationPage() {
               Batch ID: {importResult.importBatchId}
             </p>
           </div>
+
+          {importResult.matchBreakdown && (
+            <div className="mt-6 rounded-lg border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-900">Partner Resolution</h3>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {importResult.matchBreakdown.exact > 0 && (
+                  <div className="rounded-lg bg-emerald-50 p-3 text-center">
+                    <p className="text-lg font-bold text-emerald-700">{importResult.matchBreakdown.exact}</p>
+                    <p className="text-xs text-emerald-600">Exact</p>
+                  </div>
+                )}
+                {(importResult.matchBreakdown.alias_direct ?? 0) + (importResult.matchBreakdown.alias_contextual ?? 0) > 0 && (
+                  <div className="rounded-lg bg-blue-50 p-3 text-center">
+                    <p className="text-lg font-bold text-blue-700">
+                      {(importResult.matchBreakdown.alias_direct ?? 0) + (importResult.matchBreakdown.alias_contextual ?? 0)}
+                    </p>
+                    <p className="text-xs text-blue-600">Alias</p>
+                  </div>
+                )}
+                {importResult.matchBreakdown.fuzzy > 0 && (
+                  <div className="rounded-lg bg-amber-50 p-3 text-center">
+                    <p className="text-lg font-bold text-amber-700">{importResult.matchBreakdown.fuzzy}</p>
+                    <p className="text-xs text-amber-600">Fuzzy</p>
+                  </div>
+                )}
+                {importResult.matchBreakdown.vendor_key > 0 && (
+                  <div className="rounded-lg bg-indigo-50 p-3 text-center">
+                    <p className="text-lg font-bold text-indigo-700">{importResult.matchBreakdown.vendor_key}</p>
+                    <p className="text-xs text-indigo-600">Vendor Key</p>
+                  </div>
+                )}
+                {importResult.matchBreakdown.unmatched > 0 && (
+                  <div className="rounded-lg bg-red-50 p-3 text-center">
+                    <p className="text-lg font-bold text-red-700">{importResult.matchBreakdown.unmatched}</p>
+                    <p className="text-xs text-red-600">Unmatched</p>
+                  </div>
+                )}
+              </div>
+              {importResult.partnerMatched != null && (
+                <p className="mt-3 text-xs text-gray-500">
+                  {importResult.partnerMatched} of {importResult.partnerMatched + (importResult.partnerUnmatched ?? 0)} rows resolved to a partner.
+                  {(importResult.partnerUnmatched ?? 0) > 0 && ' Unmatched rows can be assigned manually via the device detail page.'}
+                </p>
+              )}
+            </div>
+          )}
+
           {importResult.errors.length > 0 && (
             <div className="mt-4 max-h-48 overflow-y-auto rounded-md bg-red-50 p-3">
-              <p className="mb-1 text-xs font-medium text-red-700">Errors & Warnings</p>
+              <p className="mb-1 text-xs font-medium text-red-700">Errors</p>
               <ul className="space-y-0.5 text-xs text-red-600">
                 {importResult.errors.map((err, i) => (
                   <li key={i}>• {err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {importResult.warnings && importResult.warnings.length > 0 && (
+            <div className="mt-4 max-h-48 overflow-y-auto rounded-md bg-amber-50 p-3">
+              <p className="mb-1 text-xs font-medium text-amber-700">Partner Resolution Notes</p>
+              <ul className="space-y-0.5 text-xs text-amber-600">
+                {importResult.warnings.map((w, i) => (
+                  <li key={i}>• {w}</li>
                 ))}
               </ul>
             </div>

@@ -6,6 +6,7 @@ import { logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
 import { safeNumber } from '../services/safeNumber.js';
 import { stripEmoji } from '../services/intakeParser.js';
+import { loadPartnerResolutionContext, resolvePartnerName } from '../services/partnerResolver.js';
 
 const router = Router();
 
@@ -81,10 +82,28 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
     let duplicates = 0;
     let errored = 0;
     const errors: string[] = [];
+    const warnings: string[] = [];
+
+    const partnerCtx = await loadPartnerResolutionContext(db);
+    req.log?.info('Partner resolution context loaded', {
+      partnerCount: partnerCtx.partners.length,
+      aliasCount: partnerCtx.aliases.length,
+    });
+
+    const partnerToKeyCache: Record<string, string> = {};
+    async function lookupPartnerKeyByPartnerId(partnerId: string): Promise<string> {
+      if (!partnerId) return '';
+      if (partnerToKeyCache[partnerId]) return partnerToKeyCache[partnerId];
+      const snap = await db.collection('partnerKeys').where('partnerId', '==', partnerId).limit(1).get();
+      if (!snap.empty) {
+        partnerToKeyCache[partnerId] = snap.docs[0].id;
+        return snap.docs[0].id;
+      }
+      return '';
+    }
 
     const partnerKeyCache: Record<string, string> = {};
-
-    async function lookupPartnerKey(vendor: string): Promise<string> {
+    async function lookupPartnerKeyBySlug(vendor: string): Promise<string> {
       if (!vendor) return '';
       if (partnerKeyCache[vendor]) return partnerKeyCache[vendor];
       const snap = await db.collection('partnerKeys').where('key', '==', vendor).limit(1).get();
@@ -94,6 +113,10 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
       }
       return '';
     }
+
+    let partnerMatched = 0;
+    let partnerUnmatched = 0;
+    const matchBreakdown: Record<string, number> = { exact: 0, alias_direct: 0, alias_contextual: 0, fuzzy: 0, unmatched: 0, vendor_key: 0 };
 
     for (const rawRow of parsed.data) {
       try {
@@ -105,9 +128,44 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
           continue;
         }
 
+        const partnerName = row['partnerName'] || '';
         const vendorSlug = row['vendor'] || '';
-        const partnerKeyId = await lookupPartnerKey(vendorSlug);
-        const pendingPartnerKey = (!partnerKeyId && vendorSlug) ? vendorSlug : null;
+        const region = row['region'] || '';
+        const country = row['country'] || '';
+
+        let partnerKeyId = '';
+        let pendingPartnerKey: string | null = null;
+
+        const resolution = resolvePartnerName(partnerName, partnerCtx, {
+          region,
+          country_iso: country,
+        });
+
+        if (resolution.partnerId) {
+          partnerKeyId = await lookupPartnerKeyByPartnerId(resolution.partnerId);
+          partnerMatched++;
+          matchBreakdown[resolution.matchConfidence] = (matchBreakdown[resolution.matchConfidence] || 0) + 1;
+          if (resolution.warning) {
+            warnings.push(`Row "${deviceId}": ${resolution.warning}`);
+          }
+        } else if (vendorSlug) {
+          partnerKeyId = await lookupPartnerKeyBySlug(vendorSlug);
+          if (partnerKeyId) {
+            partnerMatched++;
+            matchBreakdown['vendor_key']++;
+          } else {
+            pendingPartnerKey = vendorSlug;
+            partnerUnmatched++;
+            matchBreakdown['unmatched']++;
+            warnings.push(`Row "${deviceId}": Partner "${partnerName || vendorSlug}" unmatched — requires manual assignment`);
+          }
+        } else {
+          partnerUnmatched++;
+          matchBreakdown['unmatched']++;
+          if (partnerName) {
+            warnings.push(`Row "${deviceId}": Partner "${partnerName}" unmatched — requires manual assignment`);
+          }
+        }
 
         const existing = await db.collection('devices').where('deviceId', '==', deviceId).limit(1).get();
         if (!existing.empty) {
@@ -172,6 +230,9 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
       created,
       duplicates,
       errored,
+      partnerMatched,
+      partnerUnmatched,
+      matchBreakdown,
       errorSample: errors.slice(0, 5),
     });
 
@@ -182,7 +243,11 @@ router.post('/migration', requireRole('admin'), async (req, res) => {
       created,
       duplicates,
       errored,
+      partnerMatched,
+      partnerUnmatched,
+      matchBreakdown,
       errors: errors.slice(0, 100),
+      warnings: warnings.slice(0, 200),
     });
   } catch (err) {
     req.log?.error('Migration failed', formatError(err));

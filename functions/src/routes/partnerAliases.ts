@@ -57,6 +57,12 @@ const SEED_ALIASES: {
     },
     notes: 'Bare "Movistar" resolves by region/country. EMEA+ES → Movistar Spain; LATAM → Movistar HispAm.',
   },
+  {
+    alias: 'DT',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'DT',
+    notes: 'Abbreviation for Deutsche Telekom used in AllModels Partner column',
+  },
 ];
 
 const MOVISTAR_RULE_PARTNERS = ['Movistar Spain', 'Movistar HispAm'];
