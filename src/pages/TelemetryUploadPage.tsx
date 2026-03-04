@@ -7,6 +7,7 @@ import {
   CloudUpload,
   Clock,
   RotateCcw,
+  ExternalLink,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { api } from '../lib/api';
@@ -204,6 +205,15 @@ export default function TelemetryUploadPage() {
           <p className="mt-1 text-sm text-gray-500">
             Upload Datadog CSV exports to update device telemetry data
           </p>
+          <a
+            href="https://disney.my.sentry.io/organizations/disney/explore/discover/results/?field=partner&field=device&field=core_version&field=count_unique%28device_id%29&field=count%28%29&name=ADK%20Partner%20-%20Device%20Combinations&project=23&query=%21partner%3Arefapp%20%21partner%3Abroadcom%20%21partner%3Avpe%20title%3Alaunch%20%21partner%3Adss%20%21partner%3Atwdc_microsoft%20%21partner%3Atwdc_amazon&sort=-count_unique_device_id&statsPeriod=24h&yAxis=count_unique%28device_id%29&yAxis=count%28%29"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
+          >
+            ADK Partner - Device Combinations
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
         </div>
         {step !== 'upload' && (
           <button onClick={reset} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Upload, FileSpreadsheet, CheckCircle, AlertTriangle, XCircle,
-  RotateCcw, Clock,
+  RotateCcw, Clock, ExternalLink,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { api } from '../lib/api';
@@ -300,6 +300,15 @@ export default function MigrationPage() {
           <p className="mt-1 text-sm text-gray-500">
             Import devices from the AllModels CSV export into DST
           </p>
+          <a
+            href="https://airtable.com/appEZYvUCudrm2Fc5/pagWcdpKtA1fm5lrV"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
+          >
+            B2B2C Partnerships &rsaquo; Devices &rsaquo; All Models
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
         </div>
         {step !== 'upload' && (
           <button onClick={reset} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">

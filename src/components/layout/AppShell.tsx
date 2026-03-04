@@ -31,6 +31,7 @@ interface NavItem {
 
 interface NavSection {
   heading?: string;
+  headingIcon?: ReactNode;
   adminOnly?: boolean;
   items: NavItem[];
 }
@@ -60,7 +61,8 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    heading: 'Admin',
+    heading: 'Import',
+    headingIcon: <Upload className="h-3.5 w-3.5" />,
     adminOnly: true,
     items: [
       {
@@ -69,6 +71,24 @@ const NAV_SECTIONS: NavSection[] = [
         icon: <Upload className="h-5 w-5" />,
         adminOnly: true,
       },
+      {
+        label: 'All Models Migration',
+        path: '/admin/migration',
+        icon: <Database className="h-5 w-5" />,
+        adminOnly: true,
+      },
+      {
+        label: 'Intake Requests',
+        path: '/admin/intake-import',
+        icon: <FileSpreadsheet className="h-5 w-5" />,
+        adminOnly: true,
+      },
+    ],
+  },
+  {
+    heading: 'Admin',
+    adminOnly: true,
+    items: [
       {
         label: 'Alerts',
         path: '/admin/alerts',
@@ -79,12 +99,6 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Audit Log',
         path: '/admin/audit',
         icon: <History className="h-5 w-5" />,
-        adminOnly: true,
-      },
-      {
-        label: 'Migration',
-        path: '/admin/migration',
-        icon: <Database className="h-5 w-5" />,
         adminOnly: true,
       },
       {
@@ -103,12 +117,6 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Readiness',
         path: '/admin/readiness',
         icon: <CheckCircle className="h-5 w-5" />,
-        adminOnly: true,
-      },
-      {
-        label: 'Intake Import',
-        path: '/admin/intake-import',
-        icon: <FileSpreadsheet className="h-5 w-5" />,
         adminOnly: true,
       },
     ],
@@ -170,7 +178,8 @@ function Sidebar() {
           return (
             <div key={si} className={si > 0 ? 'mt-6' : ''}>
               {section.heading && (
-                <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <h3 className="mb-2 flex items-center gap-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  {section.headingIcon}
                   {section.heading}
                 </h3>
               )}

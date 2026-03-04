@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import {
   Upload, FileSpreadsheet, CheckCircle, AlertTriangle, XCircle,
-  ChevronLeft, ChevronRight, RotateCcw, Clock, Sparkles,
+  ChevronLeft, ChevronRight, RotateCcw, Clock, Sparkles, ExternalLink,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import Badge from '../components/shared/Badge';
@@ -415,6 +415,15 @@ export default function IntakeImportPage() {
           <p className="mt-1 text-sm text-gray-500">
             Upload a CSV exported from the Airtable Intake Requests base
           </p>
+          <a
+            href="https://airtable.com/appEZYvUCudrm2Fc5/pagE1XJGzSxvf1yYG?YmHNz=allRecords"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
+          >
+            B2B2C Partnerships &rsaquo; Intake Requests &rsaquo; All Intakes
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
         </div>
         {step !== 'upload' && (
           <button onClick={reset} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">

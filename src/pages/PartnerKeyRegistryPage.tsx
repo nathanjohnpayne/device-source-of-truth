@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Sparkles,
+  Info,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
@@ -230,6 +231,9 @@ function ImportTab() {
   const [disambiguating, setDisambiguating] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [rawCsvRows, setRawCsvRows] = useState<Record<string, unknown>[]>([]);
+  const [useAI, setUseAI] = useState(false);
+  const [showAICostModal, setShowAICostModal] = useState(false);
+  const aiModalShownRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -286,7 +290,7 @@ function ImportTab() {
       setStep('preview');
       trackEvent('partner_key_import_preview', { row_count: res.totalRows });
 
-      if (res.warningCount > 0 || res.rows.some(r => r.matchConfidence === 'unmatched')) {
+      if (useAI && (res.warningCount > 0 || res.rows.some(r => r.matchConfidence === 'unmatched'))) {
         setDisambiguating(true);
         try {
           const aiResult = await api.disambiguation.disambiguate('partner_key', csvRows);
