@@ -1,3 +1,5 @@
+// Ordering matters: keep specific static routes before dynamic catch-alls
+// (e.g. "/admin/questionnaires/upload" must be checked before "/admin/questionnaires/:id").
 const ANALYTICS_ROUTES: Array<{ pattern: RegExp; pagePath: string; pageTitle: string }> = [
   { pattern: /^\/$/, pagePath: '/', pageTitle: 'Dashboard' },
   { pattern: /^\/login$/, pagePath: '/login', pageTitle: 'Login' },
