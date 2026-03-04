@@ -20,6 +20,7 @@ import intakeRouter from './routes/intake.js';
 import disambiguateRouter from './routes/disambiguate.js';
 import versionMappingsRouter from './routes/versionMappings.js';
 import partnerAliasesRouter from './routes/partnerAliases.js';
+import questionnaireIntakeRouter from './routes/questionnaireIntake.js';
 
 admin.initializeApp();
 log.info('Firebase Admin initialized');
@@ -47,6 +48,7 @@ app.use('/api/intake', intakeRouter);
 app.use('/api/import/disambiguate', disambiguateRouter);
 app.use('/api/version-mappings', versionMappingsRouter);
 app.use('/api/partner-aliases', partnerAliasesRouter);
+app.use('/api/questionnaire-intake', questionnaireIntakeRouter);
 
 app.use(
   (

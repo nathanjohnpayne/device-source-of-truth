@@ -92,6 +92,10 @@ const IntakeImportPage = lazyRetry(() => import('./pages/IntakeImportPage'));
 const PartnerKeyRegistryPage = lazyRetry(() => import('./pages/PartnerKeyRegistryPage'));
 const DangerZonePage = lazyRetry(() => import('./pages/DangerZonePage'));
 const VersionRegistryPage = lazyRetry(() => import('./pages/VersionRegistryPage'));
+const QuestionnaireQueuePage = lazyRetry(() => import('./pages/QuestionnaireQueuePage'));
+const QuestionnaireUploadPage = lazyRetry(() => import('./pages/QuestionnaireUploadPage'));
+const QuestionnaireDetailPage = lazyRetry(() => import('./pages/QuestionnaireDetailPage'));
+const QuestionnaireReviewPage = lazyRetry(() => import('./pages/QuestionnaireReviewPage'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -286,6 +290,38 @@ function AppRoutes() {
               element={
                 <AdminRoute>
                   <IntakeImportPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/questionnaires"
+              element={
+                <ProtectedRoute>
+                  <QuestionnaireQueuePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/questionnaires/upload"
+              element={
+                <EditorRoute>
+                  <QuestionnaireUploadPage />
+                </EditorRoute>
+              }
+            />
+            <Route
+              path="admin/questionnaires/:id"
+              element={
+                <ProtectedRoute>
+                  <QuestionnaireDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin/questionnaires/:id/review"
+              element={
+                <AdminRoute>
+                  <QuestionnaireReviewPage />
                 </AdminRoute>
               }
             />

@@ -1,5 +1,7 @@
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { api } from '../../lib/api';
+import type { AppNotification } from '../../lib/types';
 import {
   LayoutDashboard,
   Monitor,
@@ -84,6 +86,11 @@ const NAV_SECTIONS: NavSection[] = [
         path: '/admin/intake-import',
         icon: <FileSpreadsheet className="h-5 w-5" />,
         adminOnly: true,
+      },
+      {
+        label: 'Questionnaires',
+        path: '/admin/questionnaires',
+        icon: <FileSpreadsheet className="h-5 w-5" />,
       },
       {
         label: 'Partner Keys',
@@ -237,6 +244,96 @@ function Sidebar() {
   );
 }
 
+function NotificationBell() {
+  const { isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifications = useCallback(() => {
+    if (!isAdmin) return;
+    api.questionnaireIntake.notifications.list({ limit: 10 })
+      .then(setNotifications)
+      .catch(() => {});
+  }, [isAdmin]);
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (!isAdmin) return null;
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleClick = async (notif: AppNotification) => {
+    if (!notif.read) {
+      await api.questionnaireIntake.notifications.markRead(notif.id).catch(() => {});
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    }
+    setOpen(false);
+    navigate(notif.link);
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="relative rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        title="Notifications"
+      >
+        <Bell className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-lg">
+          <div className="border-b border-gray-100 px-4 py-2.5">
+            <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-gray-500">No notifications</p>
+            ) : (
+              notifications.map(notif => (
+                <button
+                  key={notif.id}
+                  onClick={() => handleClick(notif)}
+                  className={`block w-full px-4 py-3 text-left hover:bg-gray-50 ${!notif.read ? 'bg-indigo-50/50' : ''}`}
+                >
+                  <p className={`text-sm ${!notif.read ? 'font-medium text-gray-900' : 'text-gray-700'}`}>
+                    {notif.title}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">{notif.body}</p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {new Date(notif.createdAt).toLocaleDateString()}
+                  </p>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TopBar() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -262,6 +359,7 @@ function TopBar() {
 
       <div className="flex items-center gap-4">
         <GlobalSearch />
+        <NotificationBell />
 
         <div className="flex items-center gap-3">
           <Badge variant={roleBadgeVariant}>{user?.role ?? 'viewer'}</Badge>

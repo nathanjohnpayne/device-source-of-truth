@@ -38,6 +38,7 @@ import type {
   AuditLogEntry,
   CertificationStatus,
   SpecCategory,
+  DeviceQuestionnaireSource,
 } from '../lib/types';
 import { SPEC_CATEGORIES, SPEC_CATEGORY_LABELS } from '../lib/types';
 import { QUESTIONNAIRE_SECTIONS, SPEC_FIELD_UNITS } from '../lib/questionnaireFields';
@@ -215,6 +216,7 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [questionnaireSources, setQuestionnaireSources] = useState<(DeviceQuestionnaireSource & { jobFileName?: string })[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     displayName: '',
@@ -245,6 +247,9 @@ export default function DeviceDetailPage() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+    api.questionnaireIntake.getDeviceSources(id)
+      .then(setQuestionnaireSources)
+      .catch(() => {});
   }, [id]);
 
   const handleSave = async () => {
@@ -661,6 +666,34 @@ export default function DeviceDetailPage() {
           )}
         </div>
       </section>
+
+      {/* Source Questionnaires */}
+      {questionnaireSources.length > 0 && (
+        <section className="rounded-lg border border-gray-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+            <FileText className="h-5 w-5 text-gray-400" />
+            <h2 className="text-base font-semibold text-gray-900">Source Questionnaires</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {questionnaireSources.map((source) => (
+              <div key={source.id} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <Link
+                    to={`/admin/questionnaires/${source.intakeJobId}`}
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                  >
+                    {source.jobFileName || source.intakeJobId}
+                  </Link>
+                  <p className="text-xs text-gray-500">
+                    Imported {formatDate(source.importedAt)} by {source.importedByEmail} · {source.fieldsImported} fields
+                    {source.fieldsOverridden > 0 && ` (${source.fieldsOverridden} overridden)`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Audit History */}
       <section className="rounded-lg border border-gray-200 bg-white">

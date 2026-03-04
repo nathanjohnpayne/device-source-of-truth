@@ -55,6 +55,22 @@ export type {
   DashboardReportResponse,
   PartnerReportResponse,
   SpecCoverageReportResponse,
+  DevicePhase,
+  QuestionnaireFormat,
+  QuestionnaireIntakeJobStatus,
+  PlatformType,
+  PartnerDetectionMethod,
+  ExtractionMethod,
+  ConflictStatus,
+  FieldResolution,
+  StagedDeviceReviewStatus,
+  DeviceMatchMethod,
+  QuestionnaireIntakeJob,
+  QuestionnaireStagedDevice,
+  QuestionnaireStagedField,
+  DeviceQuestionnaireSource,
+  QuestionnaireIntakeJobDetail,
+  AppNotification,
 } from '@dst/contracts';
 
 // ── Backend-only types below ──

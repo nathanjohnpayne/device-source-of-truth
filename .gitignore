@@ -21,6 +21,9 @@ functions/.contracts
 service-account-key.json
 import-output.json
 
+# Sample data files (binary)
+mappings/questionnairesamples/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

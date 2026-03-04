@@ -36,6 +36,10 @@ import type {
   DisambiguationFieldResult,
   ClarificationAnswer,
   PartnerAlias,
+  QuestionnaireIntakeJob,
+  QuestionnaireIntakeJobDetail,
+  QuestionnaireStagedDevice,
+  QuestionnaireStagedField,
 } from './types';
 
 class ApiError extends Error {
@@ -400,6 +404,92 @@ export const api = {
       apiFetch<{ usageCount: number }>(`/version-mappings/usage/${id}`),
     seed: () =>
       apiFetch<{ created: number; skipped: number }>('/version-mappings/seed', { method: 'POST' }),
+  },
+
+  questionnaireIntake: {
+    upload: async (file: File, options: {
+      partnerId?: string;
+      aiExtraction?: boolean;
+      notes?: string;
+    } = {}) => {
+      const buffer = await file.arrayBuffer();
+      const fileData = btoa(
+        new Uint8Array(buffer).reduce((s, b) => s + String.fromCharCode(b), ''),
+      );
+      return apiFetch<QuestionnaireIntakeJob>('/questionnaire-intake', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileData,
+          fileName: file.name,
+          partnerId: options.partnerId,
+          aiExtraction: options.aiExtraction ?? false,
+          notes: options.notes,
+        }),
+      });
+    },
+    list: (params?: { status?: string; partner_id?: string; search?: string; page?: number; pageSize?: number }) =>
+      apiFetch<PaginatedResponse<QuestionnaireIntakeJob>>(`/questionnaire-intake${qs(params)}`),
+    get: (id: string) =>
+      apiFetch<QuestionnaireIntakeJobDetail>(`/questionnaire-intake/${id}`),
+    triggerExtraction: (id: string) =>
+      apiFetch<{ status: string; message: string }>(`/questionnaire-intake/${id}/trigger-extraction`, {
+        method: 'POST',
+      }),
+    getStagedDevices: (id: string) =>
+      apiFetch<(QuestionnaireStagedDevice & { fields: QuestionnaireStagedField[] })[]>(
+        `/questionnaire-intake/${id}/staged-devices`,
+      ),
+    download: (id: string) =>
+      apiFetch<{ url: string; fileName: string }>(`/questionnaire-intake/${id}/download`),
+    getReview: (id: string) =>
+      apiFetch<{
+        job: QuestionnaireIntakeJob;
+        devices: (QuestionnaireStagedDevice & { fields: QuestionnaireStagedField[] })[];
+        partner: { id: string; displayName: string } | null;
+      }>(`/questionnaire-intake/${id}/review`),
+    updateJob: (id: string, data: { partnerId?: string }) =>
+      apiFetch<QuestionnaireIntakeJob>(`/questionnaire-intake/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    updateStagedDevice: (jobId: string, deviceId: string, data: Record<string, unknown>) =>
+      apiFetch<QuestionnaireStagedDevice>(`/questionnaire-intake/${jobId}/staged-devices/${deviceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    updateField: (jobId: string, deviceId: string, fieldId: string, data: Record<string, unknown>) =>
+      apiFetch<QuestionnaireStagedField>(
+        `/questionnaire-intake/${jobId}/staged-devices/${deviceId}/fields/${fieldId}`,
+        { method: 'PATCH', body: JSON.stringify(data) },
+      ),
+    resolveAll: (jobId: string, deviceId: string) =>
+      apiFetch<{ resolved: number }>(
+        `/questionnaire-intake/${jobId}/staged-devices/${deviceId}/resolve-all`,
+        { method: 'PATCH' },
+      ),
+    approve: (id: string) =>
+      apiFetch<{ status: string; summary: Record<string, number>; affectedDeviceIds: string[] }>(
+        `/questionnaire-intake/${id}/approve`,
+        { method: 'POST' },
+      ),
+    reject: (id: string, reason?: string) =>
+      apiFetch<{ status: string }>(`/questionnaire-intake/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    getDeviceSources: (deviceId: string) =>
+      apiFetch<(import('./types').DeviceQuestionnaireSource & { jobFileName?: string })[]>(
+        `/questionnaire-intake/device-sources/${deviceId}`,
+      ),
+    notifications: {
+      list: (params?: { unread?: string; limit?: number }) =>
+        apiFetch<import('./types').AppNotification[]>(`/questionnaire-intake/notifications/list${qs(params)}`),
+      markRead: (notificationId: string) =>
+        apiFetch<{ success: boolean }>(
+          `/questionnaire-intake/notifications/${notificationId}/read`,
+          { method: 'PATCH' },
+        ),
+    },
   },
 
   partnerAliases: {

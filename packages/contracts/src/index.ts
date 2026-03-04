@@ -11,7 +11,9 @@ export type CertificationStatus =
 
 export type DeviceType = 'STB' | 'Smart TV' | 'Stick' | 'Console' | 'OTT Box' | 'Other';
 
-export type DeviceStatus = 'active' | 'deprecated' | 'device_id_missing';
+export type DeviceStatus = 'active' | 'deprecated' | 'device_id_missing' | 'out_of_scope';
+
+export type DevicePhase = 'phase_1' | 'phase_2';
 
 export type Region = 'NA' | 'EMEA' | 'LATAM' | 'APAC';
 
@@ -33,6 +35,7 @@ export type AuditEntityType =
   | 'fieldOption'
   | 'intakeRequest'
   | 'partnerAlias'
+  | 'questionnaireIntake'
   | 'system';
 
 export type Timestamp = string;
@@ -48,8 +51,10 @@ export const DeviceTypeSchema = z.enum([
 ]);
 
 export const DeviceStatusSchema = z.enum([
-  'active', 'deprecated', 'device_id_missing',
+  'active', 'deprecated', 'device_id_missing', 'out_of_scope',
 ]);
+
+export const DevicePhaseSchema = z.enum(['phase_1', 'phase_2']);
 
 export const RegionSchema = z.enum(['NA', 'EMEA', 'LATAM', 'APAC']);
 
@@ -60,7 +65,7 @@ export const PartnerKeyRegionSchema = z.enum([
 export const AuditEntityTypeSchema = z.enum([
   'partner', 'partnerKey', 'device', 'deviceSpec', 'deployment',
   'hardwareTier', 'alert', 'user', 'fieldOption', 'intakeRequest',
-  'partnerAlias', 'system',
+  'partnerAlias', 'questionnaireIntake', 'system',
 ]);
 
 const timestamp = z.string();
@@ -113,9 +118,155 @@ export interface Device {
   pendingPartnerKey: string | null;
   tierId: string | null;
   tierAssignedAt: Timestamp | null;
+  phase?: DevicePhase;
   importBatchId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+}
+
+// ── Questionnaire Intake Types (DST-047 / DST-048) ──
+
+export type QuestionnaireFormat =
+  | 'lg_stb_v1'
+  | 'gm_2024'
+  | 'vodafone_combined'
+  | 'android_atv'
+  | 'unknown';
+
+export type QuestionnaireIntakeJobStatus =
+  | 'uploading'
+  | 'parsing'
+  | 'parse_failed'
+  | 'awaiting_extraction'
+  | 'extracting'
+  | 'extraction_failed'
+  | 'pending_review'
+  | 'approved'
+  | 'partially_approved'
+  | 'rejected';
+
+export type PlatformType = 'ncp_linux' | 'android_tv' | 'android_aosp' | 'unknown';
+
+export type PartnerDetectionMethod = 'filename' | 'content' | 'ai' | 'admin';
+
+export type ExtractionMethod = 'ai' | 'rule_based' | 'skipped' | 'admin_override';
+
+export type ConflictStatus =
+  | 'new_field'
+  | 'matches_existing'
+  | 'conflicts_with_existing'
+  | 'no_existing_device';
+
+export type FieldResolution = 'pending' | 'use_new' | 'keep_existing' | 'skipped_by_admin';
+
+export type StagedDeviceReviewStatus = 'pending' | 'approved' | 'rejected';
+
+export type DeviceMatchMethod = 'exact_model_number' | 'ai' | 'admin';
+
+export interface QuestionnaireIntakeJob {
+  id: string;
+  fileName: string;
+  fileStoragePath: string;
+  fileSizeBytes: number | null;
+  uploadedBy: string;
+  uploadedByEmail: string;
+  uploadedAt: Timestamp;
+  partnerId: string | null;
+  partnerConfidence: number | null;
+  partnerDetectionMethod: PartnerDetectionMethod | null;
+  questionnaireFormat: QuestionnaireFormat;
+  deviceCountDetected: number | null;
+  status: QuestionnaireIntakeJobStatus;
+  aiExtractionMode: 'auto' | 'manual' | null;
+  aiExtractionStartedAt: Timestamp | null;
+  aiExtractionCompletedAt: Timestamp | null;
+  extractionError: string | null;
+  notes: string | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+export interface QuestionnaireStagedDevice {
+  id: string;
+  intakeJobId: string;
+  columnIndex: number;
+  rawHeaderLabel: string;
+  detectedModelName: string | null;
+  detectedModelNumber: string | null;
+  detectedManufacturer: string | null;
+  platformType: PlatformType;
+  isOutOfScope: boolean;
+  matchedDeviceId: string | null;
+  matchConfidence: number | null;
+  matchMethod: DeviceMatchMethod | null;
+  reviewStatus: StagedDeviceReviewStatus;
+  reviewedBy: string | null;
+  reviewedAt: Timestamp | null;
+  rejectionReason: string | null;
+  confirmedDisplayName: string | null;
+  confirmedModelNumber: string | null;
+  confirmedManufacturer: string | null;
+  confirmedDeviceType: DeviceType | null;
+  createdAt: Timestamp;
+}
+
+export interface QuestionnaireStagedField {
+  id: string;
+  stagedDeviceId: string;
+  intakeJobId: string;
+  dstFieldKey: string;
+  dstFieldCategory: string;
+  rawQuestionText: string;
+  rawAnswerText: string | null;
+  extractedValue: string | null;
+  extractionMethod: ExtractionMethod;
+  aiConfidence: number | null;
+  aiReasoning: string | null;
+  conflictStatus: ConflictStatus;
+  existingValue: string | null;
+  resolution: FieldResolution;
+  resolvedBy: string | null;
+  resolvedAt: Timestamp | null;
+  createdAt: Timestamp;
+}
+
+export interface DeviceQuestionnaireSource {
+  id: string;
+  deviceId: string;
+  intakeJobId: string;
+  stagedDeviceId: string;
+  importedAt: Timestamp;
+  importedBy: string;
+  importedByEmail: string;
+  fieldsImported: number;
+  fieldsOverridden: number;
+}
+
+export interface QuestionnaireIntakeJobDetail extends QuestionnaireIntakeJob {
+  stagedDevices: (QuestionnaireStagedDevice & {
+    fieldSummary: {
+      totalFields: number;
+      extractedFields: number;
+      conflictCount: number;
+      newFieldCount: number;
+    };
+  })[];
+  partner: Partner | null;
+  extractionProgress: {
+    totalDevices: number;
+    devicesComplete: number;
+    devicesFailed: number;
+  } | null;
+}
+
+export interface AppNotification {
+  id: string;
+  recipientRole: 'admin';
+  title: string;
+  body: string;
+  link: string;
+  read: boolean;
+  createdAt: Timestamp;
 }
 
 // ── Device Spec Section Interfaces (16 sections) ──
@@ -840,6 +991,7 @@ export const DeviceSchema = z.object({
   specCompleteness: z.number(),
   tierId: z.string().nullable(),
   tierAssignedAt: timestamp.nullable(),
+  phase: DevicePhaseSchema.optional(),
   createdAt: timestamp,
   updatedAt: timestamp,
 });

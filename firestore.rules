@@ -103,5 +103,30 @@ service cloud.firestore {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser();
     }
+
+    match /questionnaireIntakeJobs/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /questionnaireStagedDevices/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /questionnaireStagedFields/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /deviceQuestionnaireSources/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /notifications/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
   }
 }

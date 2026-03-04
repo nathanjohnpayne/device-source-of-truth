@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /questionnaires/{allPaths=**} {
+      allow read: if request.auth != null;
+      // Writes are handled by the admin SDK (server-side only)
+      allow write: if false;
+    }
+  }
+}
