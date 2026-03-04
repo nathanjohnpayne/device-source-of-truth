@@ -85,6 +85,12 @@ const NAV_SECTIONS: NavSection[] = [
         icon: <FileSpreadsheet className="h-5 w-5" />,
         adminOnly: true,
       },
+      {
+        label: 'Partner Keys',
+        path: '/admin/partner-keys',
+        icon: <Key className="h-5 w-5" />,
+        adminOnly: true,
+      },
     ],
   },
   {
@@ -107,12 +113,6 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Reference Data',
         path: '/admin/reference-data',
         icon: <ListChecks className="h-5 w-5" />,
-        adminOnly: true,
-      },
-      {
-        label: 'Partner Keys',
-        path: '/admin/partner-keys',
-        icon: <Key className="h-5 w-5" />,
         adminOnly: true,
       },
       {
