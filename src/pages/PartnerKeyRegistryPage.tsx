@@ -247,7 +247,7 @@ function ImportTab() {
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [preview, setPreview] = useState<PartnerKeyImportPreview | null>(null);
-  const [result, setResult] = useState<{ imported: number; skipped: number; batchId: string } | null>(null);
+  const [result, setResult] = useState<{ imported: number; skipped: number; batchId: string; partnersCreated?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [batches, setBatches] = useState<PartnerKeyImportBatch[]>([]);
   const [rollingBack, setRollingBack] = useState<string | null>(null);
@@ -625,6 +625,20 @@ function ImportTab() {
             </div>
           </div>
 
+          {preview.newPartnerCount != null && preview.newPartnerCount > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+              <Plus className="mt-0.5 h-5 w-5 text-indigo-500" />
+              <div>
+                <p className="text-sm font-medium text-indigo-800">
+                  {preview.newPartnerCount} new partner{preview.newPartnerCount !== 1 ? 's' : ''} will be created on import
+                </p>
+                <p className="mt-1 text-xs text-indigo-600">
+                  {preview.newPartnerNames?.join(', ')}
+                </p>
+              </div>
+            </div>
+          )}
+
           {disambiguation?.fieldTypeFallbacks && disambiguation.fieldTypeFallbacks.length > 0 && (
             <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -746,6 +760,9 @@ function ImportTab() {
               <h3 className="font-semibold text-emerald-900">Import Complete</h3>
               <p className="mt-1 text-sm text-emerald-800">
                 {result.imported} partner keys imported, {result.skipped} skipped.
+                {result.partnersCreated != null && result.partnersCreated > 0 && (
+                  <span> {result.partnersCreated} new partner{result.partnersCreated !== 1 ? 's' : ''} created.</span>
+                )}
               </p>
               <p className="mt-1 text-xs text-emerald-700">Batch ID: {result.batchId}</p>
               <button
@@ -1002,6 +1019,8 @@ function PreviewRow({ row, onResolution, aiResults }: {
       <Badge variant="success">Exact</Badge>
     ) : row.matchConfidence === 'fuzzy' ? (
       <Badge variant="warning">Fuzzy</Badge>
+    ) : row.matchConfidence === 'new_partner' ? (
+      <Badge variant="info">New Partner</Badge>
     ) : (
       <Badge variant="danger">None</Badge>
     );

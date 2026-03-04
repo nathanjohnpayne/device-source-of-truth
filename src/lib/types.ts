@@ -93,7 +93,7 @@ export interface User {
 
 // ── Partner Key Import ──
 
-export type MatchConfidence = 'exact' | 'alias_direct' | 'alias_contextual' | 'fuzzy' | 'unmatched';
+export type MatchConfidence = 'exact' | 'alias_direct' | 'alias_contextual' | 'fuzzy' | 'new_partner' | 'unmatched';
 
 import type { PartnerKeyRegion, Timestamp } from '@dst/contracts';
 
@@ -130,6 +130,8 @@ export interface PartnerKeyImportPreview {
   warningCount: number;
   errorCount: number;
   skippedCount: number;
+  newPartnerCount?: number;
+  newPartnerNames?: string[];
 }
 
 export interface PartnerKeyImportResult {
@@ -137,6 +139,7 @@ export interface PartnerKeyImportResult {
   imported: number;
   skipped: number;
   batchId: string;
+  partnersCreated?: number;
 }
 
 export interface PartnerKeyImportBatch {

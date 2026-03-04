@@ -85,7 +85,7 @@ export type TierAssignmentTrigger = 'spec_update' | 'tier_definition_update' | '
 
 export type PartnerKeySource = 'csv_import' | 'manual';
 
-export type MatchConfidence = 'exact' | 'alias_direct' | 'alias_contextual' | 'fuzzy' | 'unmatched';
+export type MatchConfidence = 'exact' | 'alias_direct' | 'alias_contextual' | 'fuzzy' | 'new_partner' | 'unmatched';
 
 import type { PartnerKeyRegion, Timestamp } from '@dst/contracts';
 
