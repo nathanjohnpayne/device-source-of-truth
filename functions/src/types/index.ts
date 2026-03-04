@@ -179,6 +179,9 @@ export interface TelemetrySnapshot {
   uniqueDevices: number;
   eventCount: number;
   snapshotDate: Timestamp;
+  countUpdatedAt: Timestamp | null;
+  uploadedAt: Timestamp | null;
+  uploadBatchId: string | null;
 }
 
 // ── Hardware Tiers ──
@@ -252,6 +255,11 @@ export interface UploadHistory {
   errorCount: number;
   snapshotDate: Timestamp;
   errors: string[];
+  newCount?: number;
+  updatedCount?: number;
+  noChangeCount?: number;
+  staleOverwrittenCount?: number;
+  uploadBatchId?: string;
 }
 
 // ── API Response Types ──

@@ -8,40 +8,65 @@ import {
   Clock,
   RotateCcw,
   ExternalLink,
+  Pencil,
+  ArrowRightLeft,
+  Minus,
 } from 'lucide-react';
-import Papa from 'papaparse';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
-import type { UploadHistory } from '../lib/types';
+import type { UploadHistory, TelemetryPreviewRow } from '../lib/types';
 
-const EMOJI_REGEX = /[\u{1F1E0}-\u{1F1FF}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
+const MONTH_NAMES = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
 
-function stripEmoji(str: string): string {
-  return str.replace(EMOJI_REGEX, '').trim();
+function parseSnapshotDateFromFilename(fileName: string): string | null {
+  try {
+    const base = fileName.replace(/\.csv$/i, '');
+    const segments = base.split('_');
+    if (segments.length < 3) return null;
+
+    const dateSegment = segments[segments.length - 2];
+    const dateParts = dateSegment.split('-');
+    if (dateParts.length !== 3) return null;
+
+    const [yearStr, monthName, dayStr] = dateParts;
+    const year = parseInt(yearStr);
+    if (isNaN(year) || yearStr.length !== 4) return null;
+
+    const monthIndex = MONTH_NAMES.indexOf(monthName.toLowerCase());
+    if (monthIndex === -1) return null;
+
+    const day = parseInt(dayStr);
+    if (isNaN(day) || day < 1 || day > 31) return null;
+
+    const mm = String(monthIndex + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    return `${year}-${mm}-${dd}`;
+  } catch {
+    return null;
+  }
 }
 
-function stripBom(text: string): string {
-  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
-}
-
-const EXPECTED_COLUMNS = ['partner', 'device', 'core_version', 'count_unique_device_id', 'count'];
-
-interface TelemetryPreviewRow {
-  rowIndex: number;
-  partner: string;
-  device: string;
-  coreVersion: string;
-  uniqueDevices: number;
-  eventCount: number;
-  status: 'ready' | 'warning' | 'error';
-  warnings: string[];
-  errors: string[];
+function formatSnapshotDate(isoDate: string): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const monthName = MONTH_NAMES[m - 1];
+  if (!monthName) return isoDate;
+  return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${d}, ${y}`;
 }
 
 type Step = 'upload' | 'preview' | 'result';
+
+const UPSERT_BADGE: Record<string, { variant: 'info' | 'success' | 'warning' | 'default'; label: string }> = {
+  new: { variant: 'success', label: 'New' },
+  update: { variant: 'info', label: 'Update' },
+  no_change: { variant: 'default', label: 'No change' },
+  stale: { variant: 'warning', label: 'Stale' },
+};
 
 export default function TelemetryUploadPage() {
   const [step, setStep] = useState<Step>('upload');
@@ -49,14 +74,21 @@ export default function TelemetryUploadPage() {
   const [snapshotDate, setSnapshotDate] = useState(
     new Date().toISOString().split('T')[0],
   );
+  const [dateParsedFromFile, setDateParsedFromFile] = useState(false);
+  const [dateReadOnly, setDateReadOnly] = useState(false);
+  const [dateWarning, setDateWarning] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
 
   const [previewRows, setPreviewRows] = useState<TelemetryPreviewRow[]>([]);
+  const [previewSummary, setPreviewSummary] = useState<{ total: number; new: number; update: number; noChange: number; stale: number } | null>(null);
+  const [staleOverrides, setStaleOverrides] = useState<Set<number>>(new Set());
 
   const [uploadResult, setUploadResult] = useState<{
-    uploadBatchId: string; rowCount: number; successCount: number; errorCount: number; errors: string[];
+    uploadBatchId: string; rowCount: number; successCount: number;
+    newCount: number; updatedCount: number; noChangeCount: number; staleOverwrittenCount: number;
+    errorCount: number; errors: string[];
   } | null>(null);
 
   const [history, setHistory] = useState<(UploadHistory & { uploadBatchId?: string; rollbackAvailable?: boolean })[]>([]);
@@ -83,6 +115,7 @@ export default function TelemetryUploadPage() {
 
   const handleFile = useCallback(async (f: File) => {
     setParseError(null);
+    setDateWarning(null);
     if (!f.name.endsWith('.csv')) {
       setParseError('Only .csv files are accepted.');
       return;
@@ -92,52 +125,31 @@ export default function TelemetryUploadPage() {
       return;
     }
 
+    const parsedDate = parseSnapshotDateFromFilename(f.name);
+    if (parsedDate) {
+      setSnapshotDate(parsedDate);
+      setDateParsedFromFile(true);
+      setDateReadOnly(true);
+      setDateWarning(null);
+    } else {
+      setSnapshotDate(new Date().toISOString().split('T')[0]);
+      setDateParsedFromFile(false);
+      setDateReadOnly(false);
+      setDateWarning('Could not parse date from filename. Please confirm the snapshot date below.');
+    }
+
     setFile(f);
     setLoading(true);
+    setStaleOverrides(new Set());
 
     try {
-      const text = stripBom(await f.text());
-      const parsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: true });
-
-      if (parsed.errors.length > 0) {
-        setParseError(`CSV parse errors: ${parsed.errors.map(e => e.message).join('; ')}`);
-        setLoading(false);
-        return;
-      }
-
-      const headers = (parsed.meta.fields || []).map(h => h.trim().toLowerCase());
-      const missing = EXPECTED_COLUMNS.filter(col => !headers.includes(col));
-      if (missing.length > 0) {
-        setParseError(`Missing required columns: ${missing.join(', ')}. Expected: ${EXPECTED_COLUMNS.join(', ')}`);
-        setLoading(false);
-        return;
-      }
-
-      const rows: TelemetryPreviewRow[] = parsed.data.map((raw, idx) => {
-        const warnings: string[] = [];
-        const errors: string[] = [];
-
-        const partner = stripEmoji((raw['partner'] || '').trim());
-        const device = stripEmoji((raw['device'] || '').trim());
-        const coreVersion = (raw['core_version'] || '').trim();
-        const uniqueDevices = parseInt(raw['count_unique_device_id']) || 0;
-        const eventCount = parseInt(raw['count']) || 0;
-
-        if (!partner) warnings.push('Missing partner key');
-        if (!device) warnings.push('Missing device ID');
-        if (uniqueDevices === 0 && eventCount === 0) warnings.push('Zero device count and event count');
-
-        let status: TelemetryPreviewRow['status'] = 'ready';
-        if (errors.length > 0) status = 'error';
-        else if (warnings.length > 0) status = 'warning';
-
-        return { rowIndex: idx + 1, partner, device, coreVersion, uniqueDevices, eventCount, status, warnings, errors };
-      });
-
-      setPreviewRows(rows);
+      const dateToUse = parsedDate ?? new Date().toISOString().split('T')[0];
+      const result = await api.telemetry.preview(f, dateToUse);
+      setPreviewRows(result.rows);
+      setPreviewSummary(result.summary);
       setStep('preview');
     } catch (err) {
-      setParseError(`Failed to process file: ${err instanceof Error ? err.message : String(err)}`);
+      setParseError(err instanceof Error ? err.message : `Failed to process file: ${String(err)}`);
     }
     setLoading(false);
   }, []);
@@ -149,13 +161,9 @@ export default function TelemetryUploadPage() {
     if (f) handleFile(f);
   }, [handleFile]);
 
-  const summary = useMemo(() => {
-    const total = previewRows.length;
-    const ready = previewRows.filter(r => r.status === 'ready').length;
-    const warnings = previewRows.filter(r => r.status === 'warning').length;
-    const errors = previewRows.filter(r => r.status === 'error').length;
-    return { total, ready, warnings, errors };
-  }, [previewRows]);
+  const hasUnresolvedStale = useMemo(() => {
+    return previewRows.some(r => r.upsertStatus === 'stale' && !staleOverrides.has(r.rowIndex));
+  }, [previewRows, staleOverrides]);
 
   const handleUpload = useCallback(async () => {
     if (!file) return;
@@ -163,8 +171,8 @@ export default function TelemetryUploadPage() {
     setParseError(null);
 
     try {
-      const result = await api.telemetry.upload(file, snapshotDate);
-      setUploadResult(result as unknown as typeof uploadResult);
+      const result = await api.telemetry.upload(file, snapshotDate, Array.from(staleOverrides));
+      setUploadResult(result);
       trackEvent('telemetry_upload', { file_name: file.name, row_count: result.rowCount });
       setStep('result');
       loadHistory();
@@ -173,7 +181,7 @@ export default function TelemetryUploadPage() {
     } finally {
       setLoading(false);
     }
-  }, [file, snapshotDate, loadHistory]);
+  }, [file, snapshotDate, staleOverrides, loadHistory]);
 
   const handleRollback = useCallback(async (batch: UploadHistory & { uploadBatchId?: string }) => {
     if (!batch.uploadBatchId) return;
@@ -192,8 +200,14 @@ export default function TelemetryUploadPage() {
     setStep('upload');
     setFile(null);
     setParseError(null);
+    setDateWarning(null);
+    setDateParsedFromFile(false);
+    setDateReadOnly(false);
     setPreviewRows([]);
+    setPreviewSummary(null);
+    setStaleOverrides(new Set());
     setUploadResult(null);
+    setSnapshotDate(new Date().toISOString().split('T')[0]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -293,7 +307,7 @@ export default function TelemetryUploadPage() {
           <div className="mt-4 rounded-md bg-gray-50 p-3">
             <p className="text-xs font-medium text-gray-600">Expected CSV Columns</p>
             <p className="mt-1 font-mono text-xs text-gray-500">
-              {EXPECTED_COLUMNS.join(', ')}
+              partner, device, core_version, count_unique_device_id, count
             </p>
           </div>
 
@@ -309,36 +323,76 @@ export default function TelemetryUploadPage() {
       {/* Step 2: Preview & Validate */}
       {step === 'preview' && (
         <>
-          <div className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white px-6 py-4">
-            <span className="text-sm font-medium text-gray-700">{summary.total} rows parsed</span>
-            <span className="text-gray-300">|</span>
-            <span className="flex items-center gap-1.5 text-sm">
-              <CheckCircle className="h-4 w-4 text-emerald-500" />
-              <span className="font-medium text-emerald-700">{summary.ready}</span> ready
-            </span>
-            {summary.warnings > 0 && (
-              <>
-                <span className="text-gray-300">|</span>
-                <span className="flex items-center gap-1.5 text-sm">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  <span className="font-medium text-amber-700">{summary.warnings}</span> with warnings
-                </span>
-              </>
-            )}
-            {summary.errors > 0 && (
-              <>
-                <span className="text-gray-300">|</span>
-                <span className="flex items-center gap-1.5 text-sm">
-                  <XCircle className="h-4 w-4 text-red-500" />
-                  <span className="font-medium text-red-700">{summary.errors}</span> errors
-                </span>
-              </>
-            )}
-            <span className="text-gray-300">|</span>
-            <span className="text-sm text-gray-500">
-              <Clock className="mr-1 inline h-3.5 w-3.5" /> Snapshot: {snapshotDate}
-            </span>
+          {/* Snapshot date header */}
+          <div className="rounded-lg border border-gray-200 bg-white px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Clock className="h-5 w-5 text-gray-400" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    Snapshot date: {formatSnapshotDate(snapshotDate)}
+                    {dateParsedFromFile && <span className="ml-2 text-xs text-gray-500">(parsed from filename)</span>}
+                  </p>
+                  {dateWarning && (
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-amber-600">
+                      <AlertTriangle className="h-3 w-3" /> {dateWarning}
+                    </p>
+                  )}
+                  {dateParsedFromFile && dateReadOnly && (
+                    <p className="mt-0.5 text-xs text-gray-500">Parsed from filename.</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {dateReadOnly ? (
+                  <button
+                    onClick={() => setDateReadOnly(false)}
+                    className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  >
+                    <Pencil className="h-3 w-3" /> Edit
+                  </button>
+                ) : (
+                  <input
+                    type="date"
+                    value={snapshotDate}
+                    onChange={(e) => setSnapshotDate(e.target.value)}
+                    className="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Summary banner */}
+          {previewSummary && (
+            <div className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white px-6 py-4">
+              <span className="text-sm font-medium text-gray-700">{previewSummary.total} rows</span>
+              <span className="text-gray-300">|</span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <span className="font-medium text-emerald-700">{previewSummary.new}</span> new
+              </span>
+              <span className="text-gray-300">|</span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <ArrowRightLeft className="h-4 w-4 text-indigo-500" />
+                <span className="font-medium text-indigo-700">{previewSummary.update}</span> updates
+              </span>
+              <span className="text-gray-300">|</span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <Minus className="h-4 w-4 text-gray-400" />
+                <span className="font-medium text-gray-600">{previewSummary.noChange}</span> no change
+              </span>
+              {previewSummary.stale > 0 && (
+                <>
+                  <span className="text-gray-300">|</span>
+                  <span className="flex items-center gap-1.5 text-sm">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <span className="font-medium text-amber-700">{previewSummary.stale}</span> stale (review required)
+                  </span>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="max-h-[500px] overflow-auto">
@@ -356,27 +410,58 @@ export default function TelemetryUploadPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {previewRows.slice(0, 200).map(row => (
-                    <tr key={row.rowIndex} className={row.status === 'error' ? 'bg-red-50' : row.status === 'warning' ? 'bg-amber-50' : ''}>
-                      <td className="px-3 py-2 text-xs text-gray-500">{row.rowIndex}</td>
-                      <td className="px-3 py-2">
-                        {row.status === 'error' ? <Badge variant="danger">Error</Badge>
-                          : row.status === 'warning' ? <Badge variant="warning">Warning</Badge>
-                          : <Badge variant="success">Ready</Badge>}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-900">{row.partner || '—'}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.device || '—'}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.coreVersion || '—'}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{row.uniqueDevices.toLocaleString()}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{row.eventCount.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-xs">
-                        {[...row.errors, ...row.warnings].map((note, i) => (
-                          <p key={i} className={row.errors.includes(note) ? 'text-red-600' : 'text-amber-600'}>{note}</p>
-                        ))}
-                        {row.errors.length === 0 && row.warnings.length === 0 && <span className="text-gray-400">—</span>}
-                      </td>
-                    </tr>
-                  ))}
+                  {previewRows.slice(0, 200).map(row => {
+                    const isStale = row.upsertStatus === 'stale';
+                    const isOverridden = staleOverrides.has(row.rowIndex);
+                    const badge = UPSERT_BADGE[row.upsertStatus] ?? UPSERT_BADGE.new;
+
+                    return (
+                      <tr
+                        key={row.rowIndex}
+                        className={
+                          isStale && !isOverridden ? 'bg-amber-50' :
+                          row.status === 'error' ? 'bg-red-50' :
+                          row.status === 'warning' ? 'bg-amber-50/40' : ''
+                        }
+                      >
+                        <td className="px-3 py-2 text-xs text-gray-500">{row.rowIndex}</td>
+                        <td className="px-3 py-2">
+                          <Badge variant={badge.variant}>{badge.label}</Badge>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-900">{row.partner || '—'}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.device || '—'}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.coreVersion || '—'}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{row.uniqueDevices.toLocaleString()}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{row.eventCount.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-xs">
+                          {isStale && !isOverridden && (
+                            <div className="mb-1">
+                              <label className="flex items-center gap-1.5 text-amber-700">
+                                <input
+                                  type="checkbox"
+                                  checked={false}
+                                  onChange={() => setStaleOverrides(prev => {
+                                    const next = new Set(prev);
+                                    next.add(row.rowIndex);
+                                    return next;
+                                  })}
+                                  className="rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                                />
+                                Overwrite anyway
+                              </label>
+                            </div>
+                          )}
+                          {isStale && isOverridden && (
+                            <p className="mb-1 text-xs text-emerald-600">Will overwrite older → newer</p>
+                          )}
+                          {[...row.errors, ...row.warnings].map((note, i) => (
+                            <p key={i} className={row.errors.includes(note) ? 'text-red-600' : 'text-amber-600'}>{note}</p>
+                          ))}
+                          {row.errors.length === 0 && row.warnings.length === 0 && !isStale && <span className="text-gray-400">—</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -394,14 +479,23 @@ export default function TelemetryUploadPage() {
             </div>
           )}
 
+          {hasUnresolvedStale && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+              <p className="text-sm text-amber-700">
+                {previewRows.filter(r => r.upsertStatus === 'stale' && !staleOverrides.has(r.rowIndex)).length} stale row(s) will be skipped unless you check "Overwrite anyway" for each.
+              </p>
+            </div>
+          )}
+
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={handleUpload}
-              disabled={loading || summary.total === 0}
+              disabled={loading || (previewSummary?.total ?? 0) === 0}
               className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? <LoadingSpinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
-              Upload {summary.total} records
+              Upload {previewSummary?.total ?? 0} records
             </button>
           </div>
         </>
@@ -413,10 +507,18 @@ export default function TelemetryUploadPage() {
           <div className="flex flex-col items-center text-center">
             <CheckCircle className="mb-4 h-16 w-16 text-emerald-500" />
             <h2 className="text-xl font-bold text-gray-900">Upload Complete</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              {uploadResult.successCount} records uploaded, {uploadResult.errorCount} errors.
-            </p>
-            <p className="mt-1 text-xs text-gray-400">
+            <div className="mt-3 flex flex-wrap justify-center gap-3 text-sm">
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{uploadResult.newCount} new</span>
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700">{uploadResult.updatedCount} updated</span>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-600">{uploadResult.noChangeCount} unchanged</span>
+              {uploadResult.staleOverwrittenCount > 0 && (
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">{uploadResult.staleOverwrittenCount} stale overwritten</span>
+              )}
+              {uploadResult.errorCount > 0 && (
+                <span className="rounded-full bg-red-50 px-3 py-1 text-red-700">{uploadResult.errorCount} errors</span>
+              )}
+            </div>
+            <p className="mt-3 text-xs text-gray-400">
               Batch ID: {uploadResult.uploadBatchId}
             </p>
           </div>
@@ -425,7 +527,7 @@ export default function TelemetryUploadPage() {
               <p className="mb-1 text-xs font-medium text-red-700">Error Details</p>
               <ul className="space-y-0.5 text-xs text-red-600">
                 {uploadResult.errors.map((err, i) => (
-                  <li key={i}>• {err}</li>
+                  <li key={i}>&bull; {err}</li>
                 ))}
               </ul>
             </div>
@@ -456,10 +558,15 @@ export default function TelemetryUploadPage() {
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium text-gray-900">{batch.fileName}</p>
                       <p className="text-xs text-gray-500">
-                        {new Date(batch.uploadedAt).toLocaleString()} by {batch.uploadedByEmail}
+                        Snapshot: {formatSnapshotDate(batch.snapshotDate)} &middot; Uploaded {new Date(batch.uploadedAt).toLocaleString()} by {batch.uploadedByEmail}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {batch.rowCount} rows, {batch.successCount} succeeded, {batch.errorCount} errors
+                        {batch.rowCount} rows
+                        {batch.newCount != null && <> &middot; {batch.newCount} new</>}
+                        {batch.updatedCount != null && <> &middot; {batch.updatedCount} updated</>}
+                        {batch.noChangeCount != null && <> &middot; {batch.noChangeCount} unchanged</>}
+                        {batch.staleOverwrittenCount != null && batch.staleOverwrittenCount > 0 && <> &middot; {batch.staleOverwrittenCount} stale overwritten</>}
+                        {(batch.newCount == null) && <>, {batch.successCount} succeeded, {batch.errorCount} errors</>}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

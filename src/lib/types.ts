@@ -551,6 +551,26 @@ export interface TelemetrySnapshot {
   uniqueDevices: number;
   eventCount: number;
   snapshotDate: Timestamp;
+  countUpdatedAt: Timestamp | null;
+  uploadedAt: Timestamp | null;
+  uploadBatchId: string | null;
+}
+
+export type TelemetryRowStatus = 'new' | 'update' | 'no_change' | 'stale';
+
+export interface TelemetryPreviewRow {
+  rowIndex: number;
+  partner: string;
+  device: string;
+  coreVersion: string;
+  uniqueDevices: number;
+  eventCount: number;
+  status: 'ready' | 'warning' | 'error';
+  upsertStatus: TelemetryRowStatus;
+  existingSnapshotDate: string | null;
+  overwriteStale: boolean;
+  warnings: string[];
+  errors: string[];
 }
 
 // ── Hardware Tiers ──
@@ -624,6 +644,11 @@ export interface UploadHistory {
   errorCount: number;
   snapshotDate: Timestamp;
   errors: string[];
+  newCount?: number;
+  updatedCount?: number;
+  noChangeCount?: number;
+  staleOverwrittenCount?: number;
+  uploadBatchId?: string;
 }
 
 // ── API Response Types ──

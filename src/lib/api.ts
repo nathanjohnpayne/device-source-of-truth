@@ -198,11 +198,33 @@ export const api = {
   },
 
   telemetry: {
-    upload: async (file: File, snapshotDate?: string) => {
+    preview: async (file: File, snapshotDate: string) => {
       const csvData = await file.text();
-      return apiFetch<UploadHistory>('/telemetry/upload', {
+      return apiFetch<{
+        rows: import('./types').TelemetryPreviewRow[];
+        summary: { total: number; new: number; update: number; noChange: number; stale: number };
+      }>('/telemetry/preview', {
         method: 'POST',
-        body: JSON.stringify({ csvData, snapshotDate, fileName: file.name }),
+        body: JSON.stringify({ csvData, snapshotDate }),
+      });
+    },
+    upload: async (file: File, snapshotDate: string, staleOverrides?: number[]) => {
+      const csvData = await file.text();
+      return apiFetch<{
+        success: boolean;
+        uploadBatchId: string;
+        rowCount: number;
+        successCount: number;
+        newCount: number;
+        updatedCount: number;
+        noChangeCount: number;
+        staleOverwrittenCount: number;
+        errorCount: number;
+        errors: string[];
+        devicesUpdated: number;
+      }>('/telemetry/upload', {
+        method: 'POST',
+        body: JSON.stringify({ csvData, snapshotDate, fileName: file.name, staleOverrides }),
       });
     },
     history: (params?: QueryParams) =>

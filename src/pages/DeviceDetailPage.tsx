@@ -297,6 +297,12 @@ export default function DeviceDetailPage() {
       ).snapshotDate
     : null;
 
+  const latestCountUpdatedAt = telemetry.length
+    ? telemetry.reduce((latest, t) =>
+        (t.countUpdatedAt ?? '') > (latest.countUpdatedAt ?? '') ? t : latest,
+      ).countUpdatedAt
+    : null;
+
   const versionBreakdown = telemetry.reduce<Record<string, number>>((acc, t) => {
     acc[t.coreVersion] = (acc[t.coreVersion] || 0) + t.uniqueDevices;
     return acc;
@@ -538,7 +544,7 @@ export default function DeviceDetailPage() {
         <div className="p-4">
           {telemetry.length > 0 ? (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-lg bg-gray-50 p-4">
                   <p className="text-sm font-medium text-gray-500">Total Unique Devices</p>
                   <p className="mt-1 text-2xl font-bold text-gray-900">
@@ -549,6 +555,12 @@ export default function DeviceDetailPage() {
                   <p className="text-sm font-medium text-gray-500">Last Upload</p>
                   <p className="mt-1 text-2xl font-bold text-gray-900">
                     {formatDate(lastUpload)}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-50 p-4">
+                  <p className="text-sm font-medium text-gray-500">Count Updated</p>
+                  <p className="mt-1 text-2xl font-bold text-gray-900">
+                    {latestCountUpdatedAt ? formatDate(latestCountUpdatedAt) : '—'}
                   </p>
                 </div>
               </div>
