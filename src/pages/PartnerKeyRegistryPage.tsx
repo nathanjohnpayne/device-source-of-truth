@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   Sparkles,
   Info,
+  Clock,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
@@ -31,10 +32,10 @@ import type {
   ConflictResolution,
 } from '../lib/types';
 
-type Tab = 'registry' | 'import';
+type Tab = 'import' | 'registry';
 
 export default function PartnerKeyRegistryPage() {
-  const [tab, setTab] = useState<Tab>('registry');
+  const [tab, setTab] = useState<Tab>('import');
 
   return (
     <div className="space-y-6">
@@ -47,7 +48,7 @@ export default function PartnerKeyRegistryPage() {
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-6">
-          {(['registry', 'import'] as Tab[]).map((t) => (
+          {(['import', 'registry'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -57,13 +58,13 @@ export default function PartnerKeyRegistryPage() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              {t === 'registry' ? 'All Keys' : 'CSV Import'}
+              {t === 'import' ? 'CSV Import' : 'All Keys'}
             </button>
           ))}
         </nav>
       </div>
 
-      {tab === 'registry' ? <RegistryTab /> : <ImportTab />}
+      {tab === 'import' ? <ImportTab /> : <RegistryTab />}
     </div>
   );
 }
@@ -737,50 +738,16 @@ function ImportTab() {
       )}
 
       {/* Import history */}
-      {batches.length > 0 && (
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="mb-4 text-base font-semibold text-gray-900">Import History</h2>
-          <div className="overflow-hidden rounded-md border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">File</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">Records</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">Imported By</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">Date</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {batches.map((b) => (
-                  <tr key={b.id}>
-                    <td className="px-4 py-2 text-gray-700">{b.fileName}</td>
-                    <td className="px-4 py-2 text-gray-700">{b.importedCount}</td>
-                    <td className="px-4 py-2 text-gray-500">{b.importedByEmail}</td>
-                    <td className="px-4 py-2 text-gray-500">
-                      {new Date(b.importedAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-2">
-                      {b.rollbackAvailable ? (
-                        <button
-                          onClick={() => setRollbackConfirm(b.id)}
-                          disabled={rollingBack === b.id}
-                          className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          {rollingBack === b.id ? 'Rolling back...' : 'Rollback'}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-400">Expired</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <PKImportHistory
+        batches={batches}
+        loadBatches={() => {
+          api.partnerKeys.importBatches()
+            .then((res) => setBatches(res.data))
+            .catch(() => {});
+        }}
+        onRollback={(batchId) => setRollbackConfirm(batchId)}
+        rollingBack={rollingBack}
+      />
 
       <Modal
         open={!!rollbackConfirm}
@@ -850,6 +817,84 @@ function ImportTab() {
           account.
         </p>
       </Modal>
+    </div>
+  );
+}
+
+function PKImportHistory({
+  batches,
+  loadBatches,
+  onRollback,
+  rollingBack,
+}: {
+  batches: PartnerKeyImportBatch[];
+  loadBatches: () => void;
+  onRollback: (batchId: string) => void;
+  rollingBack: string | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white">
+      <button
+        onClick={() => {
+          setExpanded(!expanded);
+          if (!expanded && batches.length === 0) loadBatches();
+        }}
+        className="flex w-full items-center justify-between px-6 py-4 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <Clock className="h-5 w-5 text-gray-400" />
+          <h3 className="text-sm font-semibold text-gray-900">Import History</h3>
+          {batches.length > 0 && (
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              {batches.length}
+            </span>
+          )}
+        </div>
+        <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-200 px-6 py-4">
+          {batches.length === 0 ? (
+            <p className="text-sm text-gray-500">No import batches yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {batches.map((b) => (
+                <div key={b.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-medium text-gray-900">{b.fileName}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(b.importedAt).toLocaleString()} by {b.importedByEmail}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {b.importedCount} records imported
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">
+                      {b.id.slice(0, 8)}...
+                    </span>
+                    {b.rollbackAvailable ? (
+                      <button
+                        onClick={() => onRollback(b.id)}
+                        disabled={rollingBack === b.id}
+                        className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        {rollingBack === b.id ? 'Rolling back...' : 'Rollback'}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400">Rollback expired</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
