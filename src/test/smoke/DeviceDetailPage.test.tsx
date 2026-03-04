@@ -12,6 +12,9 @@ vi.mock('../../lib/api', () => ({
     deviceSpecs: {
       create: vi.fn(),
     },
+    versionMappings: {
+      friendlyVersions: vi.fn().mockResolvedValue({ data: [] }),
+    },
   },
 }));
 
