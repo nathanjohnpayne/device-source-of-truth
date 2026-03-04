@@ -23,6 +23,7 @@ Firebase Hosting (static SPA)
 - Frontend: React 19 + TypeScript + Tailwind CSS 4, built with Vite 7
 - Backend: Express 5 app exported as a single Firebase Cloud Function named `api`
 - Database: Firestore (18 collections)
+- AI: Anthropic Claude API (claude-sonnet-4-6) for import disambiguation (pre-production/testing)
 - Auth: Firebase Auth with Google OAuth, domain-restricted to `@disney.com` and `@disneystreaming.com`
 
 ## Directory Structure
@@ -53,8 +54,8 @@ Firebase Hosting (static SPA)
 │   ├── src/
 │   │   ├── index.ts              ← Express app, route mounting, error handler
 │   │   ├── middleware/auth.ts    ← Token verification, domain check, role guard
-│   │   ├── routes/               ← 13 Express routers (partners, devices, etc.)
-│   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, seedFieldOptions)
+│   │   ├── routes/               ← 14 Express routers (partners, devices, disambiguate, etc.)
+│   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, seedFieldOptions)
 │   │   └── types/index.ts        ← Backend type definitions (mirrors src/lib/types.ts)
 │   ├── package.json              ← Separate deps (firebase-admin, express, xlsx, etc.)
 │   └── tsconfig.json
@@ -152,6 +153,8 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | GET | /intake/history | any | Intake import history |
 | GET | /intake/:id | any | Get intake request detail |
 | DELETE | /intake/rollback/:batchId | admin | Rollback an intake import |
+| POST | /import/disambiguate | admin | AI disambiguation pass on parsed import rows (DST-039, pre-production) |
+| POST | /import/disambiguate/resolve | admin | Apply admin answers to AI clarification questions (DST-039, pre-production) |
 
 ## Role System
 
@@ -174,7 +177,7 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 - **Styling:** Tailwind CSS utility classes only. No CSS modules, no styled-components.
 - **Icons:** `lucide-react` exclusively.
 - **Charts:** `recharts` for all data visualizations.
-- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip` in `src/components/shared/`.
+- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel` in `src/components/shared/`.
 - **Update banner:** `UpdateBanner` in `src/components/UpdateBanner.tsx` detects new versions via service worker (Workbox/PWA) and version polling, shows a dismissible top-of-viewport banner.
 - **Analytics:** Use `trackEvent()` from `src/lib/analytics.ts`. Events are no-ops in development mode.
 - **Exports:** Use `exportToCsv()` and `exportToPdf()` from `src/lib/export.ts`.
@@ -239,6 +242,9 @@ Frontend (in `.env`, prefixed with `VITE_`):
 
 These are safe to expose in the client bundle (Firebase security is handled by Auth + Firestore rules, not API key secrecy).
 
+Backend (in `functions/.env`, gitignored):
+- `ANTHROPIC_API_KEY` — Anthropic API key for AI disambiguation (DST-039). **Pre-production/testing only.** Falls back gracefully if not set.
+
 ## Things to Watch Out For
 
 1. **Two separate `package.json` files.** Root is for the frontend, `functions/package.json` is for the backend. Install deps in the right one.
@@ -248,3 +254,4 @@ These are safe to expose in the client bundle (Firebase security is handled by A
 5. **The tier engine auto-runs** on spec save and tier definition save. Don't forget this side effect when modifying those flows.
 6. **Firestore has no joins.** The backend manually fetches related collections. Watch for N+1 query patterns.
 7. **The `api` Cloud Function handles ALL routes.** There is only one function exported. All Express routes are under `/api/*`.
+8. **AI disambiguation (DST-039) is pre-production/testing.** The Anthropic API key is stored in `functions/.env` (gitignored). If the key is missing or the API times out (5s), imports fall back to rule-based validation gracefully. The AI pass runs between CSV parsing and the validation preview.

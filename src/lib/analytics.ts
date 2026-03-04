@@ -36,7 +36,11 @@ export type AnalyticsEvent =
   | 'field_option_create'
   | 'partner_key_import_preview'
   | 'partner_key_import_complete'
-  | 'partner_key_import_rollback';
+  | 'partner_key_import_rollback'
+  | 'partner_key_ai_disambiguation'
+  | 'partner_key_clarification_resolved'
+  | 'intake_ai_disambiguation'
+  | 'intake_clarification_resolved';
 
 export interface AnalyticsParams {
   page_view: { page_title: string; page_path: string };
@@ -75,6 +79,10 @@ export interface AnalyticsParams {
   partner_key_import_preview: { row_count: number };
   partner_key_import_complete: { imported: number };
   partner_key_import_rollback: { batch_id: string };
+  partner_key_ai_disambiguation: { auto_resolved: number; questions: number; fallback: boolean };
+  partner_key_clarification_resolved: { answered: number };
+  intake_ai_disambiguation: { auto_resolved: number; questions: number; fallback: boolean };
+  intake_clarification_resolved: { answered: number };
 }
 
 export function trackEvent<E extends AnalyticsEvent>(

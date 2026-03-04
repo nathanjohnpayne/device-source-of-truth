@@ -1,16 +1,19 @@
 import { useState, useCallback, useMemo } from 'react';
 import {
   Upload, FileSpreadsheet, CheckCircle, AlertTriangle, XCircle,
-  ChevronLeft, ChevronRight, RotateCcw, Clock,
+  ChevronLeft, ChevronRight, RotateCcw, Clock, Sparkles,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import ClarificationPanel from '../components/shared/ClarificationPanel';
 import { api } from '../lib/api';
+import { trackEvent } from '../lib/analytics';
 import type {
   IntakePreviewRow, IntakePreviewWarning,
   IntakePreviewPartnerMatch, IntakeImportBatch, IntakeRegion,
+  DisambiguationResponse, ClarificationAnswer,
 } from '../lib/types';
 
 const EXPECTED_COLUMNS = [
@@ -134,6 +137,10 @@ export default function IntakeImportPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [rollbackModal, setRollbackModal] = useState<IntakeImportBatch | null>(null);
   const [rollbackLoading, setRollbackLoading] = useState(false);
+  const [disambiguation, setDisambiguation] = useState<DisambiguationResponse | null>(null);
+  const [disambiguating, setDisambiguating] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [rawCsvRows, setRawCsvRows] = useState<Record<string, unknown>[]>([]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -246,8 +253,38 @@ export default function IntakeImportPage() {
 
       const previewResponse = await api.intake.preview(clientRows as Parameters<typeof api.intake.preview>[0]);
       setPreviewRows(previewResponse.rows);
+      setRawCsvRows(parsed.data as Record<string, unknown>[]);
       setPage(1);
       setStep('preview');
+
+      const hasWarnings = previewResponse.summary.warnings > 0;
+      const hasUnmatched = previewResponse.rows.some(r =>
+        r.partnerMatches?.some((m: IntakePreviewPartnerMatch) => m.matchConfidence === 'unmatched'),
+      );
+      if (hasWarnings || hasUnmatched) {
+        setDisambiguating(true);
+        try {
+          const aiResult = await api.disambiguation.disambiguate(
+            'intake',
+            parsed.data as Record<string, unknown>[],
+          );
+          setDisambiguation(aiResult);
+          trackEvent('intake_ai_disambiguation', {
+            auto_resolved: aiResult.fields.filter(f => !f.needsHuman).length,
+            questions: aiResult.questions.length,
+            fallback: aiResult.aiFallback,
+          });
+        } catch {
+          setDisambiguation({
+            fields: [],
+            questions: [],
+            aiFallback: true,
+            fallbackReason: 'AI disambiguation request failed',
+          });
+        } finally {
+          setDisambiguating(false);
+        }
+      }
     } catch (err) {
       setParseError(`Failed to process file: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -335,12 +372,39 @@ export default function IntakeImportPage() {
 
   const totalPages = Math.ceil(previewRows.length / PAGE_SIZE);
 
+  const handleClarificationSubmit = useCallback(async (answers: ClarificationAnswer[]) => {
+    if (!disambiguation) return;
+    setResolving(true);
+    try {
+      const res = await api.disambiguation.resolve(
+        'intake',
+        answers,
+        disambiguation.fields,
+        rawCsvRows,
+      );
+      setDisambiguation(prev => prev ? {
+        ...prev,
+        fields: res.fields,
+        questions: prev.questions.filter(q =>
+          res.fields.some(f => f.rowIndex === q.rowIndex && f.field === q.field && f.needsHuman),
+        ),
+      } : null);
+      trackEvent('intake_clarification_resolved', { answered: answers.length });
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'Failed to resolve answers');
+    } finally {
+      setResolving(false);
+    }
+  }, [disambiguation, rawCsvRows]);
+
   const reset = () => {
     setStep('upload');
     setFile(null);
     setParseError(null);
     setPreviewRows([]);
     setImportResult(null);
+    setDisambiguation(null);
+    setRawCsvRows([]);
   };
 
   return (
@@ -460,6 +524,25 @@ export default function IntakeImportPage() {
               </>
             )}
           </div>
+
+          {/* AI Disambiguation Panel */}
+          {disambiguating && (
+            <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+              <Sparkles className="h-5 w-5 animate-pulse text-indigo-500" />
+              <p className="text-sm text-indigo-700">Running AI disambiguation on ambiguous fields…</p>
+            </div>
+          )}
+
+          {disambiguation && !disambiguating && (
+            <ClarificationPanel
+              questions={disambiguation.questions}
+              fields={disambiguation.fields}
+              onSubmitAnswers={handleClarificationSubmit}
+              loading={resolving}
+              aiFallback={disambiguation.aiFallback}
+              fallbackReason={disambiguation.fallbackReason}
+            />
+          )}
 
           {/* Preview table */}
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">

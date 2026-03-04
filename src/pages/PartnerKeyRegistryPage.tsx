@@ -10,6 +10,7 @@ import {
   RotateCcw,
   ChevronRight,
   ChevronLeft,
+  Sparkles,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
@@ -17,11 +18,14 @@ import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
+import ClarificationPanel from '../components/shared/ClarificationPanel';
 import type {
   PartnerKey,
   PartnerKeyImportRow,
   PartnerKeyImportPreview,
   PartnerKeyImportBatch,
+  DisambiguationResponse,
+  ClarificationAnswer,
 } from '../lib/types';
 
 type Tab = 'registry' | 'import';
@@ -222,6 +226,10 @@ function ImportTab() {
   const [batches, setBatches] = useState<PartnerKeyImportBatch[]>([]);
   const [rollingBack, setRollingBack] = useState<string | null>(null);
   const [rollbackConfirm, setRollbackConfirm] = useState<string | null>(null);
+  const [disambiguation, setDisambiguation] = useState<DisambiguationResponse | null>(null);
+  const [disambiguating, setDisambiguating] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [rawCsvRows, setRawCsvRows] = useState<Record<string, unknown>[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -257,11 +265,48 @@ function ImportTab() {
     if (!file) return;
     setParsing(true);
     setError(null);
+    setDisambiguation(null);
     try {
+      const csvText = await file.text();
+      const lines = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+      const headers = lines[0]?.split(',').map(h => h.trim()) ?? [];
+      const csvRows: Record<string, unknown>[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const values = line.split(',').map(v => v.trim());
+        const row: Record<string, unknown> = {};
+        headers.forEach((h, idx) => { row[h] = values[idx] ?? ''; });
+        csvRows.push(row);
+      }
+      setRawCsvRows(csvRows);
+
       const res = await api.partnerKeys.importPreview(file);
       setPreview(res);
       setStep('preview');
       trackEvent('partner_key_import_preview', { row_count: res.totalRows });
+
+      if (res.warningCount > 0 || res.rows.some(r => r.matchConfidence === 'unmatched')) {
+        setDisambiguating(true);
+        try {
+          const aiResult = await api.disambiguation.disambiguate('partner_key', csvRows);
+          setDisambiguation(aiResult);
+          trackEvent('partner_key_ai_disambiguation', {
+            auto_resolved: aiResult.fields.filter(f => !f.needsHuman).length,
+            questions: aiResult.questions.length,
+            fallback: aiResult.aiFallback,
+          });
+        } catch {
+          setDisambiguation({
+            fields: [],
+            questions: [],
+            aiFallback: true,
+            fallbackReason: 'AI disambiguation request failed',
+          });
+        } finally {
+          setDisambiguating(false);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Preview failed');
     } finally {
@@ -300,11 +345,38 @@ function ImportTab() {
     }
   };
 
+  const handleClarificationSubmit = async (answers: ClarificationAnswer[]) => {
+    if (!disambiguation) return;
+    setResolving(true);
+    try {
+      const res = await api.disambiguation.resolve(
+        'partner_key',
+        answers,
+        disambiguation.fields,
+        rawCsvRows,
+      );
+      setDisambiguation(prev => prev ? {
+        ...prev,
+        fields: res.fields,
+        questions: prev.questions.filter(q =>
+          res.fields.some(f => f.rowIndex === q.rowIndex && f.field === q.field && f.needsHuman),
+        ),
+      } : null);
+      trackEvent('partner_key_clarification_resolved', { answered: answers.length });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resolve answers');
+    } finally {
+      setResolving(false);
+    }
+  };
+
   const reset = () => {
     setFile(null);
     setPreview(null);
     setResult(null);
     setError(null);
+    setDisambiguation(null);
+    setRawCsvRows([]);
     setStep('upload');
   };
 
@@ -420,6 +492,25 @@ function ImportTab() {
               </span>
             </div>
           </div>
+
+          {/* AI Disambiguation Panel */}
+          {disambiguating && (
+            <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+              <Sparkles className="h-5 w-5 animate-pulse text-indigo-500" />
+              <p className="text-sm text-indigo-700">Running AI disambiguation on ambiguous fields…</p>
+            </div>
+          )}
+
+          {disambiguation && !disambiguating && (
+            <ClarificationPanel
+              questions={disambiguation.questions}
+              fields={disambiguation.fields}
+              onSubmitAnswers={handleClarificationSubmit}
+              loading={resolving}
+              aiFallback={disambiguation.aiFallback}
+              fallbackReason={disambiguation.fallbackReason}
+            />
+          )}
 
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div className="max-h-[500px] overflow-auto">

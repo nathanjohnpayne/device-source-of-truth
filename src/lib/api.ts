@@ -21,6 +21,10 @@ import type {
   IntakeImportResult,
   IntakeImportBatch,
   MigrationBatch,
+  ImportType,
+  DisambiguationResponse,
+  DisambiguationFieldResult,
+  ClarificationAnswer,
 } from './types';
 
 class ApiError extends Error {
@@ -331,6 +335,27 @@ export const api = {
       apiFetch<{ success: boolean; deletedRequests: number; deletedPartners: number }>(
         `/intake/rollback/${batchId}`,
         { method: 'DELETE' },
+      ),
+  },
+
+  disambiguation: {
+    disambiguate: (importType: ImportType, rows: Record<string, unknown>[]) =>
+      apiFetch<DisambiguationResponse>('/import/disambiguate', {
+        method: 'POST',
+        body: JSON.stringify({ importType, rows }),
+      }),
+    resolve: (
+      importType: ImportType,
+      answers: ClarificationAnswer[],
+      originalFields: DisambiguationFieldResult[],
+      rows: Record<string, unknown>[],
+    ) =>
+      apiFetch<{ fields: DisambiguationFieldResult[]; questions: []; remainingCount: number }>(
+        '/import/disambiguate/resolve',
+        {
+          method: 'POST',
+          body: JSON.stringify({ importType, answers, originalFields, rows }),
+        },
       ),
   },
 

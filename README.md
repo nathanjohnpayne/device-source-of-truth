@@ -8,6 +8,7 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 |---|---|
 | Frontend | React 19, TypeScript, Tailwind CSS 4, Vite 7 |
 | Backend | Firebase Cloud Functions (Express 5 REST API) |
+| AI | Anthropic Claude API (pre-production/testing — DST-039) |
 | Database | Cloud Firestore (18 collections, 90-field device spec schema) |
 | Auth | Firebase Authentication (Google OAuth, domain-restricted) |
 | Analytics | Google Analytics 4 via Firebase (30+ typed events) |
@@ -25,6 +26,7 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 - **Role-Based Access Control** — viewer / editor / admin roles enforced on both frontend and backend
 - **Partner Key Registry** — manage Datadog manifest key → partner mappings with CSV import, batch rollback, and enrichment attributes (chipset, OEM, OS, regions)
 - **Airtable Intake Import** — parse and import Airtable Intake Request CSVs with preview, normalization, partner matching, and batch rollback
+- **AI-Assisted Import Disambiguation** — Claude-powered resolution of ambiguous CSV fields (country codes, regions, partner names) with batched clarification questions, confidence scoring, and graceful fallback (pre-production/testing — DST-039)
 - **Airtable Migration** — bulk CSV import of legacy AllModels data with spec mapping, tier assignment, history, and rollback
 - **Reference Data Management** — controlled vocabulary administration for dropdown fields (regions, chipsets, OS, request types)
 - **Auto-Update Notification** — polls for new deployments and prompts users to refresh when a new version is available
@@ -93,13 +95,14 @@ src/                          React frontend
 functions/src/                Firebase Cloud Functions backend
 ├── index.ts                  Express app + route mounting + request logging middleware
 ├── middleware/auth.ts        Token verification, domain check, role guard
-├── routes/                   13 Express routers (partners, devices, tiers, intake, etc.)
+├── routes/                   14 Express routers (partners, devices, tiers, intake, disambiguate, etc.)
 ├── services/
 │   ├── logger.ts             Structured logging (Cloud Logging integration)
 │   ├── audit.ts              Append-only field-level change tracking
 │   ├── tierEngine.ts         Hardware tier assignment engine
 │   ├── specCompleteness.ts   Spec completeness calculator
 │   ├── intakeParser.ts       Airtable CSV parser and normalizer
+│   ├── aiDisambiguate.ts     AI disambiguation service (Anthropic Claude, pre-production)
 │   └── seedFieldOptions.ts   Reference data seeding
 └── types/index.ts            Backend type definitions
 
@@ -142,6 +145,14 @@ Roles are assigned via the `users` Firestore collection. The first admin must be
 | `VITE_FIREBASE_MEASUREMENT_ID` | Google Analytics 4 measurement ID |
 
 All three are prefixed with `VITE_` so Vite includes them in the client bundle. These values are safe to expose — Firebase security relies on Auth tokens and Firestore rules, not API key secrecy.
+
+**Backend** (in `functions/.env`, gitignored):
+
+| Variable | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic API key for AI disambiguation (DST-039, pre-production/testing) |
+
+The AI disambiguation feature falls back gracefully to rule-based validation if this key is missing or the API is unavailable.
 
 ## Firebase Project
 

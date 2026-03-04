@@ -352,6 +352,66 @@ export interface IntakeImportBatch {
   skippedCount: number;
 }
 
+// ── AI Disambiguation (DST-039) ──
+
+export type ImportType = 'intake' | 'partner_key';
+
+export type DisambiguationResolutionSource = 'ai_auto' | 'ai_suggested' | 'human' | 'rule_based';
+
+export interface DisambiguationFieldResult {
+  rowIndex: number;
+  field: string;
+  rawValue: string;
+  resolvedValue: string | null;
+  confidence: number;
+  reasoning: string;
+  needsHuman: boolean;
+  question: string | null;
+  resolutionSource: DisambiguationResolutionSource;
+  overriddenByAdmin: boolean;
+  adminValue?: string | null;
+}
+
+export type ClarificationQuestionType = 'country' | 'region' | 'partner' | 'date' | 'delimiter' | 'other';
+
+export interface ClarificationQuestion {
+  id: string;
+  rowIndex: number;
+  field: string;
+  type: ClarificationQuestionType;
+  rawValue: string;
+  question: string;
+  suggestedValue: string | null;
+  options: ClarificationOption[] | null;
+  allowFreeText: boolean;
+  pattern: string;
+}
+
+export interface ClarificationOption {
+  value: string;
+  label: string;
+  suggested: boolean;
+}
+
+export interface ClarificationAnswer {
+  questionId: string;
+  value: string;
+  applyToAll: boolean;
+}
+
+export interface DisambiguationRequest {
+  importType: ImportType;
+  rows: Record<string, unknown>[];
+  existingPartners: { id: string; displayName: string }[];
+}
+
+export interface DisambiguationResponse {
+  fields: DisambiguationFieldResult[];
+  questions: ClarificationQuestion[];
+  aiFallback: boolean;
+  fallbackReason?: string;
+}
+
 // ── Config ──
 
 export interface AppConfig {
