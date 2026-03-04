@@ -9,9 +9,14 @@ const router = Router();
 
 function detectPlatform(coreVersion: string): VersionPlatform {
   if (/^dev\+/i.test(coreVersion)) return 'DEV';
+  if (/^ADK\s/i.test(coreVersion)) return 'ADK';
   if (/^\d{4}\.\d+/.test(coreVersion)) return 'NCP';
   if (/^\d+\.\d+/.test(coreVersion)) return 'ADK';
   return 'UNKNOWN';
+}
+
+function normalizeCoreVersion(raw: string): string {
+  return raw.replace(/\+plugin-[\d.]+$/, '');
 }
 
 const SEED_DATA: { coreVersion: string; friendlyVersion: string }[] = [
@@ -32,6 +37,10 @@ const SEED_DATA: { coreVersion: string; friendlyVersion: string }[] = [
   { coreVersion: '42.16+17f4b8d.1', friendlyVersion: 'ADK 3.1.1' },
   { coreVersion: '47.4.1+8e3bba6.1', friendlyVersion: 'ADK 3.x (newer)' },
   { coreVersion: 'dev+8dcd8b6.1', friendlyVersion: 'Dev Build' },
+  { coreVersion: 'ADK 2.1.1', friendlyVersion: 'ADK 2.1.1' },
+  { coreVersion: 'ADK 3.1.0', friendlyVersion: 'ADK 3.1' },
+  { coreVersion: 'ADK 4.0', friendlyVersion: 'ADK 4.0' },
+  { coreVersion: 'ADK 4.0 Beta', friendlyVersion: 'ADK 4.0 Beta' },
 ];
 
 router.get('/', async (req, res) => {
@@ -208,7 +217,7 @@ router.get('/unmapped', async (req, res) => {
     for (const doc of telSnap.docs) {
       const data = doc.data();
       const cv = data.coreVersion as string;
-      if (!cv || mappedVersions.has(cv)) continue;
+      if (!cv || mappedVersions.has(cv) || mappedVersions.has(normalizeCoreVersion(cv))) continue;
 
       if (!unmappedMap.has(cv)) {
         unmappedMap.set(cv, { deviceIds: new Set(), partnerKeys: new Set(), firstSeen: null, sources: new Set() });
@@ -371,5 +380,5 @@ async function retroactiveResolve(
   }
 }
 
-export { detectPlatform };
+export { detectPlatform, normalizeCoreVersion };
 export default router;

@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/auth.js';
 import { logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
 import { stripEmoji } from '../services/intakeParser.js';
+import { normalizeCoreVersion } from './versionMappings.js';
 
 const router = Router();
 
@@ -109,7 +110,11 @@ async function buildPreview(
     if (!parsed.deviceId) warnings.push('Missing device ID');
     if (parsed.uniqueDevices === 0 && parsed.eventCount === 0) warnings.push('Zero device count and event count');
 
-    const friendlyVersion = parsed.coreVersion ? (versionMap.get(parsed.coreVersion) ?? null) : null;
+    const normalizedCv = parsed.coreVersion ? normalizeCoreVersion(parsed.coreVersion) : '';
+    const friendlyVersion = parsed.coreVersion ? (versionMap.get(parsed.coreVersion) ?? versionMap.get(normalizedCv) ?? null) : null;
+    if (parsed.coreVersion && friendlyVersion && normalizedCv !== parsed.coreVersion) {
+      warnings.push(`Resolved via normalized form "${normalizedCv}" (raw: "${parsed.coreVersion}").`);
+    }
     if (parsed.coreVersion && !friendlyVersion) {
       warnings.push(`No version mapping for "${parsed.coreVersion}". The raw build string will be stored. Add a mapping in the Version Registry to display a friendly label.`);
     }
@@ -263,7 +268,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
         const coreVersion = (row.core_version ?? '').trim();
         const uniqueDevices = parseInt(row.count_unique_device_id) || 0;
         const eventCount = parseInt(row.count) || 0;
-        const friendlyVersion = coreVersion ? (versionMap.get(coreVersion) ?? null) : null;
+        const friendlyVersion = coreVersion ? (versionMap.get(coreVersion) ?? versionMap.get(normalizeCoreVersion(coreVersion)) ?? null) : null;
 
         if (!partnerKey || !deviceId) {
           successCount++;

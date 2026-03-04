@@ -17,6 +17,7 @@ import type { CoreVersionMapping, UnmappedVersion, VersionPlatform } from '../li
 
 function detectPlatform(coreVersion: string): VersionPlatform {
   if (/^dev\+/i.test(coreVersion)) return 'DEV';
+  if (/^ADK\s/i.test(coreVersion)) return 'ADK';
   if (/^\d{4}\.\d+/.test(coreVersion)) return 'NCP';
   if (/^\d+\.\d+/.test(coreVersion)) return 'ADK';
   return 'UNKNOWN';
