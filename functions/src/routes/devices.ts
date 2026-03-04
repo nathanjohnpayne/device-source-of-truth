@@ -54,7 +54,9 @@ router.get('/', async (req, res) => {
     }
 
     if (region) {
-      const keysSnap = await db.collection('partnerKeys').where('regions', 'array-contains', region).get();
+      const REGION_TO_PK: Record<string, string> = { NA: 'DOMESTIC', WORLDWIDE: 'GLOBAL' };
+      const pkRegion = REGION_TO_PK[region] ?? region;
+      const keysSnap = await db.collection('partnerKeys').where('regions', 'array-contains', pkRegion).get();
       const keyIds = new Set(keysSnap.docs.map((d) => d.id));
       devices = devices.filter((d) => keyIds.has(d.partnerKeyId));
       req.log?.debug('Filtered by region', { region, remaining: devices.length });
@@ -205,7 +207,10 @@ router.get('/:id', async (req, res) => {
       spec: specSnap && !specSnap.empty ? { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } : null,
       tier: tierSnap && tierSnap.exists ? { id: tierSnap.id, ...tierSnap.data() } : null,
       deployments: deploySnap ? deploySnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
-      telemetrySnapshots: telSnap ? telSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
+      telemetrySnapshots: telSnap ? telSnap.docs.map((d) => {
+        const td = d.data();
+        return { id: d.id, ...td, uniqueDevices: safeNumber(td.uniqueDevices), eventCount: safeNumber(td.eventCount) };
+      }) : [],
       auditHistory: auditSnap ? auditSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
     });
   } catch (err) {
@@ -241,7 +246,7 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
       partnerKeyId,
       deviceType: deviceType ?? 'Other',
       status: 'active',
-      liveAdkVersion: null,
+      liveAdkVersion: req.body.liveAdkVersion ?? null,
       certificationStatus: certificationStatus ?? 'Not Submitted',
       certificationNotes: null,
       lastCertifiedDate: null,
@@ -289,9 +294,19 @@ router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
     }
 
     const oldData = existing.data()!;
-    const updates = { ...req.body, updatedAt: new Date().toISOString() };
-    delete updates.id;
-    delete updates.createdAt;
+    const MUTABLE_FIELDS = [
+      'displayName', 'deviceId', 'partnerKeyId', 'deviceType', 'status',
+      'liveAdkVersion', 'certificationStatus', 'certificationNotes',
+      'lastCertifiedDate', 'questionnaireUrl', 'questionnaireFileUrl',
+      'pendingPartnerKey', 'tierId', 'tierAssignedAt',
+      'activeDeviceCount', 'specCompleteness',
+    ];
+    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    for (const key of MUTABLE_FIELDS) {
+      if (key in req.body) {
+        updates[key] = req.body[key];
+      }
+    }
 
     await docRef.update(updates);
     await diffAndLog('device', deviceDocId, oldData, updates, req.user!.uid, req.user!.email);

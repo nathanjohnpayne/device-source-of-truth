@@ -14,6 +14,10 @@ const ENTITY_TYPES: AuditEntityType[] = [
   'hardwareTier',
   'alert',
   'user',
+  'fieldOption',
+  'intakeRequest',
+  'partnerAlias',
+  'system',
 ];
 
 const ENTITY_TYPE_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'danger' | 'info'> = {
@@ -25,6 +29,10 @@ const ENTITY_TYPE_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'd
   hardwareTier: 'default',
   alert: 'danger',
   user: 'default',
+  fieldOption: 'info',
+  intakeRequest: 'warning',
+  partnerAlias: 'info',
+  system: 'danger',
 };
 
 const PAGE_SIZE = 25;

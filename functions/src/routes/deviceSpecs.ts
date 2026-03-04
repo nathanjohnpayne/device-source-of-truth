@@ -49,13 +49,27 @@ router.put('/:deviceId', requireRole('editor', 'admin'), async (req, res) => {
       return;
     }
 
+    const unknownKeys = Object.keys(req.body).filter(
+      k => k !== 'deviceId' && k !== 'updatedAt' && k !== 'id' && !(SPEC_CATEGORIES as readonly string[]).includes(k),
+    );
+    if (unknownKeys.length > 0) {
+      req.log?.warn('Unknown spec keys rejected', { unknownKeys });
+      res.status(400).json({ error: 'Unknown spec sections', detail: unknownKeys });
+      return;
+    }
+
     const specData: Record<string, unknown> = {
       deviceId,
       updatedAt: new Date().toISOString(),
     };
 
     for (const key of SPEC_CATEGORIES) {
-      specData[key] = req.body[key] ?? {};
+      const section = req.body[key];
+      if (section !== undefined && (typeof section !== 'object' || section === null || Array.isArray(section))) {
+        res.status(400).json({ error: `Spec section "${key}" must be an object` });
+        return;
+      }
+      specData[key] = section ?? {};
     }
 
     const existingSnap = await db

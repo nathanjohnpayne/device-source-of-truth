@@ -37,7 +37,9 @@ export type AuditEntityType =
   | 'alert'
   | 'user'
   | 'fieldOption'
-  | 'intakeRequest';
+  | 'intakeRequest'
+  | 'partnerAlias'
+  | 'system';
 
 // ── Firestore Timestamp (serialized as ISO string in API responses) ──
 
@@ -101,7 +103,7 @@ export interface PartnerKeyImportRow {
   os: string | null;
   partnerId: string | null;
   partnerDisplayName: string | null;
-  matchConfidence: 'exact' | 'fuzzy' | 'unmatched';
+  matchConfidence: MatchConfidence;
   warnings: string[];
   errors: string[];
   status: 'ready' | 'warning' | 'error' | 'skipped';
@@ -154,6 +156,7 @@ export interface Device {
   pendingPartnerKey: string | null;
   tierId: string | null;
   tierAssignedAt: Timestamp | null;
+  importBatchId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -714,6 +717,14 @@ export interface PartnerWithStats extends Partner {
   activeDeviceCount: number;
 }
 
+export interface PartnerKeyWithDisplay extends PartnerKey {
+  partnerDisplayName: string | null;
+}
+
+export interface UploadHistoryWithRollback extends UploadHistory {
+  rollbackAvailable: boolean;
+}
+
 // ── Field Options (DST-036) ──
 
 export interface FieldOption {
@@ -742,7 +753,7 @@ export interface FieldOptionKeyInfo {
 
 export type IntakeRegion = 'APAC' | 'DOMESTIC' | 'EMEA' | 'GLOBAL' | 'LATAM';
 
-export type MatchConfidence = 'exact' | 'fuzzy' | 'unmatched';
+export type MatchConfidence = 'exact' | 'alias_direct' | 'alias_contextual' | 'fuzzy' | 'unmatched';
 
 export interface IntakeRequest {
   id: string;
@@ -927,6 +938,38 @@ export interface DeduplicationInfo {
   diffs?: FieldDiff[];
   resolution?: ConflictResolution;
   duplicateOfRow?: number;
+}
+
+// ── Partner Aliases (DST-046) ──
+
+export type PartnerAliasResolutionType = 'direct' | 'contextual';
+
+export type PartnerAliasContextSignal = 'region' | 'country_iso' | 'device_type' | 'vendor';
+
+export interface PartnerAliasContextRule {
+  conditions: Record<string, string[]>;
+  partner_id: string;
+}
+
+export interface PartnerAliasContextRules {
+  signals: PartnerAliasContextSignal[];
+  rules: PartnerAliasContextRule[];
+  fallback: string | null;
+}
+
+export interface PartnerAlias {
+  id: string;
+  alias: string;
+  partnerId: string | null;
+  partnerDisplayName?: string | null;
+  resolutionType: PartnerAliasResolutionType;
+  contextRules: PartnerAliasContextRules | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
 }
 
 // ── Config ──

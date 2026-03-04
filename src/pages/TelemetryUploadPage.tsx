@@ -17,7 +17,7 @@ import { trackEvent } from '../lib/analytics';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
-import type { UploadHistory, TelemetryPreviewRow } from '../lib/types';
+import type { UploadHistoryWithRollback, TelemetryPreviewRow } from '../lib/types';
 
 const MONTH_NAMES = [
   'january', 'february', 'march', 'april', 'may', 'june',
@@ -91,9 +91,9 @@ export default function TelemetryUploadPage() {
     errorCount: number; errors: string[];
   } | null>(null);
 
-  const [history, setHistory] = useState<(UploadHistory & { uploadBatchId?: string; rollbackAvailable?: boolean })[]>([]);
+  const [history, setHistory] = useState<UploadHistoryWithRollback[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [rollbackModal, setRollbackModal] = useState<(UploadHistory & { uploadBatchId?: string }) | null>(null);
+  const [rollbackModal, setRollbackModal] = useState<UploadHistoryWithRollback | null>(null);
   const [rollbackLoading, setRollbackLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,7 +101,7 @@ export default function TelemetryUploadPage() {
   const loadHistory = useCallback(async () => {
     try {
       const res = await api.telemetry.history();
-      setHistory(res.data as (UploadHistory & { uploadBatchId?: string; rollbackAvailable?: boolean })[]);
+      setHistory(res.data);
     } catch {
       // silent
     } finally {
@@ -183,7 +183,7 @@ export default function TelemetryUploadPage() {
     }
   }, [file, snapshotDate, staleOverrides, loadHistory]);
 
-  const handleRollback = useCallback(async (batch: UploadHistory & { uploadBatchId?: string }) => {
+  const handleRollback = useCallback(async (batch: UploadHistoryWithRollback) => {
     if (!batch.uploadBatchId) return;
     setRollbackLoading(true);
     try {
@@ -559,7 +559,7 @@ export default function TelemetryUploadPage() {
           ) : (
             <div className="space-y-3">
               {history.map(batch => {
-                const canRollback = !!(batch as { rollbackAvailable?: boolean }).rollbackAvailable;
+                const canRollback = !!batch.rollbackAvailable;
 
                 return (
                   <div key={batch.id} className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">

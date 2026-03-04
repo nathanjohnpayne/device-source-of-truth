@@ -367,10 +367,10 @@ function SpecEditForm() {
     setError(null);
 
     try {
-      await api.deviceSpecs.save(deviceId, formData as unknown as Partial<DeviceSpec>);
+      await api.deviceSpecs.save(deviceId, formData as Partial<DeviceSpec>);
 
       if (questionnaireUrl || questionnaireFile) {
-        await api.devices.update(deviceId, { questionnaireUrl: questionnaireUrl || null } as Record<string, unknown>);
+        await api.devices.update(deviceId, { questionnaireUrl: questionnaireUrl || null });
       }
 
       setIsDirty(false);

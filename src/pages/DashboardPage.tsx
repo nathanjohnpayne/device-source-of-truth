@@ -91,18 +91,17 @@ export default function DashboardPage() {
     api.reports
       .dashboard()
       .then((res) => {
-        const raw = (res ?? {}) as Record<string, unknown>;
         setData({
-          totalActiveDevices: (raw.totalActiveDevices as number) ?? 0,
-          totalDevices: (raw.totalDevices as number) ?? 0,
-          specCoverageWeighted: (raw.specCoverageWeighted as number) ?? 0,
-          certifiedCount: (raw.certifiedCount as number) ?? 0,
-          pendingCount: (raw.pendingCount as number) ?? 0,
-          uncertifiedCount: (raw.uncertifiedCount as number) ?? 0,
-          openAlertCount: (raw.openAlertCount as number) ?? 0,
-          top20Devices: (raw.top20Devices as DashboardData['top20Devices']) ?? [],
-          adkVersions: (raw.adkVersions as DashboardData['adkVersions']) ?? [],
-          regionBreakdown: (raw.regionBreakdown as DashboardData['regionBreakdown']) ?? [],
+          totalActiveDevices: res.totalActiveDevices ?? 0,
+          totalDevices: res.totalDevices ?? 0,
+          specCoverageWeighted: res.specCoverageWeighted ?? 0,
+          certifiedCount: res.certifiedCount ?? 0,
+          pendingCount: res.pendingCount ?? 0,
+          uncertifiedCount: res.uncertifiedCount ?? 0,
+          openAlertCount: res.openAlertCount ?? 0,
+          top20Devices: res.top20Devices ?? [],
+          adkVersions: res.adkVersions ?? [],
+          regionBreakdown: res.regionBreakdown ?? [],
         });
       })
       .catch(() => {})

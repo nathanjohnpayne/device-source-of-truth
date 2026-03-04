@@ -13,6 +13,12 @@ import {
   Sparkles,
   Info,
   Clock,
+  Plus,
+  Pencil,
+  ToggleLeft,
+  ToggleRight,
+  Database,
+  Trash2,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
@@ -22,7 +28,7 @@ import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
 import ClarificationPanel from '../components/shared/ClarificationPanel';
 import type {
-  PartnerKey,
+  PartnerKeyWithDisplay,
   PartnerKeyImportRow,
   PartnerKeyImportPreview,
   PartnerKeyImportBatch,
@@ -30,9 +36,13 @@ import type {
   DisambiguationFieldResult,
   ClarificationAnswer,
   ConflictResolution,
+  PartnerAlias,
+  PartnerAliasContextRules,
+  PartnerAliasContextRule,
+  Partner,
 } from '../lib/types';
 
-type Tab = 'import' | 'registry';
+type Tab = 'import' | 'registry' | 'aliases';
 
 export default function PartnerKeyRegistryPage() {
   const [tab, setTab] = useState<Tab>('import');
@@ -48,7 +58,7 @@ export default function PartnerKeyRegistryPage() {
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-6">
-          {(['import', 'registry'] as Tab[]).map((t) => (
+          {(['import', 'registry', 'aliases'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -58,13 +68,13 @@ export default function PartnerKeyRegistryPage() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              {t === 'import' ? 'CSV Import' : 'All Keys'}
+              {t === 'import' ? 'CSV Import' : t === 'registry' ? 'All Keys' : 'Aliases'}
             </button>
           ))}
         </nav>
       </div>
 
-      {tab === 'import' ? <ImportTab /> : <RegistryTab />}
+      {tab === 'import' ? <ImportTab /> : tab === 'registry' ? <RegistryTab /> : <AliasesTab />}
     </div>
   );
 }
@@ -73,7 +83,7 @@ export default function PartnerKeyRegistryPage() {
 
 function RegistryTab() {
   const navigate = useNavigate();
-  const [keys, setKeys] = useState<(PartnerKey & { partnerDisplayName?: string })[]>([]);
+  const [keys, setKeys] = useState<PartnerKeyWithDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -85,7 +95,7 @@ function RegistryTab() {
     api.partnerKeys
       .list({ search: search || undefined, page, pageSize })
       .then((res) => {
-        setKeys(res.data as (PartnerKey & { partnerDisplayName?: string })[]);
+        setKeys(res.data);
         setTotal(res.total);
       })
       .catch(() => {})
@@ -1053,5 +1063,599 @@ function PreviewRow({ row, onResolution, aiResults }: {
         </tr>
       )}
     </>
+  );
+}
+
+// ── Aliases Tab (DST-046) ──
+
+interface AliasFormState {
+  alias: string;
+  resolutionType: 'direct' | 'contextual';
+  partnerId: string | null;
+  contextRules: PartnerAliasContextRules | null;
+  notes: string;
+}
+
+const EMPTY_FORM: AliasFormState = {
+  alias: '',
+  resolutionType: 'direct',
+  partnerId: null,
+  contextRules: null,
+  notes: '',
+};
+
+function AliasesTab() {
+  const [aliases, setAliases] = useState<PartnerAlias[]>([]);
+  const [partners, setPartners] = useState<{ id: string; displayName: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<AliasFormState>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [collisionWarning, setCollisionWarning] = useState<string | null>(null);
+  const [partnerSearch, setPartnerSearch] = useState('');
+  const [showPartnerDropdown, setShowPartnerDropdown] = useState(false);
+  const partnerDropdownRef = useRef<HTMLDivElement>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [aliasRes, partnerRes] = await Promise.all([
+        api.partnerAliases.list(),
+        api.partners.list(),
+      ]);
+      setAliases(aliasRes.data);
+      const pList = (partnerRes as { data: Partner[] }).data?.map((p: Partner) => ({ id: p.id, displayName: p.displayName })) ?? [];
+      setPartners(pList);
+    } catch {
+      setError('Failed to load aliases');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (partnerDropdownRef.current && !partnerDropdownRef.current.contains(e.target as Node)) {
+        setShowPartnerDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredPartners = partnerSearch
+    ? partners.filter(p => p.displayName.toLowerCase().includes(partnerSearch.toLowerCase())).slice(0, 10)
+    : partners.slice(0, 10);
+
+  const selectedPartnerName = form.partnerId
+    ? partners.find(p => p.id === form.partnerId)?.displayName ?? '(unknown)'
+    : '';
+
+  async function checkCollision(value: string) {
+    if (!value.trim()) { setCollisionWarning(null); return; }
+    const lower = value.trim().toLowerCase();
+    const match = partners.find(p => p.displayName.toLowerCase() === lower);
+    if (match) {
+      setCollisionWarning(`"${value.trim()}" matches existing partner "${match.displayName}". Aliases cannot shadow canonical partner names.`);
+    } else {
+      setCollisionWarning(null);
+    }
+  }
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setPartnerSearch('');
+    setCollisionWarning(null);
+    setError(null);
+    setShowModal(true);
+  }
+
+  function openEdit(a: PartnerAlias) {
+    setEditingId(a.id);
+    setForm({
+      alias: a.alias,
+      resolutionType: a.resolutionType,
+      partnerId: a.partnerId,
+      contextRules: a.contextRules,
+      notes: a.notes ?? '',
+    });
+    setPartnerSearch(a.partnerDisplayName ?? '');
+    setCollisionWarning(null);
+    setError(null);
+    setShowModal(true);
+  }
+
+  async function handleSave() {
+    if (!form.alias.trim()) return;
+    if (collisionWarning) return;
+    setSaving(true);
+    setError(null);
+    try {
+      if (editingId) {
+        await api.partnerAliases.update(editingId, {
+          alias: form.alias,
+          partnerId: form.partnerId,
+          resolutionType: form.resolutionType,
+          contextRules: form.contextRules,
+          notes: form.notes,
+        });
+      } else {
+        await api.partnerAliases.create({
+          alias: form.alias,
+          partnerId: form.partnerId,
+          resolutionType: form.resolutionType,
+          contextRules: form.contextRules,
+          notes: form.notes,
+        });
+      }
+      trackEvent('partner_alias_saved', { resolutionType: form.resolutionType });
+      setShowModal(false);
+      loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save alias');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleActive(a: PartnerAlias) {
+    try {
+      if (a.isActive) {
+        await api.partnerAliases.deactivate(a.id);
+      } else {
+        await api.partnerAliases.update(a.id, { isActive: true });
+      }
+      loadData();
+    } catch {
+      setError('Failed to update alias status');
+    }
+  }
+
+  async function handleSeed() {
+    setSeeding(true);
+    setError(null);
+    try {
+      const result = await api.partnerAliases.seed();
+      trackEvent('partner_aliases_seeded', { created: result.created });
+      if (result.warnings.length > 0) {
+        setError(`Seeded ${result.created} aliases. Warnings: ${result.warnings.join('; ')}`);
+      }
+      loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to seed aliases');
+    } finally {
+      setSeeding(false);
+    }
+  }
+
+  function addContextRule() {
+    const rules = form.contextRules ?? { signals: ['region', 'country_iso'], rules: [], fallback: null };
+    setForm({
+      ...form,
+      contextRules: {
+        ...rules,
+        rules: [...rules.rules, { conditions: { region: [''] }, partner_id: '' }],
+      },
+    });
+  }
+
+  function updateContextRule(idx: number, updates: Partial<PartnerAliasContextRule>) {
+    if (!form.contextRules) return;
+    const newRules = [...form.contextRules.rules];
+    newRules[idx] = { ...newRules[idx], ...updates };
+    setForm({ ...form, contextRules: { ...form.contextRules, rules: newRules } });
+  }
+
+  function removeContextRule(idx: number) {
+    if (!form.contextRules) return;
+    const newRules = form.contextRules.rules.filter((_, i) => i !== idx);
+    setForm({ ...form, contextRules: { ...form.contextRules, rules: newRules } });
+  }
+
+  function resolvedDisplay(a: PartnerAlias): string {
+    if (a.resolutionType === 'direct') return a.partnerDisplayName ?? '(unlinked)';
+    return 'Context-dependent';
+  }
+
+  if (loading) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">{aliases.length} alias{aliases.length !== 1 ? 'es' : ''} registered</p>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSeed}
+            disabled={seeding}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <Database className="h-4 w-4" />
+            {seeding ? 'Seeding...' : 'Seed Defaults'}
+          </button>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" />
+            Add Alias
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Alias</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Type</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Resolves To</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Notes</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Active</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-500">Created</th>
+              <th className="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {aliases.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                  No aliases registered. Click &ldquo;Seed Defaults&rdquo; to create the standard aliases.
+                </td>
+              </tr>
+            ) : aliases.map(a => (
+              <tr key={a.id} className={a.isActive ? '' : 'opacity-50'}>
+                <td className="px-4 py-3 font-medium text-gray-900">{a.alias}</td>
+                <td className="px-4 py-3">
+                  <Badge variant={a.resolutionType === 'direct' ? 'info' : 'warning'}>
+                    {a.resolutionType}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3">
+                  {a.resolutionType === 'direct' ? (
+                    <span className="text-gray-700">{resolvedDisplay(a)}</span>
+                  ) : (
+                    <ContextRulesPopover rules={a.contextRules} partners={partners} />
+                  )}
+                </td>
+                <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{a.notes ?? ''}</td>
+                <td className="px-4 py-3">
+                  <button onClick={() => handleToggleActive(a)} title={a.isActive ? 'Deactivate' : 'Activate'}>
+                    {a.isActive ? (
+                      <ToggleRight className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <ToggleLeft className="h-5 w-5 text-gray-400" />
+                    )}
+                  </button>
+                </td>
+                <td className="px-4 py-3 text-gray-500 text-xs">
+                  {a.createdBy === 'system' ? 'system' : a.createdBy?.split('@')[0]}
+                  <br />
+                  {new Date(a.createdAt as unknown as string).toLocaleDateString()}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() => openEdit(a)}
+                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal
+        open={showModal}
+        title={editingId ? 'Edit Alias' : 'Add Alias'}
+        onClose={() => setShowModal(false)}
+      >
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Alias</label>
+              <input
+                type="text"
+                value={form.alias}
+                onChange={e => setForm({ ...form, alias: e.target.value })}
+                onBlur={() => checkCollision(form.alias)}
+                placeholder="e.g. Temis"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+              {collisionWarning && (
+                <p className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                  {collisionWarning}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Resolution Type</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={form.resolutionType === 'direct'}
+                    onChange={() => setForm({ ...form, resolutionType: 'direct', contextRules: null })}
+                    className="text-indigo-600"
+                  />
+                  Direct
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={form.resolutionType === 'contextual'}
+                    onChange={() => setForm({
+                      ...form,
+                      resolutionType: 'contextual',
+                      partnerId: null,
+                      contextRules: form.contextRules ?? { signals: ['region', 'country_iso'], rules: [], fallback: null },
+                    })}
+                    className="text-indigo-600"
+                  />
+                  Contextual
+                </label>
+              </div>
+            </div>
+
+            {form.resolutionType === 'direct' && (
+              <div ref={partnerDropdownRef}>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Partner</label>
+                <input
+                  type="text"
+                  value={partnerSearch}
+                  onChange={e => { setPartnerSearch(e.target.value); setShowPartnerDropdown(true); }}
+                  onFocus={() => setShowPartnerDropdown(true)}
+                  placeholder="Search partners..."
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+                {form.partnerId && (
+                  <p className="mt-1 text-xs text-green-600">Selected: {selectedPartnerName}</p>
+                )}
+                {showPartnerDropdown && filteredPartners.length > 0 && (
+                  <div className="relative">
+                    <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-auto">
+                      {filteredPartners.map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => {
+                            setForm({ ...form, partnerId: p.id });
+                            setPartnerSearch(p.displayName);
+                            setShowPartnerDropdown(false);
+                          }}
+                          className="block w-full px-3 py-1.5 text-left text-sm hover:bg-indigo-50"
+                        >
+                          {p.displayName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {form.resolutionType === 'contextual' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">Context Rules</label>
+                  <button
+                    type="button"
+                    onClick={addContextRule}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    + Add Rule
+                  </button>
+                </div>
+                {(form.contextRules?.rules ?? []).map((rule, idx) => (
+                  <ContextRuleEditor
+                    key={idx}
+                    rule={rule}
+                    partners={partners}
+                    onChange={updates => updateContextRule(idx, updates)}
+                    onRemove={() => removeContextRule(idx)}
+                  />
+                ))}
+                {(form.contextRules?.rules ?? []).length === 0 && (
+                  <p className="text-xs text-gray-400">No rules defined. Click &ldquo;+ Add Rule&rdquo; above.</p>
+                )}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">Fallback Partner (optional)</label>
+                  <select
+                    value={form.contextRules?.fallback ?? ''}
+                    onChange={e => setForm({
+                      ...form,
+                      contextRules: { ...form.contextRules!, fallback: e.target.value || null },
+                    })}
+                    className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+                  >
+                    <option value="">None (flag as unresolved)</option>
+                    {partners.map(p => <option key={p.id} value={p.id}>{p.displayName}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+              <textarea
+                value={form.notes}
+                onChange={e => setForm({ ...form, notes: e.target.value })}
+                placeholder="Optional. Why does this alias exist?"
+                rows={2}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !form.alias.trim() || !!collisionWarning}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+    </div>
+  );
+}
+
+function ContextRulesPopover({
+  rules,
+  partners,
+}: {
+  rules: PartnerAliasContextRules | null;
+  partners: { id: string; displayName: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  if (!rules) return <span className="text-gray-400">No rules</span>;
+
+  const partnerName = (id: string) => partners.find(p => p.id === id)?.displayName ?? id;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-sm text-indigo-600 underline decoration-dotted hover:text-indigo-700"
+      >
+        Context-dependent ({rules.rules.length} rule{rules.rules.length !== 1 ? 's' : ''})
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-80 rounded-lg border border-gray-200 bg-white p-3 shadow-xl text-xs">
+          <div className="space-y-2">
+            {rules.rules.map((r, i) => (
+              <div key={i} className="rounded bg-gray-50 p-2">
+                <div className="text-gray-500">
+                  {Object.entries(r.conditions).map(([k, v]) => (
+                    <span key={k} className="mr-2">{k}={v.join(',')}</span>
+                  ))}
+                </div>
+                <div className="font-medium text-gray-800 mt-0.5">&rarr; {partnerName(r.partner_id)}</div>
+              </div>
+            ))}
+            {rules.fallback && (
+              <div className="rounded bg-gray-50 p-2 text-gray-500">
+                Fallback &rarr; <span className="font-medium text-gray-800">{partnerName(rules.fallback)}</span>
+              </div>
+            )}
+            {!rules.fallback && (
+              <div className="text-gray-400 italic">No fallback (unresolved if no rule matches)</div>
+            )}
+          </div>
+          <button onClick={() => setOpen(false)} className="mt-2 text-xs text-gray-400 hover:text-gray-600">Close</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContextRuleEditor({
+  rule,
+  partners,
+  onChange,
+  onRemove,
+}: {
+  rule: PartnerAliasContextRule;
+  partners: { id: string; displayName: string }[];
+  onChange: (updates: Partial<PartnerAliasContextRule>) => void;
+  onRemove: () => void;
+}) {
+  const conditionEntries = Object.entries(rule.conditions);
+
+  function updateCondition(key: string, value: string) {
+    const newConditions = { ...rule.conditions, [key]: value.split(',').map(v => v.trim()).filter(Boolean) };
+    onChange({ conditions: newConditions });
+  }
+
+  function addCondition() {
+    const existing = new Set(Object.keys(rule.conditions));
+    const available = ['region', 'country_iso', 'device_type', 'vendor'].filter(s => !existing.has(s));
+    if (available.length === 0) return;
+    onChange({ conditions: { ...rule.conditions, [available[0]]: [''] } });
+  }
+
+  function removeCondition(key: string) {
+    const newConditions = { ...rule.conditions };
+    delete newConditions[key];
+    onChange({ conditions: newConditions });
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-500 uppercase">Rule</span>
+        <button onClick={onRemove} className="text-red-400 hover:text-red-600">
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {conditionEntries.map(([key, values]) => (
+        <div key={key} className="flex items-center gap-2">
+          <select
+            value={key}
+            onChange={e => {
+              const newConditions = { ...rule.conditions };
+              delete newConditions[key];
+              newConditions[e.target.value] = values;
+              onChange({ conditions: newConditions });
+            }}
+            className="rounded border border-gray-300 px-2 py-1 text-xs w-28"
+          >
+            {['region', 'country_iso', 'device_type', 'vendor'].map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-400">=</span>
+          <input
+            type="text"
+            value={values.join(', ')}
+            onChange={e => updateCondition(key, e.target.value)}
+            placeholder="e.g. EMEA, LATAM"
+            className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
+          />
+          <button onClick={() => removeCondition(key)} className="text-gray-400 hover:text-red-500">
+            <XCircle className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ))}
+      <button onClick={addCondition} className="text-xs text-indigo-600 hover:text-indigo-700">+ condition</button>
+      <div>
+        <label className="mb-0.5 block text-xs text-gray-500">Resolves to</label>
+        <select
+          value={rule.partner_id}
+          onChange={e => onChange({ partner_id: e.target.value })}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+        >
+          <option value="">Select partner...</option>
+          {partners.map(p => <option key={p.id} value={p.id}>{p.displayName}</option>)}
+        </select>
+      </div>
+    </div>
   );
 }

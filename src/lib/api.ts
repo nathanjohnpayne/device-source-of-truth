@@ -1,7 +1,7 @@
 import { auth } from './firebase';
 import type {
   Partner,
-  PartnerKey,
+  PartnerKeyWithDisplay,
   PartnerKeyImportPreview,
   PartnerKeyImportResult,
   PartnerKeyImportBatch,
@@ -12,7 +12,7 @@ import type {
   HardwareTier,
   Alert,
   AuditLogEntry,
-  UploadHistory,
+  UploadHistoryWithRollback,
   PaginatedResponse,
   FieldOption,
   FieldOptionKeyInfo,
@@ -27,6 +27,7 @@ import type {
   DisambiguationResponse,
   DisambiguationFieldResult,
   ClarificationAnswer,
+  PartnerAlias,
 } from './types';
 
 class ApiError extends Error {
@@ -123,9 +124,9 @@ function crudEndpoints<T>(base: string) {
   return {
     list: (params?: QueryParams) => apiFetch<PaginatedResponse<T>>(`${base}${qs(params)}`),
     get: (id: string) => apiFetch<T>(`${base}/${id}`),
-    create: (data: Partial<T>) =>
+    create: (data: Record<string, unknown>) =>
       apiFetch<T>(base, { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<T>) =>
+    update: (id: string, data: Record<string, unknown>) =>
       apiFetch<T>(`${base}/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
       apiFetch<void>(`${base}/${id}`, { method: 'DELETE' }),
@@ -135,7 +136,7 @@ function crudEndpoints<T>(base: string) {
 export const api = {
   partners: crudEndpoints<Partner>('/partners'),
   partnerKeys: {
-    ...crudEndpoints<PartnerKey>('/partner-keys'),
+    ...crudEndpoints<PartnerKeyWithDisplay>('/partner-keys'),
     importPreview: async (file: File) => {
       const csvData = await file.text();
       return apiFetch<PartnerKeyImportPreview>('/partner-keys/import/preview', {
@@ -230,7 +231,7 @@ export const api = {
       });
     },
     history: (params?: QueryParams) =>
-      apiFetch<PaginatedResponse<UploadHistory>>(`/telemetry/history${qs(params)}`),
+      apiFetch<PaginatedResponse<UploadHistoryWithRollback>>(`/telemetry/history${qs(params)}`),
     rollback: (uploadBatchId: string) =>
       apiFetch<{ success: boolean; deletedSnapshots: number }>(`/telemetry/rollback/${uploadBatchId}`, {
         method: 'DELETE',
@@ -267,7 +268,7 @@ export const api = {
     specCoverage: (params?: QueryParams) =>
       apiFetch<{
         summary: { totalDevices: number; fullSpecs: number; partialSpecs: number; noSpecs: number; weightedCoverage: number };
-        devices: { id: string; displayName: string; partnerName: string; activeDeviceCount: number; specCompleteness: number; questionnaireStatus: string; region: string }[];
+        devices: { id: string; displayName: string; partnerName: string; activeDeviceCount: number; specCompleteness: number; questionnaireStatus: 'linked' | 'received' | 'none'; region: string }[];
       }>(`/reports/spec-coverage${qs(params)}`),
   },
 
@@ -407,6 +408,38 @@ export const api = {
       apiFetch<{ usageCount: number }>(`/version-mappings/usage/${id}`),
     seed: () =>
       apiFetch<{ created: number; skipped: number }>('/version-mappings/seed', { method: 'POST' }),
+  },
+
+  partnerAliases: {
+    list: (params?: { active?: string }) =>
+      apiFetch<{ data: PartnerAlias[] }>(`/partner-aliases${qs(params)}`),
+    create: (data: {
+      alias: string;
+      partnerId?: string | null;
+      resolutionType: 'direct' | 'contextual';
+      contextRules?: unknown;
+      notes?: string;
+    }) =>
+      apiFetch<PartnerAlias>('/partner-aliases', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<{
+      alias: string;
+      partnerId: string | null;
+      resolutionType: string;
+      contextRules: unknown;
+      notes: string;
+      isActive: boolean;
+    }>) =>
+      apiFetch<PartnerAlias>(`/partner-aliases/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    deactivate: (id: string) =>
+      apiFetch<{ success: boolean }>(`/partner-aliases/${id}/deactivate`, { method: 'PUT' }),
+    seed: () =>
+      apiFetch<{ created: number; skipped: number; warnings: string[] }>('/partner-aliases/seed', { method: 'POST' }),
   },
 
 };

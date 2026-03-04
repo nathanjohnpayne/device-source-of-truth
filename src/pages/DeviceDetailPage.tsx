@@ -38,7 +38,6 @@ import type {
   AuditLogEntry,
   CertificationStatus,
   SpecCategory,
-  DeploymentStatus,
 } from '../lib/types';
 import { SPEC_CATEGORIES, SPEC_CATEGORY_LABELS } from '../lib/types';
 import { QUESTIONNAIRE_SECTIONS, SPEC_FIELD_UNITS } from '../lib/questionnaireFields';
@@ -225,13 +224,6 @@ export default function DeviceDetailPage() {
   });
   const [saving, setSaving] = useState(false);
 
-  const [deployModalOpen, setDeployModalOpen] = useState(false);
-  const [deployForm, setDeployForm] = useState({
-    countryIso2: '',
-    deploymentStatus: 'Active' as DeploymentStatus,
-    deployedAdkVersion: '',
-  });
-
   const [knownFriendlyVersions, setKnownFriendlyVersions] = useState<string[]>([]);
   useEffect(() => {
     api.versionMappings.friendlyVersions().then(res => setKnownFriendlyVersions(res.data)).catch(() => {});
@@ -264,7 +256,7 @@ export default function DeviceDetailPage() {
         liveAdkVersion: editForm.liveAdkVersion || null,
         certificationStatus: editForm.certificationStatus as CertificationStatus,
         certificationNotes: editForm.certificationNotes || null,
-      } as Record<string, unknown>);
+      });
       setDevice((prev) => (prev ? { ...prev, ...updated } : prev));
       setEditOpen(false);
     } catch (err) {
@@ -272,13 +264,6 @@ export default function DeviceDetailPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleAddDeployment = async () => {
-    if (!id || !deployForm.countryIso2) return;
-    // TODO: add a backend POST /device-deployments endpoint
-    setError('Deployment creation is not yet supported by the API');
-    void deployForm;
   };
 
   if (loading) return <LoadingSpinner />;
@@ -549,14 +534,6 @@ export default function DeviceDetailPage() {
             <h2 className="text-base font-semibold text-gray-900">Deployments</h2>
             <span className="text-sm text-gray-500">({deployments.length})</span>
           </div>
-          {isEditor && (
-            <button
-              onClick={() => setDeployModalOpen(true)}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-800"
-            >
-              <Plus className="h-4 w-4" /> Add Deployment
-            </button>
-          )}
         </div>
         <div className="p-4">
           <DataTable
@@ -779,75 +756,6 @@ export default function DeviceDetailPage() {
         </div>
       </Modal>
 
-      {/* Add Deployment Modal */}
-      <Modal
-        open={deployModalOpen}
-        onClose={() => setDeployModalOpen(false)}
-        title="Add Deployment"
-        footer={
-          <>
-            <button
-              onClick={() => setDeployModalOpen(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAddDeployment}
-              disabled={!deployForm.countryIso2}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              Add
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Country (ISO 3166-1 alpha-2)
-            </label>
-            <input
-              type="text"
-              value={deployForm.countryIso2}
-              onChange={(e) =>
-                setDeployForm((p) => ({ ...p, countryIso2: e.target.value }))
-              }
-              placeholder="US"
-              maxLength={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
-            <select
-              value={deployForm.deploymentStatus}
-              onChange={(e) =>
-                setDeployForm((p) => ({
-                  ...p,
-                  deploymentStatus: e.target.value as DeploymentStatus,
-                }))
-              }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="Active">Active</option>
-              <option value="Deprecated">Deprecated</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">ADK Version</label>
-            <input
-              type="text"
-              value={deployForm.deployedAdkVersion}
-              onChange={(e) =>
-                setDeployForm((p) => ({ ...p, deployedAdkVersion: e.target.value }))
-              }
-              placeholder="e.g. 7.3.1"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            />
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

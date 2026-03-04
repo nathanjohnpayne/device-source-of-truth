@@ -127,7 +127,7 @@ export default function SpecCoveragePage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.reports.specCoverage() as SpecCoverageResponse;
+        const res = await api.reports.specCoverage();
         setData(res);
       } catch {
         setError('Failed to load spec coverage data.');

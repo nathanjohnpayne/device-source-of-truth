@@ -14,7 +14,7 @@ const CODEC_FIELD_MAP: Record<string, string> = {
 };
 
 function getHw(spec: DeviceSpec, field: string): unknown {
-  return (spec.hardware as Record<string, unknown>)?.[field];
+  return (spec.hardware as unknown as Record<string, unknown>)?.[field];
 }
 
 function deviceMeetsTier(spec: DeviceSpec, tier: HardwareTier): boolean {
@@ -39,7 +39,7 @@ function deviceMeetsTier(spec: DeviceSpec, tier: HardwareTier): boolean {
     if (!arch.includes('64')) return false;
   }
 
-  const mc = spec.mediaCodec as Record<string, unknown> ?? {};
+  const mc = (spec.mediaCodec as unknown as Record<string, unknown>) ?? {};
   for (const codec of tier.requiredCodecs) {
     const fieldName = CODEC_FIELD_MAP[codec.toLowerCase()];
     if (fieldName && !mc[fieldName]) return false;

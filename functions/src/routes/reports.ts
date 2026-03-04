@@ -36,11 +36,12 @@ router.get('/dashboard', async (req, res) => {
     }
 
     const keyPartnerMap = new Map<string, string>();
-    const keyRegionMap = new Map<string, string>();
+    const keyRegionsMap = new Map<string, string[]>();
     for (const doc of keysSnap.docs) {
       const data = doc.data();
       if (data.partnerId) keyPartnerMap.set(doc.id, data.partnerId as string);
-      if (data.region) keyRegionMap.set(doc.id, data.region as string);
+      const regions: string[] = Array.isArray(data.regions) ? data.regions : (data.region ? [data.region] : []);
+      if (regions.length) keyRegionsMap.set(doc.id, regions);
     }
 
     const devices = devicesSnap.docs.map((d) => {
@@ -101,11 +102,13 @@ router.get('/dashboard', async (req, res) => {
 
     const regionAgg = new Map<string, { activeDevices: number; deviceCount: number }>();
     for (const d of devices) {
-      const region = keyRegionMap.get(d.partnerKeyId) ?? 'Unknown';
-      const entry = regionAgg.get(region) ?? { activeDevices: 0, deviceCount: 0 };
-      entry.activeDevices += d.activeDeviceCount;
-      entry.deviceCount += 1;
-      regionAgg.set(region, entry);
+      const regions = keyRegionsMap.get(d.partnerKeyId) ?? ['Unknown'];
+      for (const region of regions) {
+        const entry = regionAgg.get(region) ?? { activeDevices: 0, deviceCount: 0 };
+        entry.activeDevices += d.activeDeviceCount;
+        entry.deviceCount += 1;
+        regionAgg.set(region, entry);
+      }
     }
     const regionBreakdown = [...regionAgg.entries()].map(([region, stats]) => ({
       region,
@@ -157,7 +160,10 @@ router.get('/partner/:id', async (req, res) => {
     for (let i = 0; i < keyIds.length; i += 30) {
       const batch = keyIds.slice(i, i + 30);
       const devSnap = await db.collection('devices').where('partnerKeyId', 'in', batch).get();
-      devices = devices.concat(devSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Device));
+      devices = devices.concat(devSnap.docs.map((d) => {
+        const data = d.data();
+        return { id: d.id, ...data, activeDeviceCount: safeNumber(data.activeDeviceCount), specCompleteness: safeNumber(data.specCompleteness) } as Device;
+      }));
     }
 
     const totalActive = devices.reduce((sum, d) => sum + safeNumber(d.activeDeviceCount), 0);

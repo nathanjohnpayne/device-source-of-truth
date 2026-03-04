@@ -4,18 +4,15 @@ import { ArrowLeft } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import VersionInput from '../components/shared/VersionInput';
-import type { PartnerKey, DeviceType, Region } from '../lib/types';
+import type { PartnerKey, DeviceType } from '../lib/types';
 
 const DEVICE_TYPES: DeviceType[] = ['STB', 'Smart TV', 'Stick', 'Console', 'OTT Box', 'Other'];
-const REGIONS: Region[] = ['NA', 'EMEA', 'LATAM', 'APAC'];
 
 interface FormState {
   deviceId: string;
   displayName: string;
   partnerKeyId: string;
   deviceType: DeviceType;
-  region: Region | '';
-  countriesIso2: string;
   liveAdkVersion: string;
 }
 
@@ -24,8 +21,6 @@ const INITIAL: FormState = {
   displayName: '',
   partnerKeyId: '',
   deviceType: 'STB',
-  region: '',
-  countriesIso2: '',
   liveAdkVersion: '',
 };
 
@@ -51,6 +46,7 @@ export default function DeviceCreatePage() {
     const errs: Record<string, string> = {};
     if (!form.deviceId.trim()) errs.deviceId = 'Device ID is required';
     if (!form.displayName.trim()) errs.displayName = 'Display name is required';
+    if (!form.partnerKeyId) errs.partnerKeyId = 'Partner Key is required';
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -62,18 +58,13 @@ export default function DeviceCreatePage() {
     setSubmitting(true);
     setError(null);
     try {
-      const countries = form.countriesIso2
-        .split(',')
-        .map((s) => s.trim().toUpperCase())
-        .filter(Boolean);
       const created = await api.devices.create({
         deviceId: form.deviceId.trim(),
         displayName: form.displayName.trim(),
-        partnerKeyId: form.partnerKeyId || undefined,
+        partnerKeyId: form.partnerKeyId,
         deviceType: form.deviceType,
         liveAdkVersion: form.liveAdkVersion || null,
-        countriesIso2: countries,
-      } as Record<string, unknown>);
+      });
       navigate(`/devices/${created.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -151,11 +142,17 @@ export default function DeviceCreatePage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Partner Key</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Partner Key <span className="text-red-500">*</span>
+          </label>
           <select
             value={form.partnerKeyId}
             onChange={set('partnerKeyId')}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            className={`w-full rounded-lg border px-3 py-2 text-sm focus:ring-1 ${
+              fieldErrors.partnerKeyId
+                ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
+            }`}
           >
             <option value="">— Select Partner Key —</option>
             {partnerKeys.map((pk) => (
@@ -164,45 +161,22 @@ export default function DeviceCreatePage() {
               </option>
             ))}
           </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Device Type</label>
-            <select
-              value={form.deviceType}
-              onChange={set('deviceType')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            >
-              {DEVICE_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Region</label>
-            <select
-              value={form.region}
-              onChange={set('region')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">— Select Region —</option>
-              {REGIONS.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </div>
+          {fieldErrors.partnerKeyId && (
+            <p className="mt-1 text-xs text-red-600">{fieldErrors.partnerKeyId}</p>
+          )}
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Countries (ISO 3166-1 alpha-2)</label>
-          <input
-            type="text"
-            value={form.countriesIso2}
-            onChange={set('countriesIso2')}
-            placeholder="US, GB, DE"
+          <label className="mb-1 block text-sm font-medium text-gray-700">Device Type</label>
+          <select
+            value={form.deviceType}
+            onChange={set('deviceType')}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-          />
+          >
+            {DEVICE_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
         </div>
 
         <VersionInput
