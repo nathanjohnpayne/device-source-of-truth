@@ -315,7 +315,7 @@ function ImportTab() {
       setStep('preview');
       trackEvent('partner_key_import_preview', { row_count: res.totalRows });
 
-      if (useAI && (res.warningCount > 0 || res.rows.some(r => r.matchConfidence === 'unmatched'))) {
+      if (useAI && res.errorCount > 0) {
         setDisambiguating(true);
         try {
           const aiResult = await api.disambiguation.disambiguate('partner_key', csvRows);

@@ -107,7 +107,6 @@ registerImportFlow({
   fields: [
     { csvColumn: 'countries_operate_iso2', fieldType: 'country' },
     { csvColumn: 'regions_operate', fieldType: 'region' },
-    { csvColumn: 'friendly_partner_name', fieldType: 'partner_name' },
     { csvColumn: 'chipset', fieldType: 'enum', optionsKey: 'partner_chipset' },
   ],
 });
