@@ -396,7 +396,7 @@ export default function DeviceDetailPage() {
           <div>
             <dt className="text-xs font-medium text-gray-500">Region</dt>
             <dd className="mt-0.5 text-sm text-gray-900">
-              {device.partnerKey?.region ?? '—'}
+              {device.partnerKey?.regions?.join(', ') || '—'}
             </dd>
           </div>
           <div>

@@ -470,9 +470,13 @@ export default function ReferenceDataPage() {
     setSeeding(true);
     try {
       const result = await api.fieldOptions.seed();
-      const res = await api.fieldOptions.listKeys();
-      setKeys(res.data);
       alert(`Seed complete: ${result.created} created, ${result.skipped} skipped`);
+      try {
+        const res = await api.fieldOptions.listKeys();
+        setKeys(res.data);
+      } catch {
+        // Index may still be building — reload the page after a moment
+      }
     } catch {
       alert('Failed to seed field options');
     } finally {

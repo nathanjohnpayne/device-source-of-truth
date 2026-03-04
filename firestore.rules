@@ -78,5 +78,25 @@ service cloud.firestore {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser();
     }
+
+    match /partnerKeyImportBatches/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /intakeRequests/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /intakeRequestPartners/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
+
+    match /intakeImportHistory/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
   }
 }

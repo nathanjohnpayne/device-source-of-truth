@@ -2,6 +2,9 @@ import { auth } from './firebase';
 import type {
   Partner,
   PartnerKey,
+  PartnerKeyImportPreview,
+  PartnerKeyImportResult,
+  PartnerKeyImportBatch,
   DeviceSpec,
   DeviceDetail,
   DeviceWithRelations,
@@ -13,6 +16,11 @@ import type {
   PaginatedResponse,
   FieldOption,
   FieldOptionKeyInfo,
+  IntakeRequest,
+  IntakePreviewRow,
+  IntakeImportResult,
+  IntakeImportBatch,
+  MigrationBatch,
 } from './types';
 
 class ApiError extends Error {
@@ -120,7 +128,27 @@ function crudEndpoints<T>(base: string) {
 
 export const api = {
   partners: crudEndpoints<Partner>('/partners'),
-  partnerKeys: crudEndpoints<PartnerKey>('/partner-keys'),
+  partnerKeys: {
+    ...crudEndpoints<PartnerKey>('/partner-keys'),
+    importPreview: async (file: File) => {
+      const csvData = await file.text();
+      return apiFetch<PartnerKeyImportPreview>('/partner-keys/import/preview', {
+        method: 'POST',
+        body: JSON.stringify({ csvData }),
+      });
+    },
+    importConfirm: (rows: PartnerKeyImportPreview['rows'], fileName: string) =>
+      apiFetch<PartnerKeyImportResult>('/partner-keys/import/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ rows, fileName }),
+      }),
+    importBatches: () =>
+      apiFetch<{ data: PartnerKeyImportBatch[] }>('/partner-keys/import-batches'),
+    rollbackBatch: (batchId: string) =>
+      apiFetch<{ success: boolean; deleted: number }>(`/partner-keys/import-batches/${batchId}/rollback`, {
+        method: 'POST',
+      }),
+  },
   devices: {
     ...crudEndpoints<DeviceWithRelations>('/devices'),
     get: (id: string) => apiFetch<DeviceDetail>(`/devices/${id}`),
@@ -175,6 +203,10 @@ export const api = {
     },
     history: (params?: QueryParams) =>
       apiFetch<PaginatedResponse<UploadHistory>>(`/telemetry/history${qs(params)}`),
+    rollback: (uploadBatchId: string) =>
+      apiFetch<{ success: boolean; deletedSnapshots: number }>(`/telemetry/rollback/${uploadBatchId}`, {
+        method: 'DELETE',
+      }),
   },
 
   search: (query: string) =>
@@ -237,11 +269,20 @@ export const api = {
   upload: {
     migration: async (file: File) => {
       const csvData = await file.text();
-      return apiFetch<{ success: boolean; created: number; duplicates: number; errored: number; errors: string[] }>(
+      return apiFetch<{
+        success: boolean; importBatchId: string; created: number; duplicates: number; errored: number; errors: string[];
+      }>(
         '/upload/migration',
-        { method: 'POST', body: JSON.stringify({ csvData }) },
+        { method: 'POST', body: JSON.stringify({ csvData, fileName: file.name }) },
       );
     },
+    migrationHistory: () =>
+      apiFetch<{ data: MigrationBatch[] }>('/upload/migration/history'),
+    migrationRollback: (importBatchId: string) =>
+      apiFetch<{ success: boolean; deletedDevices: number; deletedSpecs: number }>(
+        `/upload/migration/rollback/${importBatchId}`,
+        { method: 'DELETE' },
+      ),
     bulkSpecs: async (file: File) => {
       const isXlsx = file.name.endsWith('.xlsx');
       if (isXlsx) {
@@ -260,6 +301,37 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ csvData }) },
       );
     },
+    clearAll: () =>
+      apiFetch<{ success: boolean; deleted: Record<string, number> }>(
+        '/upload/clear-all',
+        { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE_ALL_DATA' }) },
+      ),
+  },
+
+  intake: {
+    preview: (rows: Omit<IntakePreviewRow, 'partnerMatches' | 'warnings' | 'errors' | 'status'>[]) =>
+      apiFetch<{
+        rows: IntakePreviewRow[];
+        summary: { total: number; ready: number; warnings: number; errors: number };
+      }>('/intake/preview', { method: 'POST', body: JSON.stringify({ rows }) }),
+    import: (rows: IntakePreviewRow[], fileName: string) =>
+      apiFetch<IntakeImportResult>('/intake/import', {
+        method: 'POST',
+        body: JSON.stringify({ rows, fileName }),
+      }),
+    list: (params?: QueryParams) =>
+      apiFetch<PaginatedResponse<IntakeRequest>>(`/intake${qs(params)}`),
+    get: (id: string) =>
+      apiFetch<IntakeRequest & { partners: Array<{ id: string; partnerNameRaw: string; partnerId: string | null; matchConfidence: string }> }>(
+        `/intake/${id}`,
+      ),
+    history: () =>
+      apiFetch<{ data: IntakeImportBatch[] }>('/intake/history'),
+    rollback: (batchId: string) =>
+      apiFetch<{ success: boolean; deletedRequests: number; deletedPartners: number }>(
+        `/intake/rollback/${batchId}`,
+        { method: 'DELETE' },
+      ),
   },
 
 };

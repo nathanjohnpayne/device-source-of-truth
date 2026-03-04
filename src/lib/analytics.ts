@@ -33,7 +33,10 @@ export type AnalyticsEvent =
   | 'field_option_reorder'
   | 'field_option_update'
   | 'field_option_delete'
-  | 'field_option_create';
+  | 'field_option_create'
+  | 'partner_key_import_preview'
+  | 'partner_key_import_complete'
+  | 'partner_key_import_rollback';
 
 export interface AnalyticsParams {
   page_view: { page_title: string; page_path: string };
@@ -69,6 +72,9 @@ export interface AnalyticsParams {
   field_option_update: { dropdown_key: string; option_id: string };
   field_option_delete: { dropdown_key: string; option_id: string };
   field_option_create: { dropdown_key: string };
+  partner_key_import_preview: { row_count: number };
+  partner_key_import_complete: { imported: number };
+  partner_key_import_rollback: { batch_id: string };
 }
 
 export function trackEvent<E extends AnalyticsEvent>(

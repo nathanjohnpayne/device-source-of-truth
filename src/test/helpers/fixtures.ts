@@ -34,6 +34,7 @@ export const minimalDevice: DeviceWithRelations = {
   questionnaireFileUrl: null,
   activeDeviceCount: 0,
   specCompleteness: 0,
+  pendingPartnerKey: null,
   tierId: null,
   tierAssignedAt: null,
   createdAt: NOW,

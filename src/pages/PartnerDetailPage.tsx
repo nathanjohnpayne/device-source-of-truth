@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pencil, ArrowLeft, Monitor, Key } from 'lucide-react';
+import { Pencil, ArrowLeft, Monitor, Key, Plus, Power, PowerOff } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import DataTable, { type Column } from '../components/shared/DataTable';
@@ -11,11 +11,13 @@ import EmptyState from '../components/shared/EmptyState';
 import type {
   Partner,
   PartnerKey,
+  PartnerKeyRegion,
   DeviceWithRelations,
   Region,
 } from '../lib/types';
 
 const REGIONS: Region[] = ['NA', 'EMEA', 'LATAM', 'APAC'];
+const PK_REGIONS: PartnerKeyRegion[] = ['APAC', 'EMEA', 'LATAM', 'DOMESTIC', 'GLOBAL'];
 
 function countryFlag(iso2: string): string {
   if (iso2.length !== 2) return '\u{1F3F3}';
@@ -23,17 +25,6 @@ function countryFlag(iso2: string): string {
   const cp2 = 0x1f1e6 + iso2.toUpperCase().charCodeAt(1) - 65;
   return String.fromCodePoint(cp1, cp2);
 }
-
-const keyColumns: Column<PartnerKey>[] = [
-  { header: 'Key', accessor: 'key', sortable: true },
-  { header: 'Chipset', accessor: 'chipset', sortable: true },
-  { header: 'OEM', accessor: 'oem', sortable: true },
-  {
-    header: 'Region',
-    accessor: 'region',
-    render: (row) => row.region ? <Badge variant="info">{row.region}</Badge> : '—',
-  },
-];
 
 const deviceColumns: Column<DeviceWithRelations>[] = [
   { header: 'Device Name', accessor: 'displayName', sortable: true },
@@ -54,10 +45,20 @@ const deviceColumns: Column<DeviceWithRelations>[] = [
   },
 ];
 
+const EMPTY_KEY_FORM = {
+  key: '',
+  chipset: '',
+  oem: '',
+  kernel: '',
+  os: '',
+  countries: '',
+  regions: [] as PartnerKeyRegion[],
+};
+
 export default function PartnerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isEditor } = useAuth();
+  const { isEditor, isAdmin } = useAuth();
 
   const [partner, setPartner] = useState<Partner | null>(null);
   const [partnerKeys, setPartnerKeys] = useState<PartnerKey[]>([]);
@@ -71,6 +72,14 @@ export default function PartnerDetailPage() {
     countriesIso2: '',
   });
   const [saving, setSaving] = useState(false);
+
+  // Key management state
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
+  const [editingKey, setEditingKey] = useState<PartnerKey | null>(null);
+  const [keyForm, setKeyForm] = useState(EMPTY_KEY_FORM);
+  const [savingKey, setSavingKey] = useState(false);
+  const [deactivateConfirm, setDeactivateConfirm] = useState<PartnerKey | null>(null);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -133,8 +142,84 @@ export default function PartnerDetailPage() {
     }));
   };
 
+  const openAddKey = () => {
+    setEditingKey(null);
+    setKeyForm(EMPTY_KEY_FORM);
+    setKeyModalOpen(true);
+  };
+
+  const openEditKey = (pk: PartnerKey) => {
+    setEditingKey(pk);
+    setKeyForm({
+      key: pk.key,
+      chipset: pk.chipset ?? '',
+      oem: pk.oem ?? '',
+      kernel: pk.kernel ?? '',
+      os: pk.os ?? '',
+      countries: (pk.countries ?? []).join(', '),
+      regions: pk.regions ?? [],
+    });
+    setKeyModalOpen(true);
+  };
+
+  const handleSaveKey = async () => {
+    if (!id) return;
+    setSavingKey(true);
+    try {
+      const countries = keyForm.countries
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
+      const payload = {
+        key: keyForm.key,
+        partnerId: id,
+        chipset: keyForm.chipset || null,
+        oem: keyForm.oem || null,
+        kernel: keyForm.kernel || null,
+        os: keyForm.os || null,
+        countries,
+        regions: keyForm.regions,
+      };
+
+      if (editingKey) {
+        const updated = await api.partnerKeys.update(editingKey.id, payload);
+        setPartnerKeys((prev) => prev.map((k) => (k.id === editingKey.id ? updated : k)));
+      } else {
+        const created = await api.partnerKeys.create(payload as Partial<PartnerKey>);
+        setPartnerKeys((prev) => [...prev, created]);
+      }
+      setKeyModalOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save key');
+    } finally {
+      setSavingKey(false);
+    }
+  };
+
+  const handleToggleActive = async (pk: PartnerKey) => {
+    setToggling(true);
+    try {
+      const updated = await api.partnerKeys.update(pk.id, { isActive: !pk.isActive } as Partial<PartnerKey>);
+      setPartnerKeys((prev) => prev.map((k) => (k.id === pk.id ? updated : k)));
+      setDeactivateConfirm(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update key');
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const toggleKeyRegion = (r: PartnerKeyRegion) => {
+    setKeyForm((prev) => ({
+      ...prev,
+      regions: prev.regions.includes(r)
+        ? prev.regions.filter((x) => x !== r)
+        : [...prev.regions, r],
+    }));
+  };
+
   if (loading) return <LoadingSpinner />;
-  if (error) {
+  if (error && !partner) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         {error}
@@ -180,6 +265,12 @@ export default function PartnerDetailPage() {
         </div>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-gray-200 bg-white p-5">
           <p className="text-sm font-medium text-gray-500">Total Devices</p>
@@ -195,18 +286,107 @@ export default function PartnerDetailPage() {
         </div>
       </div>
 
+      {/* Partner Keys section */}
       <section>
-        <div className="mb-3 flex items-center gap-2">
-          <Key className="h-5 w-5 text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900">Partner Keys</h2>
-          <span className="text-sm text-gray-500">({partnerKeys.length})</span>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Key className="h-5 w-5 text-gray-400" />
+            <h2 className="text-lg font-semibold text-gray-900">Partner Keys</h2>
+            <span className="text-sm text-gray-500">({partnerKeys.length})</span>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={openAddKey}
+              className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              <Plus className="h-4 w-4" /> Add Key
+            </button>
+          )}
         </div>
-        <DataTable
-          columns={keyColumns}
-          data={partnerKeys}
-          emptyTitle="No partner keys"
-          emptyDescription="No keys are associated with this partner yet."
-        />
+
+        {partnerKeys.length === 0 ? (
+          <EmptyState
+            title="No partner keys"
+            description="No keys are associated with this partner yet."
+          />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Key</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Countries</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Region</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Chipset</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">OEM</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Kernel</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">OS</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Active</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Source</th>
+                    {isAdmin && (
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {partnerKeys.map((pk) => (
+                    <tr key={pk.id} className="hover:bg-gray-50">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">{pk.key}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{(pk.countries ?? []).join(', ') || '—'}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {(pk.regions ?? []).map((r) => (
+                          <Badge key={r} variant="info" className="mr-1">{r}</Badge>
+                        ))}
+                        {!(pk.regions?.length) && '—'}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{pk.chipset ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{pk.oem ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{pk.kernel ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">{pk.os ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        {pk.isActive !== false ? (
+                          <Badge variant="success">Active</Badge>
+                        ) : (
+                          <Badge variant="danger">Inactive</Badge>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+                        {pk.source === 'csv_import' ? 'CSV' : 'Manual'}
+                      </td>
+                      {isAdmin && (
+                        <td className="whitespace-nowrap px-4 py-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openEditKey(pk)}
+                              className="text-indigo-600 hover:text-indigo-800"
+                              title="Edit"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (pk.isActive !== false) {
+                                  setDeactivateConfirm(pk);
+                                } else {
+                                  handleToggleActive(pk);
+                                }
+                              }}
+                              className={pk.isActive !== false ? 'text-amber-600 hover:text-amber-800' : 'text-emerald-600 hover:text-emerald-800'}
+                              title={pk.isActive !== false ? 'Deactivate' : 'Activate'}
+                            >
+                              {pk.isActive !== false ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </section>
 
       <section>
@@ -224,6 +404,7 @@ export default function PartnerDetailPage() {
         />
       </section>
 
+      {/* Edit Partner Modal */}
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
@@ -280,6 +461,146 @@ export default function PartnerDetailPage() {
               onChange={(e) => setFormData((p) => ({ ...p, countriesIso2: e.target.value }))}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add/Edit Key Modal */}
+      <Modal
+        open={keyModalOpen}
+        onClose={() => setKeyModalOpen(false)}
+        title={editingKey ? 'Edit Partner Key' : 'Add Partner Key'}
+        wide
+        footer={
+          <>
+            <button
+              onClick={() => setKeyModalOpen(false)}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveKey}
+              disabled={!keyForm.key || savingKey}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {savingKey ? 'Saving...' : editingKey ? 'Update' : 'Create'}
+            </button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Partner Key *</label>
+            <input
+              type="text"
+              value={keyForm.key}
+              onChange={(e) => setKeyForm((p) => ({ ...p, key: e.target.value }))}
+              disabled={!!editingKey}
+              placeholder="e.g. vodafone_es"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-100"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Chipset</label>
+            <input
+              type="text"
+              value={keyForm.chipset}
+              onChange={(e) => setKeyForm((p) => ({ ...p, chipset: e.target.value }))}
+              placeholder="e.g. Amlogic"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">OEM</label>
+            <input
+              type="text"
+              value={keyForm.oem}
+              onChange={(e) => setKeyForm((p) => ({ ...p, oem: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Kernel</label>
+            <input
+              type="text"
+              value={keyForm.kernel}
+              onChange={(e) => setKeyForm((p) => ({ ...p, kernel: e.target.value }))}
+              placeholder="e.g. Linux"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">OS</label>
+            <input
+              type="text"
+              value={keyForm.os}
+              onChange={(e) => setKeyForm((p) => ({ ...p, os: e.target.value }))}
+              placeholder="e.g. TiVo OS"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Countries (ISO 3166-1 alpha-2, comma-separated)</label>
+            <input
+              type="text"
+              value={keyForm.countries}
+              onChange={(e) => setKeyForm((p) => ({ ...p, countries: e.target.value }))}
+              placeholder="e.g. US, GB, DE"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Regions</label>
+            <div className="flex flex-wrap gap-3">
+              {PK_REGIONS.map((r) => (
+                <label key={r} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={keyForm.regions.includes(r)}
+                    onChange={() => toggleKeyRegion(r)}
+                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  {r}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Deactivate Confirmation Modal */}
+      <Modal
+        open={!!deactivateConfirm}
+        onClose={() => setDeactivateConfirm(null)}
+        title="Deactivate Partner Key"
+        footer={
+          <>
+            <button
+              onClick={() => setDeactivateConfirm(null)}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => deactivateConfirm && handleToggleActive(deactivateConfirm)}
+              disabled={toggling}
+              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              {toggling ? 'Deactivating...' : 'Deactivate'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-700">
+            Are you sure you want to deactivate the key <strong>{deactivateConfirm?.key}</strong>?
+          </p>
+          <div className="rounded-md bg-amber-50 p-3">
+            <p className="text-sm text-amber-800">
+              Deactivating this key will exclude its devices from active counts. The key is
+              retained for historical telemetry lookups.
+            </p>
           </div>
         </div>
       </Modal>

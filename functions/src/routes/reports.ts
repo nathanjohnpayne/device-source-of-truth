@@ -223,15 +223,15 @@ router.get('/spec-coverage', async (req, res) => {
       partnerMap.set(doc.id, (doc.data().displayName as string) ?? doc.id);
     }
 
-    const keyInfo = new Map<string, { partnerId: string; region: string }>();
+    const keyInfo = new Map<string, { partnerId: string; regions: string[] }>();
     for (const doc of keysSnap.docs) {
       const d = doc.data();
-      keyInfo.set(doc.id, { partnerId: d.partnerId ?? '', region: d.region ?? '' });
+      keyInfo.set(doc.id, { partnerId: d.partnerId ?? '', regions: d.regions ?? (d.region ? [d.region] : []) });
     }
 
     const devices = devicesSnap.docs.map((d) => {
       const data = d.data();
-      const key = keyInfo.get(data.partnerKeyId ?? '') ?? { partnerId: '', region: '' };
+      const key = keyInfo.get(data.partnerKeyId ?? '') ?? { partnerId: '', regions: [] };
       const completeness = safeNumber(data.specCompleteness);
       const hasUrl = !!data.questionnaireUrl;
       const hasFile = !!data.questionnaireFileUrl;
@@ -242,7 +242,7 @@ router.get('/spec-coverage', async (req, res) => {
         activeDeviceCount: safeNumber(data.activeDeviceCount),
         specCompleteness: completeness,
         questionnaireStatus: hasUrl ? 'linked' : hasFile ? 'received' : 'none',
-        region: key.region || 'Unknown',
+        region: key.regions[0] || 'Unknown',
       };
     });
 

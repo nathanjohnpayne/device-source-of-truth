@@ -2,7 +2,9 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import Papa from 'papaparse';
 import { requireRole } from '../middleware/auth.js';
+import { logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
+import { stripEmoji } from '../services/intakeParser.js';
 
 const router = Router();
 
@@ -49,40 +51,50 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
     const rows = parsed.data;
     req.log?.info('Telemetry CSV parsed', { rowCount: rows.length });
 
+    const uploadBatchId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
     let successCount = 0;
     const errors: string[] = [];
     const deviceCounts: Record<string, number> = {};
 
-    const batch = db.batch();
-    for (const row of rows) {
-      try {
-        const uniqueDevices = parseInt(row.count_unique_device_id) || 0;
-        const eventCount = parseInt(row.count) || 0;
+    const BATCH_LIMIT = 450;
+    for (let i = 0; i < rows.length; i += BATCH_LIMIT) {
+      const chunk = rows.slice(i, i + BATCH_LIMIT);
+      const batch = db.batch();
 
-        const docRef = db.collection('telemetrySnapshots').doc();
-        batch.set(docRef, {
-          partnerKey: row.partner ?? '',
-          deviceId: row.device ?? '',
-          coreVersion: row.core_version ?? '',
-          uniqueDevices,
-          eventCount,
-          snapshotDate,
-        });
+      for (const row of chunk) {
+        try {
+          const partnerKey = stripEmoji((row.partner ?? '').trim());
+          const deviceId = stripEmoji((row.device ?? '').trim());
+          const uniqueDevices = parseInt(row.count_unique_device_id) || 0;
+          const eventCount = parseInt(row.count) || 0;
 
-        const deviceKey = row.device ?? '';
-        if (deviceKey) {
-          deviceCounts[deviceKey] = (deviceCounts[deviceKey] ?? 0) + uniqueDevices;
+          const docRef = db.collection('telemetrySnapshots').doc();
+          batch.set(docRef, {
+            partnerKey,
+            deviceId,
+            coreVersion: (row.core_version ?? '').trim(),
+            uniqueDevices,
+            eventCount,
+            snapshotDate,
+            uploadBatchId,
+          });
+
+          if (deviceId) {
+            deviceCounts[deviceId] = (deviceCounts[deviceId] ?? 0) + uniqueDevices;
+          }
+
+          successCount++;
+        } catch (rowErr) {
+          errors.push(`Row error: ${String(rowErr)}`);
         }
-
-        successCount++;
-      } catch (rowErr) {
-        errors.push(`Row error: ${String(rowErr)}`);
       }
+
+      await batch.commit();
     }
 
-    req.log?.debug('Committing telemetry batch write', { successCount, errorCount: errors.length });
-    await batch.commit();
-    req.log?.info('Telemetry batch write committed', { successCount });
+    req.log?.info('Telemetry batch writes committed', { successCount });
 
     req.log?.debug('Updating device active counts', { deviceCount: Object.keys(deviceCounts).length });
     for (const [deviceId, count] of Object.entries(deviceCounts)) {
@@ -93,10 +105,9 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
     }
     req.log?.info('Device active counts updated', { devicesUpdated: Object.keys(deviceCounts).length });
 
-    const allPartnerKeys = new Set(rows.map((r) => r.partner).filter(Boolean));
-    const allDeviceIds = new Set(rows.map((r) => r.device).filter(Boolean));
+    const allPartnerKeys = new Set(rows.map((r) => stripEmoji((r.partner ?? '').trim())).filter(Boolean));
+    const allDeviceIds = new Set(rows.map((r) => stripEmoji((r.device ?? '').trim())).filter(Boolean));
     const alertBatch = db.batch();
-    const now = new Date().toISOString();
     let newPartnerKeyAlerts = 0;
     let newDeviceAlerts = 0;
 
@@ -148,7 +159,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
           const alertRef = db.collection('alerts').doc();
           alertBatch.set(alertRef, {
             type: 'unregistered_device',
-            partnerKey: rows.find((r) => r.device === devId)?.partner ?? '',
+            partnerKey: rows.find((r) => stripEmoji((r.device ?? '').trim()) === devId)?.partner ?? '',
             deviceId: devId,
             firstSeen: now,
             lastSeen: now,
@@ -177,9 +188,11 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
       errorCount: errors.length,
       snapshotDate,
       errors,
+      uploadBatchId,
     });
 
     req.log?.info('Telemetry upload complete', {
+      uploadBatchId,
       rowCount: rows.length,
       successCount,
       errorCount: errors.length,
@@ -190,6 +203,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
 
     res.json({
       success: true,
+      uploadBatchId,
       rowCount: rows.length,
       successCount,
       errorCount: errors.length,
@@ -208,7 +222,15 @@ router.get('/history', async (req, res) => {
     req.log?.debug('Listing upload history');
 
     const snap = await db.collection('uploadHistory').orderBy('uploadedAt', 'desc').limit(100).get();
-    const history = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const history = snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        rollbackAvailable: data.uploadedAt > thirtyDaysAgo && !!data.uploadBatchId,
+      };
+    });
 
     req.log?.info('Upload history listed', { count: history.length });
     res.json({
@@ -221,6 +243,75 @@ router.get('/history', async (req, res) => {
   } catch (err) {
     req.log?.error('Failed to list upload history', formatError(err));
     res.status(500).json({ error: 'Failed to list upload history', detail: String(err) });
+  }
+});
+
+router.delete('/rollback/:batchId', requireRole('admin'), async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const uploadBatchId = String(req.params.batchId);
+
+    req.log?.info('Telemetry rollback requested', { uploadBatchId, userId: req.user!.uid });
+
+    const historySnap = await db.collection('uploadHistory')
+      .where('uploadBatchId', '==', uploadBatchId)
+      .limit(1)
+      .get();
+
+    if (historySnap.empty) {
+      res.status(404).json({ error: 'Upload batch not found' });
+      return;
+    }
+
+    const historyDoc = historySnap.docs[0];
+    const historyData = historyDoc.data();
+
+    const uploadDate = new Date(historyData.uploadedAt);
+    const daysSince = (Date.now() - uploadDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince > 30) {
+      res.status(400).json({
+        error: 'Rollback window expired',
+        detail: `This batch was uploaded ${Math.floor(daysSince)} days ago. Rollback is only available within 30 days.`,
+      });
+      return;
+    }
+
+    const snapshotsSnap = await db.collection('telemetrySnapshots')
+      .where('uploadBatchId', '==', uploadBatchId)
+      .get();
+
+    let deletedSnapshots = 0;
+    for (let i = 0; i < snapshotsSnap.docs.length; i += 450) {
+      const chunk = snapshotsSnap.docs.slice(i, i + 450);
+      const batch = db.batch();
+      for (const doc of chunk) {
+        batch.delete(doc.ref);
+        deletedSnapshots++;
+      }
+      await batch.commit();
+    }
+
+    await historyDoc.ref.delete();
+
+    await logAuditEntry({
+      entityType: 'system',
+      entityId: uploadBatchId,
+      field: 'telemetryRollback',
+      oldValue: JSON.stringify({
+        uploadedBy: historyData.uploadedByEmail,
+        uploadedAt: historyData.uploadedAt,
+        rowCount: historyData.rowCount,
+      }),
+      newValue: null,
+      userId: req.user!.uid,
+      userEmail: req.user!.email,
+    });
+
+    req.log?.info('Telemetry rollback complete', { uploadBatchId, deletedSnapshots });
+    res.json({ success: true, deletedSnapshots });
+  } catch (err) {
+    req.log?.error('Telemetry rollback failed', formatError(err));
+    res.status(500).json({ error: 'Rollback failed', detail: String(err) });
   }
 });
 

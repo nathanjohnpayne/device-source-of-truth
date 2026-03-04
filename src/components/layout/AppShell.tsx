@@ -12,6 +12,8 @@ import {
   Database,
   CheckCircle,
   ListChecks,
+  FileSpreadsheet,
+  Key,
   LogOut,
   ChevronRight,
 } from 'lucide-react';
@@ -92,9 +94,21 @@ const NAV_SECTIONS: NavSection[] = [
         adminOnly: true,
       },
       {
+        label: 'Partner Keys',
+        path: '/admin/partner-keys',
+        icon: <Key className="h-5 w-5" />,
+        adminOnly: true,
+      },
+      {
         label: 'Readiness',
         path: '/admin/readiness',
         icon: <CheckCircle className="h-5 w-5" />,
+        adminOnly: true,
+      },
+      {
+        label: 'Intake Import',
+        path: '/admin/intake-import',
+        icon: <FileSpreadsheet className="h-5 w-5" />,
         adminOnly: true,
       },
     ],

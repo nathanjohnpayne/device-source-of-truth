@@ -36,7 +36,9 @@ export type AuditEntityType =
   | 'hardwareTier'
   | 'alert'
   | 'user'
-  | 'fieldOption';
+  | 'fieldOption'
+  | 'intakeRequest'
+  | 'system';
 
 export type Timestamp = string;
 
@@ -64,14 +66,27 @@ export interface Partner {
 
 // ── Partner Keys ──
 
+export type PartnerKeySource = 'csv_import' | 'manual';
+
+export type PartnerKeyRegion = 'APAC' | 'EMEA' | 'LATAM' | 'DOMESTIC' | 'GLOBAL';
+
 export interface PartnerKey {
   id: string;
   key: string;
-  partnerId: string;
+  partnerId: string | null;
+  countries: string[];
+  regions: PartnerKeyRegion[];
   chipset: string | null;
   oem: string | null;
-  region: Region | null;
-  countries: string[];
+  kernel: string | null;
+  os: string | null;
+  isActive: boolean;
+  source: PartnerKeySource;
+  importBatchId: string | null;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
 }
 
 // ── Devices ──
@@ -91,6 +106,7 @@ export interface Device {
   questionnaireFileUrl: string | null;
   activeDeviceCount: number;
   specCompleteness: number;
+  pendingPartnerKey: string | null;
   tierId: string | null;
   tierAssignedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -292,6 +308,48 @@ export interface FieldOptionKeyInfo {
   optionCount: number;
   activeCount: number;
   updatedAt: string;
+}
+
+// ── Intake Requests (DST-037) ──
+
+export type IntakeRegion = 'APAC' | 'DOMESTIC' | 'EMEA' | 'GLOBAL' | 'LATAM';
+
+export type MatchConfidence = 'exact' | 'fuzzy' | 'unmatched';
+
+export interface IntakeRequest {
+  id: string;
+  airtableSubject: string;
+  requestType: string;
+  requestStatus: string;
+  requestPhase: string | null;
+  countries: string[] | null;
+  regions: IntakeRegion[] | null;
+  tamNames: string[] | null;
+  ieLeadNames: string[] | null;
+  targetLaunchDate: string | null;
+  releaseTargets: string[] | null;
+  importedAt: Timestamp;
+  importedBy: string;
+  importBatchId: string;
+}
+
+export interface IntakeRequestPartner {
+  id: string;
+  intakeRequestId: string;
+  partnerNameRaw: string;
+  partnerId: string | null;
+  matchConfidence: MatchConfidence;
+}
+
+export interface IntakeImportBatch {
+  id: string;
+  importBatchId: string;
+  importedAt: Timestamp;
+  importedBy: string;
+  fileName: string;
+  totalRows: number;
+  importedCount: number;
+  skippedCount: number;
 }
 
 // ── Config ──

@@ -1,8 +1,7 @@
 import admin from 'firebase-admin';
 import express from 'express';
 import cors from 'cors';
-import { onRequest, HttpsError } from 'firebase-functions/v2/https';
-import { beforeUserSignedIn } from 'firebase-functions/v2/identity';
+import { onRequest } from 'firebase-functions/v2/https';
 import { authenticate } from './middleware/auth.js';
 import { requestLoggingMiddleware, log, formatError } from './services/logger.js';
 import partnersRouter from './routes/partners.js';
@@ -17,25 +16,9 @@ import searchRouter from './routes/search.js';
 import reportsRouter from './routes/reports.js';
 import uploadRouter from './routes/upload.js';
 import fieldOptionsRouter from './routes/fieldOptions.js';
+import intakeRouter from './routes/intake.js';
 
 admin.initializeApp();
-
-const ALLOWED_EMAIL_DOMAINS = ['disney.com', 'disneystreaming.com'];
-
-export const beforesignin = beforeUserSignedIn((event) => {
-  const email = event.data?.email;
-  if (!email) {
-    throw new HttpsError('invalid-argument', 'An email address is required to sign in.');
-  }
-  const domain = email.split('@')[1]?.toLowerCase();
-  if (!domain || !ALLOWED_EMAIL_DOMAINS.includes(domain)) {
-    log.warn('Blocked sign-in from unauthorized domain', { email, domain });
-    throw new HttpsError(
-      'permission-denied',
-      'Your email domain is not authorized to access Device Source of Truth.',
-    );
-  }
-});
 log.info('Firebase Admin initialized');
 
 const app = express();
@@ -57,6 +40,7 @@ app.use('/api/search', searchRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/field-options', fieldOptionsRouter);
+app.use('/api/intake', intakeRouter);
 
 app.use(
   (

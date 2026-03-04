@@ -36,7 +36,8 @@ export type AuditEntityType =
   | 'hardwareTier'
   | 'alert'
   | 'user'
-  | 'fieldOption';
+  | 'fieldOption'
+  | 'intakeRequest';
 
 // ── Firestore Timestamp (serialized as ISO string in API responses) ──
 
@@ -66,14 +67,70 @@ export interface Partner {
 
 // ── Partner Keys ──
 
+export type PartnerKeySource = 'csv_import' | 'manual';
+
+export type PartnerKeyRegion = 'APAC' | 'EMEA' | 'LATAM' | 'DOMESTIC' | 'GLOBAL';
+
 export interface PartnerKey {
   id: string;
   key: string;
-  partnerId: string;
+  partnerId: string | null;
+  countries: string[];
+  regions: PartnerKeyRegion[];
   chipset: string | null;
   oem: string | null;
-  region: Region | null;
+  kernel: string | null;
+  os: string | null;
+  isActive: boolean;
+  source: PartnerKeySource;
+  importBatchId: string | null;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
+}
+
+export interface PartnerKeyImportRow {
+  key: string;
+  friendlyPartnerName: string;
   countries: string[];
+  regions: PartnerKeyRegion[];
+  chipset: string | null;
+  oem: string | null;
+  kernel: string | null;
+  os: string | null;
+  partnerId: string | null;
+  partnerDisplayName: string | null;
+  matchConfidence: 'exact' | 'fuzzy' | 'unmatched';
+  warnings: string[];
+  errors: string[];
+  status: 'ready' | 'warning' | 'error' | 'skipped';
+}
+
+export interface PartnerKeyImportPreview {
+  rows: PartnerKeyImportRow[];
+  totalRows: number;
+  readyCount: number;
+  warningCount: number;
+  errorCount: number;
+  skippedCount: number;
+}
+
+export interface PartnerKeyImportResult {
+  success: boolean;
+  imported: number;
+  skipped: number;
+  batchId: string;
+}
+
+export interface PartnerKeyImportBatch {
+  id: string;
+  fileName: string;
+  importedCount: number;
+  importedAt: Timestamp;
+  importedBy: string;
+  importedByEmail: string;
+  rollbackAvailable: boolean;
 }
 
 // ── Devices ──
@@ -93,6 +150,7 @@ export interface Device {
   questionnaireFileUrl: string | null;
   activeDeviceCount: number;
   specCompleteness: number;
+  pendingPartnerKey: string | null;
   tierId: string | null;
   tierAssignedAt: Timestamp | null;
   createdAt: Timestamp;
@@ -621,6 +679,108 @@ export interface FieldOptionKeyInfo {
   optionCount: number;
   activeCount: number;
   updatedAt: Timestamp;
+}
+
+// ── Intake Requests (DST-037) ──
+
+export type IntakeRegion = 'APAC' | 'DOMESTIC' | 'EMEA' | 'GLOBAL' | 'LATAM';
+
+export type MatchConfidence = 'exact' | 'fuzzy' | 'unmatched';
+
+export interface IntakeRequest {
+  id: string;
+  airtableSubject: string;
+  requestType: string;
+  requestStatus: string;
+  requestPhase: string | null;
+  countries: string[] | null;
+  regions: IntakeRegion[] | null;
+  tamNames: string[] | null;
+  ieLeadNames: string[] | null;
+  targetLaunchDate: string | null;
+  releaseTargets: string[] | null;
+  importedAt: Timestamp;
+  importedBy: string;
+  importBatchId: string;
+}
+
+export interface IntakeRequestPartner {
+  id: string;
+  intakeRequestId: string;
+  partnerNameRaw: string;
+  partnerId: string | null;
+  matchConfidence: MatchConfidence;
+}
+
+export interface IntakePreviewWarning {
+  type: 'sk_ambiguity' | 'unknown_country' | 'unparseable_date' | 'unrecognized_request_type' | 'blank_subject';
+  field: string;
+  rawValue: string;
+  message: string;
+}
+
+export interface IntakePreviewPartnerMatch {
+  partnerNameRaw: string;
+  partnerId: string | null;
+  partnerDisplayName: string | null;
+  matchConfidence: MatchConfidence;
+  similarityScore?: number;
+}
+
+export interface IntakePreviewRow {
+  rowIndex: number;
+  airtableSubject: string;
+  requestType: string;
+  requestStatus: string;
+  requestPhase: string | null;
+  countries: string[] | null;
+  regions: IntakeRegion[] | null;
+  tamNames: string[] | null;
+  ieLeadNames: string[] | null;
+  targetLaunchDate: string | null;
+  releaseTargets: string[] | null;
+  partnerMatches: IntakePreviewPartnerMatch[];
+  warnings: IntakePreviewWarning[];
+  errors: IntakePreviewWarning[];
+  status: 'ready' | 'warning' | 'error';
+  skipped?: boolean;
+  overrides?: Record<string, string>;
+}
+
+export interface IntakeImportResult {
+  success: boolean;
+  importBatchId: string;
+  importedCount: number;
+  skippedCount: number;
+  errorCount: number;
+  errors: string[];
+}
+
+export interface IntakeImportBatch {
+  id: string;
+  importBatchId: string;
+  importedAt: Timestamp;
+  importedBy: string;
+  fileName: string;
+  totalRows: number;
+  importedCount: number;
+  skippedCount: number;
+}
+
+// ── Migration History ──
+
+export interface MigrationBatch {
+  id: string;
+  importBatchId: string;
+  importedAt: Timestamp;
+  importedBy: string;
+  importedByEmail: string;
+  fileName: string;
+  totalRows: number;
+  created: number;
+  duplicates: number;
+  errored: number;
+  rollbackAvailable: boolean;
 }
 
 // ── Config ──

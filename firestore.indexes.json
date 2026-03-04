@@ -72,6 +72,14 @@
         { "fieldPath": "tierId", "order": "ASCENDING" },
         { "fieldPath": "activeDeviceCount", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "fieldOptions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dropdownKey", "order": "ASCENDING" },
+        { "fieldPath": "sortOrder", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

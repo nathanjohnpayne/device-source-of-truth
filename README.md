@@ -8,7 +8,7 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 |---|---|
 | Frontend | React 19, TypeScript, Tailwind CSS 4, Vite 7 |
 | Backend | Firebase Cloud Functions (Express 5 REST API) |
-| Database | Cloud Firestore (13 collections, 90-field device spec schema) |
+| Database | Cloud Firestore (18 collections, 90-field device spec schema) |
 | Auth | Firebase Authentication (Google OAuth, domain-restricted) |
 | Analytics | Google Analytics 4 via Firebase (30+ typed events) |
 | Hosting | Firebase Hosting (CDN with API proxy) |
@@ -23,7 +23,10 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 - **Spec Coverage Reports** — weighted coverage metrics, per-partner breakdowns, CSV/PDF export
 - **Audit Log** — append-only, field-level change tracking for every mutation across all entities
 - **Role-Based Access Control** — viewer / editor / admin roles enforced on both frontend and backend
-- **Airtable Migration** — bulk CSV import of legacy AllModels data with spec mapping and tier assignment
+- **Partner Key Registry** — manage Datadog manifest key → partner mappings with CSV import, batch rollback, and enrichment attributes (chipset, OEM, OS, regions)
+- **Airtable Intake Import** — parse and import Airtable Intake Request CSVs with preview, normalization, partner matching, and batch rollback
+- **Airtable Migration** — bulk CSV import of legacy AllModels data with spec mapping, tier assignment, history, and rollback
+- **Reference Data Management** — controlled vocabulary administration for dropdown fields (regions, chipsets, OS, request types)
 - **Auto-Update Notification** — polls for new deployments and prompts users to refresh when a new version is available
 - **Structured Logging** — request-scoped logging with timing, context propagation, and Cloud Logging integration for production troubleshooting
 - **Dashboard** — KPI summaries, certification breakdown, tier distribution, and top-device charts
@@ -75,13 +78,13 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including
 
 ```
 src/                          React frontend
-├── pages/                    18 route-level page components (lazy-loaded)
+├── pages/                    21 route-level page components (lazy-loaded)
 ├── components/               Shared UI (DataTable, Badge, Modal, FilterPanel, etc.)
 ├── hooks/
 │   ├── useAuth.tsx          Auth context provider + useAuth() hook
 │   └── useAppUpdate.ts      Dual-path update detection (SW + version polling)
 └── lib/
-    ├── types.ts              All TypeScript interfaces (408 lines, single source of truth)
+    ├── types.ts              All TypeScript interfaces (791 lines, single source of truth)
     ├── api.ts                Typed HTTP client for /api/* endpoints
     ├── analytics.ts          GA4 event tracking (30 typed events)
     ├── firebase.ts           Firebase SDK initialization
@@ -90,15 +93,17 @@ src/                          React frontend
 functions/src/                Firebase Cloud Functions backend
 ├── index.ts                  Express app + route mounting + request logging middleware
 ├── middleware/auth.ts        Token verification, domain check, role guard
-├── routes/                   11 Express routers (partners, devices, tiers, etc.)
+├── routes/                   13 Express routers (partners, devices, tiers, intake, etc.)
 ├── services/
 │   ├── logger.ts             Structured logging (Cloud Logging integration)
 │   ├── audit.ts              Append-only field-level change tracking
 │   ├── tierEngine.ts         Hardware tier assignment engine
-│   └── specCompleteness.ts   Spec completeness calculator
+│   ├── specCompleteness.ts   Spec completeness calculator
+│   ├── intakeParser.ts       Airtable CSV parser and normalizer
+│   └── seedFieldOptions.ts   Reference data seeding
 └── types/index.ts            Backend type definitions
 
-specs/                        Product specification document (877 lines)
+specs/                        Product specs and feature stories
 docs/                         Technical documentation
 ```
 
@@ -112,6 +117,9 @@ docs/                         Technical documentation
 | [docs/DATA_MODEL.md](./docs/DATA_MODEL.md) | Firestore schema reference for all 13 collections |
 | [docs/API_REFERENCE.md](./docs/API_REFERENCE.md) | Full REST API documentation with request/response examples |
 | [specs/Device Source of Truth (DST).md](./specs/Device%20Source%20of%20Truth%20(DST).md) | Original product specification |
+| [specs/DST-037](./specs/DST-037-airtable-intake-import.md) | Airtable Intake Request Import |
+| [specs/DST-038](./specs/DST-038-partner-key-registry.md) | Partner Key Registry |
+| [specs/DST-039](./specs/DST-039-ai-import-disambiguation.md) | AI-Assisted Import Disambiguation |
 
 ## Auth & Access
 
@@ -121,7 +129,7 @@ Login requires a `@disney.com` or `@disneystreaming.com` Google account. Domain 
 |---|---|
 | Viewer | Read all data, run simulations, use search, view reports |
 | Editor | + create/edit devices, specs, partners, bulk-import specs |
-| Admin | + manage tiers, upload telemetry, manage partner keys, run migrations, dismiss alerts |
+| Admin | + manage tiers, upload telemetry, manage partner keys, import intake requests, run migrations, dismiss alerts, rollback imports |
 
 Roles are assigned via the `users` Firestore collection. The first admin must be created manually in Firebase Console (see [DEPLOYMENT.md](./DEPLOYMENT.md#seeding-initial-data)).
 

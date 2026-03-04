@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
     }
 
     if (region) {
-      const keysSnap = await db.collection('partnerKeys').where('region', '==', region).get();
+      const keysSnap = await db.collection('partnerKeys').where('regions', 'array-contains', region).get();
       const keyIds = new Set(keysSnap.docs.map((d) => d.id));
       devices = devices.filter((d) => keyIds.has(d.partnerKeyId));
       req.log?.debug('Filtered by region', { region, remaining: devices.length });

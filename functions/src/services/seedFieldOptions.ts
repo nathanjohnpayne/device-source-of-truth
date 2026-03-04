@@ -924,6 +924,34 @@ const SEED_DATA: SeedKey[] = [
       { displayValue: 'N/A' },
     ],
   },
+  {
+    dropdownKey: 'intake_request_type',
+    displayLabel: 'Intake Request Type',
+    options: [
+      { displayValue: 'ADK' },
+      { displayValue: 'ANDTV' },
+      { displayValue: 'BBD' },
+      { displayValue: 'Content Provider API' },
+      { displayValue: 'Eligibility API' },
+      { displayValue: 'Feeds & Integration' },
+      { displayValue: 'Partner API' },
+      { displayValue: 'Perks' },
+      { displayValue: 'Redemption Code' },
+      { displayValue: 'Supplemental Data API' },
+      { displayValue: 'Web App' },
+    ],
+  },
+  {
+    dropdownKey: 'intake_region',
+    displayLabel: 'Intake Region',
+    options: [
+      { displayValue: 'APAC' },
+      { displayValue: 'DOMESTIC' },
+      { displayValue: 'EMEA' },
+      { displayValue: 'GLOBAL' },
+      { displayValue: 'LATAM' },
+    ],
+  },
 ];
 
 export async function seedFieldOptions(userEmail = 'system@disney.com'): Promise<{ created: number; skipped: number }> {

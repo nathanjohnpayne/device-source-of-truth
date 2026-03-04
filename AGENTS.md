@@ -22,7 +22,7 @@ Firebase Hosting (static SPA)
 
 - Frontend: React 19 + TypeScript + Tailwind CSS 4, built with Vite 7
 - Backend: Express 5 app exported as a single Firebase Cloud Function named `api`
-- Database: Firestore (13 collections)
+- Database: Firestore (18 collections)
 - Auth: Firebase Auth with Google OAuth, domain-restricted to `@disney.com` and `@disneystreaming.com`
 
 ## Directory Structure
@@ -33,7 +33,7 @@ Firebase Hosting (static SPA)
 │   ├── App.tsx                   ← Router, auth guards, lazy-loaded routes
 │   ├── main.tsx                  ← Entry point
 │   ├── index.css                 ← Tailwind imports + global styles
-│   ├── pages/                    ← 18 route-level page components
+│   ├── pages/                    ← 21 route-level page components
 │   ├── components/
 │   │   ├── layout/               ← AppShell (sidebar + topbar), GlobalSearch
 │   │   ├── shared/               ← DataTable, Badge, Modal, FilterPanel, etc.
@@ -47,21 +47,21 @@ Firebase Hosting (static SPA)
 │       ├── api.ts                ← Typed fetch wrapper for /api/* endpoints
 │       ├── analytics.ts          ← Typed GA4 event tracking (no-op in dev)
 │       ├── export.ts             ← CSV/PDF export utilities
-│       └── types.ts              ← ALL shared TypeScript interfaces (408 lines)
+│       └── types.ts              ← ALL shared TypeScript interfaces (791 lines)
 │
 ├── functions/                    ← Firebase Cloud Functions (backend)
 │   ├── src/
 │   │   ├── index.ts              ← Express app, route mounting, error handler
 │   │   ├── middleware/auth.ts    ← Token verification, domain check, role guard
-│   │   ├── routes/               ← 11 Express routers (partners, devices, etc.)
-│   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness)
+│   │   ├── routes/               ← 13 Express routers (partners, devices, etc.)
+│   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, seedFieldOptions)
 │   │   └── types/index.ts        ← Backend type definitions (mirrors src/lib/types.ts)
 │   ├── package.json              ← Separate deps (firebase-admin, express, xlsx, etc.)
 │   └── tsconfig.json
 │
-├── specs/                        ← Product spec document
+├── specs/                        ← Product specs and feature stories
 ├── firebase.json                 ← Hosting rewrites + functions + firestore config
-├── firestore.rules               ← Firestore security rules (13 collections)
+├── firestore.rules               ← Firestore security rules (18 collections)
 ├── firestore.indexes.json        ← Composite index definitions (currently empty)
 ├── .env / .env.example           ← Firebase API keys (3 vars, all VITE_ prefixed)
 └── vite.config.ts                ← Vite + Tailwind + code-split config
@@ -92,6 +92,11 @@ Firebase Hosting (static SPA)
 | `uploadHistory` | Telemetry upload log | uploadedBy, fileName, rowCount, successCount |
 | `users` | Role assignments | email, role (viewer/editor/admin) |
 | `config` | App-level settings | retentionDailyDays, retentionWeeklyYears |
+| `fieldOptions` | Controlled vocabulary options | category, options[] |
+| `partnerKeyImportBatches` | Partner key CSV import history | importedBy, fileName, keyCount, status |
+| `intakeRequests` | Airtable intake request records | requestType, partnerName, region, tamOwner, batchId |
+| `intakeRequestPartners` | Intake request → partner links | intakeRequestId, partnerId, matchType |
+| `intakeImportHistory` | Intake CSV import history | importedBy, fileName, rowCount, status |
 
 ## API Routes
 
@@ -127,7 +132,26 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | GET | /reports/partner/:id | any | Partner report |
 | GET | /reports/spec-coverage | any | Spec coverage report |
 | POST | /upload/migration | admin | AllModels CSV migration |
+| GET | /upload/migration/history | admin | Migration batch history |
+| DELETE | /upload/migration/rollback/:batchId | admin | Rollback a migration batch |
+| GET | /upload/migration/template | any | Download migration CSV template |
 | POST | /upload/bulk-specs | editor+ | Bulk spec import |
+| GET | /upload/bulk-specs/template | any | Download bulk spec CSV template |
+| DELETE | /upload/clear-all | admin | Clear all imported data |
+| GET | /partner-keys/:id | any | Get partner key detail |
+| PUT | /partner-keys/:id | admin | Update partner key |
+| DELETE | /partner-keys/:id | admin | Delete partner key |
+| POST | /partner-keys/import/preview | admin | Preview partner key CSV import |
+| POST | /partner-keys/import/confirm | admin | Confirm partner key CSV import |
+| GET | /partner-keys/import-batches | admin | List partner key import batches |
+| POST | /partner-keys/import-batches/:id/rollback | admin | Rollback a partner key import |
+| DELETE | /telemetry/rollback/:batchId | admin | Rollback a telemetry upload |
+| POST | /intake/preview | admin | Preview Airtable intake CSV |
+| POST | /intake/import | admin | Import intake request records |
+| GET | /intake | any | List intake requests |
+| GET | /intake/history | any | Intake import history |
+| GET | /intake/:id | any | Get intake request detail |
+| DELETE | /intake/rollback/:batchId | admin | Rollback an intake import |
 
 ## Role System
 
@@ -137,7 +161,7 @@ Three roles, checked by `requireRole()` middleware on the backend and `useAuth()
 |---|---|
 | `viewer` | Read all data, run simulations, use search |
 | `editor` | Everything viewer can do + create/edit devices, specs, partners |
-| `admin` | Everything editor can do + manage tiers, upload telemetry, manage partner keys, run migrations, dismiss alerts |
+| `admin` | Everything editor can do + manage tiers, upload telemetry, manage partner keys, import intake requests, run migrations, dismiss alerts, rollback imports |
 
 Roles are stored in the `users` Firestore collection. A user doc must exist with matching email for login to succeed. Users not in the collection get a default `viewer` role on the frontend but will fail backend writes.
 

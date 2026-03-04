@@ -88,6 +88,8 @@ const AuditLogPage = lazyRetry(() => import('./pages/AuditLogPage'));
 const MigrationPage = lazyRetry(() => import('./pages/MigrationPage'));
 const ReadinessPage = lazyRetry(() => import('./pages/ReadinessPage'));
 const ReferenceDataPage = lazyRetry(() => import('./pages/ReferenceDataPage'));
+const IntakeImportPage = lazyRetry(() => import('./pages/IntakeImportPage'));
+const PartnerKeyRegistryPage = lazyRetry(() => import('./pages/PartnerKeyRegistryPage'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -266,6 +268,22 @@ function AppRoutes() {
               element={
                 <AdminRoute>
                   <ReferenceDataPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/partner-keys"
+              element={
+                <AdminRoute>
+                  <PartnerKeyRegistryPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/intake-import"
+              element={
+                <AdminRoute>
+                  <IntakeImportPage />
                 </AdminRoute>
               }
             />
