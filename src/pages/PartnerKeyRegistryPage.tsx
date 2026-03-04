@@ -456,6 +456,33 @@ function ImportTab() {
             )}
           </div>
 
+          {/* AI Import opt-in (DST-040) */}
+          <div className="mt-4 flex items-center gap-2">
+            <input
+              id="pk-use-ai"
+              type="checkbox"
+              checked={useAI}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                if (checked && !aiModalShownRef.current) {
+                  setShowAICostModal(true);
+                } else {
+                  setUseAI(checked);
+                }
+              }}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label htmlFor="pk-use-ai" className="text-sm text-gray-700">
+              Use AI Import?
+            </label>
+            <div className="group relative">
+              <Info className="h-4 w-4 text-gray-400" />
+              <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover:block">
+                Runs an AI pass to automatically resolve ambiguous field values before review. May incur additional Anthropic API costs.
+              </div>
+            </div>
+          </div>
+
           {error && (
             <div className="mt-4 flex items-center gap-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
               <XCircle className="h-4 w-4 shrink-0" /> {error}
@@ -665,6 +692,48 @@ function ImportTab() {
       >
         <p className="text-sm text-gray-700">
           This will delete all partner keys imported in this batch. This action cannot be undone.
+        </p>
+      </Modal>
+
+      {/* AI Cost Disclosure Modal (DST-040) */}
+      <Modal
+        open={showAICostModal}
+        onClose={() => {
+          setShowAICostModal(false);
+          setUseAI(false);
+        }}
+        title="AI-Assisted Import"
+        footer={
+          <>
+            <button
+              onClick={() => {
+                setShowAICostModal(false);
+                setUseAI(false);
+              }}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowAICostModal(false);
+                setUseAI(true);
+                aiModalShownRef.current = true;
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              <Sparkles className="h-4 w-4" />
+              Enable AI Import
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700">
+          Enabling AI Import runs your file through Claude to automatically resolve ambiguous values
+          such as country codes, region names, and partner name variations.
+          This uses the Anthropic API and may incur additional usage costs billed to your
+          organization's API account. Costs scale with file size — most standard imports are
+          a few cents or less.
         </p>
       </Modal>
     </div>

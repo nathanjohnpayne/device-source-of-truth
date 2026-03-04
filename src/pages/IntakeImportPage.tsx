@@ -1,7 +1,7 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import {
   Upload, FileSpreadsheet, CheckCircle, AlertTriangle, XCircle,
-  ChevronLeft, ChevronRight, RotateCcw, Clock, Sparkles, ExternalLink,
+  ChevronLeft, ChevronRight, RotateCcw, Clock, Sparkles, ExternalLink, Info,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import Badge from '../components/shared/Badge';
@@ -141,6 +141,10 @@ export default function IntakeImportPage() {
   const [disambiguating, setDisambiguating] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [rawCsvRows, setRawCsvRows] = useState<Record<string, unknown>[]>([]);
+  const [useAI, setUseAI] = useState(false);
+  const [showAICostModal, setShowAICostModal] = useState(false);
+  const aiModalShownRef = useRef(false);
+  const useAIRef = useRef(false);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -261,7 +265,7 @@ export default function IntakeImportPage() {
       const hasUnmatched = previewResponse.rows.some(r =>
         r.partnerMatches?.some((m: IntakePreviewPartnerMatch) => m.matchConfidence === 'unmatched'),
       );
-      if (hasWarnings || hasUnmatched) {
+      if (useAIRef.current && (hasWarnings || hasUnmatched)) {
         setDisambiguating(true);
         try {
           const aiResult = await api.disambiguation.disambiguate(
@@ -405,6 +409,8 @@ export default function IntakeImportPage() {
     setImportResult(null);
     setDisambiguation(null);
     setRawCsvRows([]);
+    setUseAI(false);
+    useAIRef.current = false;
   };
 
   return (
@@ -484,6 +490,34 @@ export default function IntakeImportPage() {
                 <p className="mt-3 text-xs text-gray-400">.csv only, max 10 MB</p>
               </>
             )}
+          </div>
+
+          {/* AI Import opt-in (DST-040) */}
+          <div className="mt-4 flex items-center gap-2">
+            <input
+              id="intake-use-ai"
+              type="checkbox"
+              checked={useAI}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                if (checked && !aiModalShownRef.current) {
+                  setShowAICostModal(true);
+                } else {
+                  setUseAI(checked);
+                  useAIRef.current = checked;
+                }
+              }}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label htmlFor="intake-use-ai" className="text-sm text-gray-700">
+              Use AI Import?
+            </label>
+            <div className="group relative">
+              <Info className="h-4 w-4 text-gray-400" />
+              <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover:block">
+                Runs an AI pass to automatically resolve ambiguous field values before review. May incur additional Anthropic API costs.
+              </div>
+            </div>
           </div>
 
           {parseError && (
@@ -691,6 +725,51 @@ export default function IntakeImportPage() {
             <p className="text-red-600 font-medium">This action cannot be undone.</p>
           </div>
         )}
+      </Modal>
+
+      {/* AI Cost Disclosure Modal (DST-040) */}
+      <Modal
+        open={showAICostModal}
+        onClose={() => {
+          setShowAICostModal(false);
+          setUseAI(false);
+          useAIRef.current = false;
+        }}
+        title="AI-Assisted Import"
+        footer={
+          <>
+            <button
+              onClick={() => {
+                setShowAICostModal(false);
+                setUseAI(false);
+                useAIRef.current = false;
+              }}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                setShowAICostModal(false);
+                setUseAI(true);
+                useAIRef.current = true;
+                aiModalShownRef.current = true;
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              <Sparkles className="h-4 w-4" />
+              Enable AI Import
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700">
+          Enabling AI Import runs your file through Claude to automatically resolve ambiguous values
+          such as country codes, region names, and partner name variations.
+          This uses the Anthropic API and may incur additional usage costs billed to your
+          organization's API account. Costs scale with file size — most standard imports are
+          a few cents or less.
+        </p>
       </Modal>
     </div>
   );
