@@ -14,9 +14,11 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import type { UploadHistoryWithRollback, TelemetryPreviewRow } from '../lib/types';
 
 const MONTH_NAMES = [
@@ -68,7 +70,67 @@ const UPSERT_BADGE: Record<string, { variant: 'info' | 'success' | 'warning' | '
   stale: { variant: 'warning', label: 'Stale' },
 };
 
+function PrerequisitesWidget() {
+  const prereqs = useImportPrerequisites();
+  if (prereqs.loading) return null;
+
+  const items = [
+    {
+      met: prereqs.partnerKeysLoaded,
+      label: prereqs.partnerKeysLoaded
+        ? `Partner Keys loaded (${prereqs.counts.partnerKeys} keys)`
+        : 'Partner Keys — not loaded',
+      warning: false,
+    },
+    {
+      met: prereqs.devicesRegistered,
+      label: prereqs.devicesRegistered
+        ? `Devices registered (${prereqs.counts.devices} devices)`
+        : 'Devices — none registered',
+      warning: false,
+    },
+    {
+      met: prereqs.versionRegistrySeeded,
+      label: prereqs.versionRegistrySeeded
+        ? `Version Registry seeded (${prereqs.counts.versionMappings} mappings)`
+        : 'Version Registry — 0 mappings. Friendly versions will be blank.',
+      warning: !prereqs.versionRegistrySeeded,
+    },
+    {
+      met: prereqs.fieldOptionsSeeded,
+      label: prereqs.fieldOptionsSeeded
+        ? 'Reference Data seeded'
+        : 'Reference Data — not seeded',
+      warning: false,
+    },
+  ];
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white px-5 py-4">
+      <h3 className="mb-2 text-sm font-semibold text-gray-900">Prerequisites</h3>
+      <ul className="space-y-1.5">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-center gap-2 text-sm">
+            {item.met ? (
+              <CheckCircle className="h-4 w-4 flex-shrink-0 text-emerald-500" />
+            ) : item.warning ? (
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-500" />
+            ) : (
+              <XCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
+            )}
+            <span className={item.met ? 'text-gray-700' : item.warning ? 'text-amber-700' : 'text-red-700'}>
+              {item.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function TelemetryUploadPage() {
+  const prereqs = useImportPrerequisites();
+  const isBlocked = !prereqs.loading && (!prereqs.partnerKeysLoaded || !prereqs.devicesRegistered);
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [snapshotDate, setSnapshotDate] = useState(
@@ -236,6 +298,35 @@ export default function TelemetryUploadPage() {
         )}
       </div>
 
+      {/* Prerequisite banners */}
+      {!prereqs.loading && !prereqs.partnerKeysLoaded && (
+        <PrerequisiteBanner
+          severity="red"
+          message="Partner Keys have not been loaded. Telemetry rows cannot be attributed to a partner. Load Partner Keys before uploading."
+          linkTo="/admin/partner-keys"
+          linkLabel="Import Partner Keys"
+        />
+      )}
+      {!prereqs.loading && !prereqs.devicesRegistered && (
+        <PrerequisiteBanner
+          severity="red"
+          message="No devices are registered. All uploaded rows will generate Unregistered Device alerts and no counts will be attributed. Complete All Models Migration first."
+          linkTo="/admin/migration"
+          linkLabel="Go to All Models Migration"
+        />
+      )}
+      {!prereqs.loading && prereqs.partnerKeysLoaded && prereqs.devicesRegistered && !prereqs.versionRegistrySeeded && (
+        <PrerequisiteBanner
+          severity="amber"
+          message="Version Registry is empty. All uploaded rows will have a blank Friendly Version and this cannot be corrected retroactively without re-uploading. Seed the Version Registry first."
+          linkTo="/admin/version-registry"
+          linkLabel="Go to Version Registry"
+        />
+      )}
+
+      {/* Prerequisites summary widget */}
+      <PrerequisitesWidget />
+
       {/* Step indicator */}
       <div className="flex items-center gap-2 text-sm">
         {(['upload', 'preview', 'result'] as Step[]).map((s, i) => (
@@ -273,13 +364,16 @@ export default function TelemetryUploadPage() {
                   Drop your observability CSV here
                 </p>
                 <p className="mb-4 text-sm text-gray-500">or click to browse</p>
-                <label className="cursor-pointer rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">
+                <label className={`rounded-lg px-6 py-2.5 text-sm font-medium text-white ${
+                  isBlocked ? 'cursor-not-allowed bg-gray-400' : 'cursor-pointer bg-indigo-600 hover:bg-indigo-700'
+                }`}>
                   Select File
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept=".csv"
                     className="hidden"
+                    disabled={isBlocked}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) handleFile(f);

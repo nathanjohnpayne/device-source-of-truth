@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, GripVertical, Plus, Search, Trash2, RotateCcw, Pencil } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, GripVertical, Plus, Search, Trash2, RotateCcw, Pencil } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -19,9 +20,42 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Modal from '../components/shared/Modal';
 import type { FieldOption, FieldOptionKeyInfo } from '../lib/types';
+
+function GettingStartedCard() {
+  const prereqs = useImportPrerequisites();
+  if (prereqs.loading) return null;
+  if (prereqs.fieldOptionsSeeded || prereqs.partnerKeysLoaded || prereqs.devicesRegistered) return null;
+
+  return (
+    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-6">
+      <h2 className="text-lg font-semibold text-indigo-900">Set up imports in order</h2>
+      <p className="mt-1 text-sm text-indigo-700">
+        The three Setup Imports below must be completed before ongoing imports will work correctly. Each step takes 2–5 minutes.
+      </p>
+      <div className="mt-4 flex items-center gap-2 text-sm font-medium text-indigo-800">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-200 text-xs font-bold">1</span>
+        Reference Data
+        <ArrowRight className="h-4 w-4 text-indigo-400" />
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-200 text-xs font-bold">2</span>
+        Partner Keys
+        <ArrowRight className="h-4 w-4 text-indigo-400" />
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-200 text-xs font-bold">3</span>
+        All Models Migration
+      </div>
+      <Link
+        to="/admin/reference-data"
+        className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+      >
+        Start with Reference Data
+        <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
+  );
+}
 
 function SortableOptionRow({
   option,
@@ -503,6 +537,8 @@ export default function ReferenceDataPage() {
 
   return (
     <div className="space-y-6">
+      <GettingStartedCard />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reference Data</h1>

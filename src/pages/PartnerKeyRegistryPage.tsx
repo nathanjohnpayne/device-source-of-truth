@@ -22,11 +22,13 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
 import ClarificationPanel from '../components/shared/ClarificationPanel';
+import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import type {
   PartnerKeyWithDisplay,
   PartnerKeyImportRow,
@@ -46,6 +48,7 @@ type Tab = 'import' | 'registry' | 'aliases';
 
 export default function PartnerKeyRegistryPage() {
   const [tab, setTab] = useState<Tab>('import');
+  const prereqs = useImportPrerequisites();
 
   return (
     <div className="space-y-6">
@@ -55,6 +58,15 @@ export default function PartnerKeyRegistryPage() {
           Manage the mapping between observability partner keys and canonical partner records.
         </p>
       </div>
+
+      {!prereqs.loading && !prereqs.fieldOptionsSeeded && (
+        <PrerequisiteBanner
+          severity="amber"
+          message="Reference Data has not been seeded. Chipset, OS, and region dropdowns will be empty during import. Seed Reference Data first for best results."
+          linkTo="/admin/reference-data"
+          linkLabel="Seed Reference Data"
+        />
+      )}
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-6">
@@ -1194,7 +1206,7 @@ function AliasesTab() {
           notes: form.notes,
         });
       }
-      trackEvent('partner_alias_saved', { resolutionType: form.resolutionType });
+      trackEvent('partner_alias_saved', { resolution_type: form.resolutionType });
       setShowModal(false);
       loadData();
     } catch (err) {

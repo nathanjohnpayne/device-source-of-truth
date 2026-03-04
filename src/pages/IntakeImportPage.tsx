@@ -8,8 +8,10 @@ import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ClarificationPanel from '../components/shared/ClarificationPanel';
+import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import type {
   IntakePreviewRow, IntakePreviewWarning,
   IntakePreviewPartnerMatch, IntakeImportBatch, IntakeRegion,
@@ -121,6 +123,8 @@ type Step = 'upload' | 'preview' | 'result';
 const PAGE_SIZE = 50;
 
 export default function IntakeImportPage() {
+  const prereqs = useImportPrerequisites();
+  const isBlocked = !prereqs.loading && !prereqs.partnersExist;
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -477,6 +481,16 @@ export default function IntakeImportPage() {
         )}
       </div>
 
+      {/* Prerequisite banners */}
+      {!prereqs.loading && !prereqs.partnersExist && (
+        <PrerequisiteBanner
+          severity="red"
+          message="No partner records exist. Intake Requests import requires at least one partner for name resolution. Import Partners first."
+          linkTo="/partners"
+          linkLabel="Go to Partners"
+        />
+      )}
+
       {/* Step indicator */}
       <div className="flex items-center gap-2 text-sm">
         {(['upload', 'preview', 'result'] as Step[]).map((s, i) => (
@@ -514,12 +528,15 @@ export default function IntakeImportPage() {
                   Drop your IntakeRequests.csv here
                 </p>
                 <p className="mb-4 text-sm text-gray-500">or click to browse</p>
-                <label className="cursor-pointer rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700">
+                <label className={`rounded-lg px-6 py-2.5 text-sm font-medium text-white ${
+                  isBlocked ? 'cursor-not-allowed bg-gray-400' : 'cursor-pointer bg-blue-600 hover:bg-blue-700'
+                }`}>
                   Select File
                   <input
                     type="file"
                     accept=".csv"
                     className="hidden"
+                    disabled={isBlocked}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) handleFile(f);

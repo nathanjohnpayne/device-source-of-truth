@@ -7,7 +7,9 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { ImportPrerequisiteProvider } from './hooks/useImportPrerequisites';
 import { trackPageView } from './lib/analytics';
+import { resolveAnalyticsRoute } from './lib/analyticsRoutes';
 import LoadingSpinner from './components/shared/LoadingSpinner';
 import UpdateBanner from './components/UpdateBanner';
 import AppShell from './components/layout/AppShell';
@@ -130,15 +132,8 @@ function PageViewTracker() {
   const location = useLocation();
 
   useEffect(() => {
-    const pageName = location.pathname === '/'
-      ? 'Dashboard'
-      : location.pathname
-          .split('/')
-          .filter(Boolean)
-          .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-          .join(' / ');
-
-    trackPageView(pageName, location.pathname);
+    const route = resolveAnalyticsRoute(location.pathname);
+    trackPageView(route.pageTitle, route.pagePath);
   }, [location.pathname]);
 
   return null;
@@ -185,7 +180,9 @@ function AppRoutes() {
           <Route
             element={
               <ProtectedRoute>
-                <AppShell />
+                <ImportPrerequisiteProvider>
+                  <AppShell />
+                </ImportPrerequisiteProvider>
               </ProtectedRoute>
             }
           >

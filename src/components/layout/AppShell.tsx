@@ -20,8 +20,10 @@ import {
   ChevronRight,
   Trash2,
   GitBranch,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useImportPrerequisites } from '../../hooks/useImportPrerequisites';
 import Badge from '../shared/Badge';
 import GlobalSearch from './GlobalSearch';
 
@@ -31,6 +33,7 @@ interface NavItem {
   icon: ReactNode;
   badge?: string;
   adminOnly?: boolean;
+  stepNumber?: number;
 }
 
 interface NavSection {
@@ -38,6 +41,7 @@ interface NavSection {
   headingIcon?: ReactNode;
   adminOnly?: boolean;
   items: NavItem[];
+  isSetupGroup?: boolean;
 }
 
 const NAV_SECTIONS: NavSection[] = [
@@ -65,22 +69,38 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    heading: 'Import',
+    heading: 'Setup Imports',
     headingIcon: <Upload className="h-3.5 w-3.5" />,
     adminOnly: true,
+    isSetupGroup: true,
     items: [
       {
-        label: 'Telemetry Upload',
-        path: '/admin/upload',
-        icon: <Upload className="h-5 w-5" />,
+        label: 'Reference Data',
+        path: '/admin/reference-data',
+        icon: <ListChecks className="h-5 w-5" />,
         adminOnly: true,
+        stepNumber: 1,
+      },
+      {
+        label: 'Partner Keys',
+        path: '/admin/partner-keys',
+        icon: <Key className="h-5 w-5" />,
+        adminOnly: true,
+        stepNumber: 2,
       },
       {
         label: 'All Models Migration',
         path: '/admin/migration',
         icon: <Database className="h-5 w-5" />,
         adminOnly: true,
+        stepNumber: 3,
       },
+    ],
+  },
+  {
+    heading: 'Ongoing Imports',
+    adminOnly: true,
+    items: [
       {
         label: 'Intake Requests',
         path: '/admin/intake-import',
@@ -88,15 +108,15 @@ const NAV_SECTIONS: NavSection[] = [
         adminOnly: true,
       },
       {
+        label: 'Telemetry Upload',
+        path: '/admin/upload',
+        icon: <Upload className="h-5 w-5" />,
+        adminOnly: true,
+      },
+      {
         label: 'Questionnaires',
         path: '/admin/questionnaires',
         icon: <FileSpreadsheet className="h-5 w-5" />,
-      },
-      {
-        label: 'Partner Keys',
-        path: '/admin/partner-keys',
-        icon: <Key className="h-5 w-5" />,
-        adminOnly: true,
       },
     ],
   },
@@ -114,12 +134,6 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Audit Log',
         path: '/admin/audit',
         icon: <History className="h-5 w-5" />,
-        adminOnly: true,
-      },
-      {
-        label: 'Reference Data',
-        path: '/admin/reference-data',
-        icon: <ListChecks className="h-5 w-5" />,
         adminOnly: true,
       },
       {
@@ -172,9 +186,39 @@ function Breadcrumbs() {
   );
 }
 
+function SetupStepBadge({ stepNumber, completed, active }: { stepNumber: number; completed: boolean; active: boolean }) {
+  if (completed) {
+    return (
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500">
+        <Check className="h-3 w-3 text-white" />
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+        active ? 'bg-indigo-400 text-white' : 'bg-slate-700 text-slate-300'
+      }`}
+    >
+      {stepNumber}
+    </span>
+  );
+}
+
 function Sidebar() {
   const location = useLocation();
   const { isAdmin } = useAuth();
+  const prereqs = useImportPrerequisites();
+
+  const stepCompleted = (stepNumber: number): boolean => {
+    if (prereqs.loading) return false;
+    switch (stepNumber) {
+      case 1: return prereqs.fieldOptionsSeeded;
+      case 2: return prereqs.partnerKeysLoaded;
+      case 3: return prereqs.devicesRegistered;
+      default: return false;
+    }
+  };
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -218,7 +262,15 @@ function Sidebar() {
                             : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                         }`}
                       >
-                        {item.icon}
+                        {section.isSetupGroup && item.stepNumber ? (
+                          <SetupStepBadge
+                            stepNumber={item.stepNumber}
+                            completed={stepCompleted(item.stepNumber)}
+                            active={active}
+                          />
+                        ) : (
+                          item.icon
+                        )}
                         <span className="flex-1">{item.label}</span>
                         {item.badge && (
                           <span

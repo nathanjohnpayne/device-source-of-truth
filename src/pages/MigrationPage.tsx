@@ -6,9 +6,11 @@ import {
 import Papa from 'papaparse';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import type { MigrationBatch, IntakeRegion } from '../lib/types';
 
 const EMOJI_REGEX = /[\u{1F1E0}-\u{1F1FF}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
@@ -118,6 +120,8 @@ interface MigrationPreviewRow {
 type Step = 'upload' | 'preview' | 'result';
 
 export default function MigrationPage() {
+  const prereqs = useImportPrerequisites();
+  const isBlocked = !prereqs.loading && !prereqs.partnersExist;
   const [step, setStep] = useState<Step>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -295,6 +299,24 @@ export default function MigrationPage() {
         )}
       </div>
 
+      {/* Prerequisite banners */}
+      {!prereqs.loading && !prereqs.partnersExist && (
+        <PrerequisiteBanner
+          severity="red"
+          message="No partner records exist. All Models Migration requires at least one partner to resolve device ownership. Import Partners first."
+          linkTo="/partners"
+          linkLabel="Go to Partners"
+        />
+      )}
+      {!prereqs.loading && prereqs.partnersExist && !prereqs.partnerKeysLoaded && (
+        <PrerequisiteBanner
+          severity="amber"
+          message="No partner keys are registered. Devices will import successfully but Datadog telemetry cannot be attributed until partner keys are added."
+          linkTo="/admin/partner-keys"
+          linkLabel="Import Partner Keys"
+        />
+      )}
+
       {/* Step indicator */}
       <div className="flex items-center gap-2 text-sm">
         {(['upload', 'preview', 'result'] as Step[]).map((s, i) => (
@@ -344,13 +366,16 @@ export default function MigrationPage() {
                   Drop your AllModels CSV here
                 </p>
                 <p className="mb-4 text-sm text-gray-500">or click to browse</p>
-                <label className="cursor-pointer rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">
+                <label className={`rounded-lg px-6 py-2.5 text-sm font-medium text-white ${
+                  isBlocked ? 'cursor-not-allowed bg-gray-400' : 'cursor-pointer bg-indigo-600 hover:bg-indigo-700'
+                }`}>
                   Select File
                   <input
                     ref={inputRef}
                     type="file"
                     accept=".csv"
                     className="hidden"
+                    disabled={isBlocked}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) handleFile(f);
