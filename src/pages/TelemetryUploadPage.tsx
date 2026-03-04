@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Upload,
-  FileSpreadsheet,
   CheckCircle,
   AlertTriangle,
   XCircle,
   CloudUpload,
   Clock,
-  ChevronRight,
   RotateCcw,
 } from 'lucide-react';
 import Papa from 'papaparse';
@@ -165,7 +163,7 @@ export default function TelemetryUploadPage() {
 
     try {
       const result = await api.telemetry.upload(file, snapshotDate);
-      setUploadResult(result as typeof uploadResult);
+      setUploadResult(result as unknown as typeof uploadResult);
       trackEvent('telemetry_upload', { file_name: file.name, row_count: result.rowCount });
       setStep('result');
       loadHistory();

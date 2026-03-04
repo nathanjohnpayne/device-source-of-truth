@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { minimalDeviceDetail, minimalSpec } from '../helpers/fixtures';
 
 vi.mock('../../lib/api', () => ({
@@ -14,13 +14,11 @@ import SpecEditPage from '../../pages/SpecEditPage';
 import { api } from '../../lib/api';
 
 function renderPage(deviceId: string = 'd1') {
-  return render(
-    <MemoryRouter initialEntries={[`/devices/${deviceId}/specs/edit`]}>
-      <Routes>
-        <Route path="/devices/:id/specs/edit" element={<SpecEditPage />} />
-      </Routes>
-    </MemoryRouter>,
+  const router = createMemoryRouter(
+    [{ path: '/devices/:id/specs/edit', element: <SpecEditPage /> }],
+    { initialEntries: [`/devices/${deviceId}/specs/edit`] },
   );
+  return render(<RouterProvider router={router} />);
 }
 
 beforeEach(() => {
@@ -37,7 +35,7 @@ describe('SpecEditPage smoke test', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Edit Device Specs')).toBeInTheDocument();
+      expect(screen.getByText('STB Questionnaire')).toBeInTheDocument();
     });
   });
 
@@ -50,7 +48,7 @@ describe('SpecEditPage smoke test', () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Edit Device Specs')).toBeInTheDocument();
+      expect(screen.getByText('STB Questionnaire')).toBeInTheDocument();
     });
   });
 });

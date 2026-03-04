@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Upload, FileSpreadsheet, CheckCircle, AlertTriangle, XCircle,
-  ChevronRight, RotateCcw, Clock,
+  RotateCcw, Clock,
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { api } from '../lib/api';
