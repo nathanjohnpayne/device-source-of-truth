@@ -137,7 +137,7 @@ The rollback confirmation modal is updated to display: "This will delete [N] new
 ## Acceptance Criteria
 
 - Re-importing `IntakeRequests.csv` against a DST database that already contains those records produces zero new duplicates. All matching rows are flagged as Duplicate (skip) or Conflict (action required) in the preview.
-- Re-importing `partner_key_mapping_enriched_2.csv` with an existing `partner_keys.key` no longer throws a database constraint error. Instead, the row is surfaced as a Conflict in the preview.
+- Re-importing `partner_key_mapping_enriched.csv` with an existing `partner_keys.key` no longer throws a database constraint error. Instead, the row is surfaced as a Conflict in the preview.
 - Natural key index on `intake_requests` is created as part of the idempotent schema migration.
 - Conflict rows display a diff of existing vs. incoming values for every differing field.
 - Skip, Overwrite, and Merge resolutions each produce the correct outcome on confirmation.

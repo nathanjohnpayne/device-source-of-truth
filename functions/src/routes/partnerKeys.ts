@@ -475,10 +475,13 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
     const fixed = fixEncoding(csvData);
     const rawRows = parseCSV(fixed);
 
-    const expectedColumns = ['partner_key', 'friendly_partner_name', 'countries_operate_iso2', 'regions_operate', 'chipset', 'oem', 'kernal', 'os'];
+    const expectedColumns = ['partner_key', 'friendly_partner_name', 'countries_operate_iso2', 'regions_operate', 'chipset', 'oem', 'kernel', 'os'];
     if (rawRows.length > 0) {
       const headers = Object.keys(rawRows[0]).map((h) => h.toLowerCase().trim());
-      const missing = expectedColumns.filter((col) => !headers.includes(col));
+      const missing = expectedColumns.filter((col) => {
+        if (col === 'kernel') return !headers.includes('kernel') && !headers.includes('kernal');
+        return !headers.includes(col);
+      });
       if (missing.length > 0) {
         res.status(400).json({ error: `Missing required columns: ${missing.join(', ')}` });
         return;
@@ -514,7 +517,7 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
       const { regions, warnings: regionWarnings } = normalizeRegion(raw['regions_operate']);
       const chipset = (raw['chipset'] ?? '').trim() || null;
       const oem = (raw['oem'] ?? '').trim() || null;
-      const kernel = (raw['kernal'] ?? '').trim() || null;
+      const kernel = (raw['kernel'] ?? raw['kernal'] ?? '').trim() || null;
       const os = (raw['os'] ?? '').trim() || null;
 
       const warnings: string[] = [...countryWarnings, ...regionWarnings];

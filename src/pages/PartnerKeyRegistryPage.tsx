@@ -468,9 +468,9 @@ function ImportTab() {
         <div className="rounded-lg border border-gray-200 bg-white p-6">
           <h2 className="mb-1 text-base font-semibold text-gray-900">Upload Partner Key CSV</h2>
           <p className="mb-4 text-sm text-gray-500">
-            Upload the <code className="rounded bg-gray-100 px-1 text-xs">partner_key_mapping_enriched_2.csv</code> file
+            Upload the <code className="rounded bg-gray-100 px-1 text-xs">partner_key_mapping_enriched.csv</code> file
             or any CSV with columns: partner_key, friendly_partner_name, countries_operate_iso2,
-            regions_operate, chipset, oem, kernal, os.
+            regions_operate, chipset, oem, kernel, os.
           </p>
 
           <div

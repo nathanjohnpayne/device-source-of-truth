@@ -25,13 +25,13 @@ Every device Disney deploys streams with a manifest that identifies the partner 
 
 The relationship is one-to-many: one partner may operate under multiple keys. For example, Vodafone operates five keys (`vodafone_es`, `vodafone_pt`, `vodafone_gr`, `vodafone_ro`, `vodafone_de`), one per country. TiVo operates five keys segmented by OEM and region. All of these resolve to the same partner record but carry different enrichment attributes per key (chipset, OEM, OS, countries of operation).
 
-The existing mapping lives in a spreadsheet (`partner_key_mapping_enriched_2.csv`) with 47 keys across 26 partners. This story creates the data model, import flow, and management UI for that registry.
+The existing mapping lives in a spreadsheet (`partner_key_mapping_enriched.csv`) with 47 keys across 26 partners. This story creates the data model, import flow, and management UI for that registry.
 
 ---
 
 ## Source File Analysis
 
-File: `partner_key_mapping_enriched_2.csv`
+File: `partner_key_mapping_enriched.csv`
 Encoding: Windows-1252 (Latin-1 superset — **not** UTF-8). The parser must open with `encoding='latin-1'` or detect and transcode. One character is corrupted in the source: "Telefónica" appears as "Telefnica" due to the `ó` (`\x97`) encoding issue. This must be corrected on import (see normalization table below).
 
 **Source columns:**
@@ -44,7 +44,7 @@ Encoding: Windows-1252 (Latin-1 superset — **not** UTF-8). The parser must ope
 | `regions_operate` | `partner_keys.regions` | Disney region code. See normalization. |
 | `chipset` | `partner_keys.chipset` | Controlled vocabulary — 4 values in current data. |
 | `oem` | `partner_keys.oem` | Free text. Blank for most rows (38 of 47). |
-| `kernal` _(sic)_ | `partner_keys.kernel` | Column is misspelled in source. DST stores as `kernel`. Only value in current data: `Linux`. |
+| `kernel` | `partner_keys.kernel` | Only value in current data: `Linux`. Legacy CSVs may use the misspelling `kernal`; the parser accepts both. |
 | `os` | `partner_keys.os` | Free text. Blank for most rows. Values: `TiVo OS`, `Titan OS`. |
 
 ---
@@ -121,9 +121,9 @@ Stored via DST-036 managed dropdown key `partner_chipset`. Seed with the four va
 - `MediaTek`
 - `Novatek`
 
-### Column name (`kernal` → `kernel`)
+### Column name (`kernel`)
 
-The source CSV column is misspelled. The parser maps `kernal` → `kernel` explicitly. Do not propagate the typo.
+The canonical column name is `kernel`. Legacy CSVs may use the misspelling `kernal`; the parser accepts both spellings and stores the value as `kernel`.
 
 ---
 
@@ -162,7 +162,7 @@ Location: Admin panel > Data Import > Partner Keys (new tab alongside Intake Req
 
 - File input accepts `.csv` only. File size limit: 10 MB.
 - Parser auto-detects Windows-1252 encoding (look for `\x97` or similar non-UTF-8 bytes) and transcodes to UTF-8 before processing. Falls back to UTF-8 if the file is clean.
-- Validates that all 8 expected columns are present (accepting the misspelled `kernal`). If any are missing, show an error and halt.
+- Validates that all 8 expected columns are present (accepts both `kernel` and `kernal`). If any are missing, show an error and halt.
 
 ### Step 2 — Preview & Validation
 
@@ -226,7 +226,7 @@ This resolution must be fast — it runs on every telemetry ingestion event. The
 ## Acceptance Criteria
 
 - `partner_keys` table exists with all columns specified above. `key` is unique and indexed. Schema migration is idempotent.
-- Uploading `partner_key_mapping_enriched_2.csv` parses all 47 rows without encoding errors, corrects `Telefnica` → `Telefónica`, maps `kernal` → `kernel`.
+- Uploading `partner_key_mapping_enriched.csv` parses all 47 rows without encoding errors, corrects `Telefnica` → `Telefónica`, reads the `kernel` column (or `kernal` from legacy CSVs).
 - `UK` → `GB` and `Worldwide` → `XW` are applied unconditionally. `NA` region rows (`tivo_us`, `tivo_element_us`) are flagged orange in the import preview and require Admin confirmation before import.
 - Multi-country semicolon-delimited values are split and stored as `VARCHAR(2)[]` arrays.
 - All 8 partners with multiple keys import successfully — multiple rows per `partner_id` is expected and not treated as an error or duplicate.
