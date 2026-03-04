@@ -126,7 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!isDomainAllowed(email)) {
         await firebaseSignOut(auth);
-        trackEvent('login_failed', { reason: 'domain_rejected' });
         setState((s) => ({
           ...s,
           firebaseUser: null,

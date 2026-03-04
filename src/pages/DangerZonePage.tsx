@@ -26,7 +26,12 @@ export default function DangerZonePage() {
         .map(([k, v]) => `${k}: ${v}`)
         .join(', ');
       setResult(summaryText || 'Nothing to delete');
-      trackEvent('migration_run', { row_count: 0 });
+      const deletedCollections = Object.values(res.deleted).filter((count) => count > 0).length;
+      const deletedRecords = Object.values(res.deleted).reduce((sum, count) => sum + count, 0);
+      trackEvent('clear_all_data', {
+        deleted_collections: deletedCollections,
+        deleted_records: deletedRecords,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Clear failed');
     } finally {
