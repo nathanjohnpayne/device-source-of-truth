@@ -64,9 +64,12 @@ export function useAppUpdate() {
   async function applyUpdate() {
     if (swNeedsRefresh) {
       await updateServiceWorker(true);
-    } else {
-      window.location.reload();
     }
+    if ('caches' in window) {
+      const names = await caches.keys();
+      await Promise.all(names.map((name) => caches.delete(name)));
+    }
+    window.location.replace(window.location.pathname + '?_=' + Date.now());
   }
 
   return { updateAvailable, applyUpdate };
