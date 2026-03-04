@@ -80,8 +80,8 @@ export default function ReadinessPage() {
     },
     {
       id: 'datadog',
-      title: 'Successful Datadog CSV upload with no errors',
-      description: 'At least one Datadog telemetry CSV was uploaded without errors.',
+      title: 'Successful observability CSV upload with no errors',
+      description: 'At least one observability telemetry CSV was uploaded without errors.',
       status: 'warn',
       value: 'Last upload: 2 warnings',
     },

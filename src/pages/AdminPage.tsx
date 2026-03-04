@@ -26,7 +26,7 @@ interface AdminCard {
 const ADMIN_CARDS: AdminCard[] = [
   {
     title: 'Telemetry Upload',
-    description: 'Upload Datadog CSV exports to refresh device field counts',
+    description: 'Upload observability CSV exports to refresh device field counts',
     icon: <Upload className="h-6 w-6" />,
     path: '/admin/upload',
   },

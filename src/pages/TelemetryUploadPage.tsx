@@ -203,7 +203,7 @@ export default function TelemetryUploadPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Telemetry Upload</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Upload Datadog CSV exports to update device telemetry data
+            Upload observability CSV exports to update device telemetry data
           </p>
           <a
             href="https://disney.my.sentry.io/organizations/disney/explore/discover/results/?field=partner&field=device&field=core_version&field=count_unique%28device_id%29&field=count%28%29&name=ADK%20Partner%20-%20Device%20Combinations&project=23&query=%21partner%3Arefapp%20%21partner%3Abroadcom%20%21partner%3Avpe%20title%3Alaunch%20%21partner%3Adss%20%21partner%3Atwdc_microsoft%20%21partner%3Atwdc_amazon&sort=-count_unique_device_id&statsPeriod=24h&yAxis=count_unique%28device_id%29&yAxis=count%28%29"
@@ -256,7 +256,7 @@ export default function TelemetryUploadPage() {
               <>
                 <CloudUpload className="mb-4 h-12 w-12 text-gray-400" />
                 <p className="mb-2 text-lg font-medium text-gray-700">
-                  Drop your Datadog CSV here
+                  Drop your observability CSV here
                 </p>
                 <p className="mb-4 text-sm text-gray-500">or click to browse</p>
                 <label className="cursor-pointer rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">

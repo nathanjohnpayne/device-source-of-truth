@@ -13,7 +13,7 @@ import { trackEvent } from '../lib/analytics';
 import type {
   IntakePreviewRow, IntakePreviewWarning,
   IntakePreviewPartnerMatch, IntakeImportBatch, IntakeRegion,
-  DisambiguationResponse, ClarificationAnswer,
+  DisambiguationResponse, DisambiguationFieldResult, ClarificationAnswer,
   ConflictResolution,
 } from '../lib/types';
 
@@ -554,7 +554,7 @@ export default function IntakeImportPage() {
             <div className="group relative">
               <Info className="h-4 w-4 text-gray-400" />
               <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover:block">
-                Runs an AI pass to automatically resolve ambiguous field values before review. May incur additional Anthropic API costs.
+                Runs an AI pass to automatically resolve ambiguous values. May incur additional Anthropic API costs.
               </div>
             </div>
           </div>
@@ -629,7 +629,34 @@ export default function IntakeImportPage() {
                 </span>
               </>
             )}
+            {disambiguation?.aiStats && disambiguation.aiStats.totalResolved > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="flex items-center gap-1.5 text-sm">
+                  <Sparkles className="h-4 w-4 text-indigo-500" />
+                  <span className="font-medium text-indigo-700">
+                    {disambiguation.aiStats.totalResolved}
+                  </span>
+                  <span className="text-indigo-600">
+                    values resolved by AI
+                    {disambiguation.aiStats.cachedCount > 0 && (
+                      <span> ({disambiguation.aiStats.cachedCount} cached)</span>
+                    )}
+                  </span>
+                </span>
+              </>
+            )}
           </div>
+
+          {disambiguation?.fieldTypeFallbacks && disambiguation.fieldTypeFallbacks.length > 0 && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <p className="text-sm text-amber-800">
+                AI disambiguation fell back to rule-based handling for: {disambiguation.fieldTypeFallbacks.join(', ')}.
+                Those fields require manual review.
+              </p>
+            </div>
+          )}
 
           {/* Apply to all conflicts */}
           {summary.unresolvedConflicts > 0 && (
@@ -688,15 +715,22 @@ export default function IntakeImportPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {paginatedRows.map(row => (
-                    <PreviewTableRow
-                      key={row.rowIndex}
-                      row={row}
-                      onSkip={handleSkipRow}
-                      onOverride={handleOverride}
-                      onResolution={handleResolution}
-                    />
-                  ))}
+                  {paginatedRows.map(row => {
+                    const csvIdx = row.rowIndex - 1;
+                    const rowAiResults = disambiguation
+                      ? disambiguation.fields.filter(f => f.rowIndex === csvIdx)
+                      : undefined;
+                    return (
+                      <PreviewTableRow
+                        key={row.rowIndex}
+                        row={row}
+                        onSkip={handleSkipRow}
+                        onOverride={handleOverride}
+                        onResolution={handleResolution}
+                        aiResults={rowAiResults}
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -825,7 +859,7 @@ export default function IntakeImportPage() {
         )}
       </Modal>
 
-      {/* AI Cost Disclosure Modal (DST-040) */}
+      {/* AI Cost Disclosure Modal (DST-042) */}
       <Modal
         open={showAICostModal}
         onClose={() => {
@@ -862,11 +896,11 @@ export default function IntakeImportPage() {
         }
       >
         <p className="text-sm text-gray-700">
-          Enabling AI Import runs your file through Claude to automatically resolve ambiguous values
-          such as country codes, region names, and partner name variations.
-          This uses the Anthropic API and may incur additional usage costs billed to your
-          organization's API account. Costs scale with file size — most standard imports are
-          a few cents or less.
+          Enabling AI Import runs ambiguous field values through Claude to automatically resolve
+          issues like country codes, region names, and partner name variations. Only values that
+          fail standard validation are sent — clean data is never transmitted. This uses the
+          Anthropic API and may incur additional usage costs billed to your organization's API
+          account.
         </p>
       </Modal>
     </div>
@@ -875,16 +909,53 @@ export default function IntakeImportPage() {
 
 // ── Preview Table Row ──
 
+function IntakeAIBadge({ result }: { result: DisambiguationFieldResult }) {
+  if (result.resolutionSource === 'human') {
+    return (
+      <span className="group/ai relative ml-1 inline-flex">
+        <span className="cursor-default rounded bg-blue-100 px-1 py-0.5 text-[10px] font-semibold text-blue-700">
+          Manual
+        </span>
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-48 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover/ai:block">
+          <span className="block font-medium">Admin override</span>
+          <span className="block mt-1 text-gray-300">Raw: {result.rawValue}</span>
+          <span className="block text-gray-300">Resolved: {result.resolvedValue}</span>
+        </span>
+      </span>
+    );
+  }
+  const isAuto = result.confidence >= 0.90;
+  return (
+    <span className="group/ai relative ml-1 inline-flex">
+      <span className={`cursor-default rounded px-1 py-0.5 text-[10px] font-semibold ${
+        isAuto ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+      }`}>
+        {isAuto ? 'AI' : 'AI \u26A0'}
+        {result.cached && ' (cached)'}
+      </span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-56 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover/ai:block">
+        <span className="block font-medium">{isAuto ? 'AI auto-resolved' : 'AI suggested — verify'}</span>
+        <span className="block mt-1 text-gray-300">Raw: {result.rawValue}</span>
+        <span className="block text-gray-300">Resolved: {result.resolvedValue}</span>
+        <span className="block text-gray-300">Confidence: {(result.confidence * 100).toFixed(0)}%</span>
+        <span className="block text-gray-400 mt-0.5">{result.reasoning}</span>
+      </span>
+    </span>
+  );
+}
+
 function PreviewTableRow({
   row,
   onSkip,
   onOverride,
   onResolution,
+  aiResults,
 }: {
   row: IntakePreviewRow;
   onSkip: (rowIndex: number) => void;
   onOverride: (rowIndex: number, key: string, value: string) => void;
   onResolution: (rowIndex: number, resolution: ConflictResolution) => void;
+  aiResults?: DisambiguationFieldResult[];
 }) {
   const dedup = row.dedupInfo;
   const isDuplicate = dedup?.dedupStatus === 'duplicate';
@@ -910,6 +981,12 @@ function PreviewTableRow({
 
   const unresolvedSK = row.warnings?.some(w => w.type === 'sk_ambiguity' && !row.overrides?.['SK']);
   const unresolvedUnknown = row.warnings?.filter(w => w.type === 'unknown_country' && !row.overrides?.[`UNKNOWN:${w.rawValue}`]);
+
+  const aiByField = (field: string) =>
+    aiResults?.find(r => r.field === field && !r.needsHuman);
+  const countryAi = aiByField('Country');
+  const regionAi = aiByField('Region (from Partner)');
+  const partnerAi = aiByField('Partner');
 
   return (
     <>
@@ -946,6 +1023,7 @@ function PreviewTableRow({
               }>
                 {m.partnerNameRaw}
               </span>
+              {i === 0 && partnerAi && <IntakeAIBadge result={partnerAi} />}
               {m.matchConfidence === 'fuzzy' && m.partnerDisplayName && (
                 <span className="ml-1 text-xs text-gray-400">
                   ~{m.partnerDisplayName} ({Math.round((m.similarityScore || 0) * 100)}%)
@@ -968,6 +1046,7 @@ function PreviewTableRow({
               {c.startsWith('UNKNOWN:') ? c.replace('UNKNOWN:', '') : c}
             </span>
           )) || '—'}
+          {countryAi && <IntakeAIBadge result={countryAi} />}
           {unresolvedSK && !row.skipped && (
             <div className="mt-1">
               <select
@@ -993,6 +1072,7 @@ function PreviewTableRow({
         </td>
         <td className="px-3 py-2 text-sm text-gray-700">
           {row.regions?.join(', ') || '—'}
+          {regionAi && <IntakeAIBadge result={regionAi} />}
         </td>
         <td className="px-3 py-2 text-xs text-gray-500">
           {isInFileDupe && (

@@ -355,9 +355,11 @@ export interface IntakeImportBatch {
   mergedCount?: number;
 }
 
-// ── AI Disambiguation (DST-039) ──
+// ── AI Disambiguation (DST-039, DST-042) ──
 
 export type ImportType = 'intake' | 'partner_key';
+
+export type AIFieldType = 'country' | 'region' | 'partner_name' | 'enum' | 'multi_value_delimiter' | 'date';
 
 export type DisambiguationResolutionSource = 'ai_auto' | 'ai_suggested' | 'human' | 'rule_based';
 
@@ -373,6 +375,7 @@ export interface DisambiguationFieldResult {
   resolutionSource: DisambiguationResolutionSource;
   overriddenByAdmin: boolean;
   adminValue?: string | null;
+  cached?: boolean;
 }
 
 export type ClarificationQuestionType = 'country' | 'region' | 'partner' | 'date' | 'delimiter' | 'other';
@@ -413,6 +416,8 @@ export interface DisambiguationResponse {
   questions: ClarificationQuestion[];
   aiFallback: boolean;
   fallbackReason?: string;
+  fieldTypeFallbacks?: string[];
+  aiStats?: { totalResolved: number; cachedCount: number };
 }
 
 // ── Import Deduplication (DST-041) ──

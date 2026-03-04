@@ -1,19 +1,23 @@
 /**
- * DST-039: AI-Assisted Import Disambiguation Route
+ * DST-039 / DST-042: AI-Assisted Import Disambiguation Route
  *
  * STATUS: PRE-PRODUCTION / TESTING ONLY
  *
  * POST /api/import/disambiguate — Runs AI disambiguation on parsed import rows
+ *   (DST-042: field-type batching, parallel dispatch, within-session cache)
  * POST /api/import/disambiguate/resolve — Applies admin answers to clarification questions
  */
 
 import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
-import { disambiguate } from '../services/aiDisambiguate.js';
+import {
+  disambiguateWithFieldTypeBatching,
+  getRegisteredFlowIds,
+} from '../services/aiImportFramework.js';
 import { logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
-import type { ImportType, ClarificationAnswer, DisambiguationFieldResult } from '../types/index.js';
+import type { ClarificationAnswer, DisambiguationFieldResult } from '../types/index.js';
 
 const router = Router();
 
@@ -22,12 +26,15 @@ const router = Router();
 router.post('/', requireRole('admin'), async (req, res) => {
   try {
     const { importType, rows } = req.body as {
-      importType: ImportType;
+      importType: string;
       rows: Record<string, unknown>[];
     };
 
-    if (!importType || !['intake', 'partner_key'].includes(importType)) {
-      res.status(400).json({ error: 'importType must be "intake" or "partner_key"' });
+    const validFlowIds = getRegisteredFlowIds();
+    if (!importType || !validFlowIds.includes(importType)) {
+      res.status(400).json({
+        error: `importType must be one of: ${validFlowIds.join(', ')}`,
+      });
       return;
     }
 
@@ -36,7 +43,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
       return;
     }
 
-    req.log?.info('AI disambiguation requested', {
+    req.log?.info('AI disambiguation requested (DST-042 field-type batching)', {
       importType,
       rowCount: rows.length,
       userId: req.user!.uid,
@@ -64,11 +71,14 @@ router.post('/', requireRole('admin'), async (req, res) => {
       // Field options are optional context
     }
 
-    const result = await disambiguate(importType, rows, partners, fieldOptions);
+    const result = await disambiguateWithFieldTypeBatching(
+      importType, rows, partners, fieldOptions,
+    );
 
     if (result.aiFallback) {
       req.log?.warn('AI disambiguation fell back to rule-based', {
         reason: result.fallbackReason,
+        fieldTypeFallbacks: result.fieldTypeFallbacks,
       });
     }
 
@@ -78,6 +88,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
     req.log?.info('AI disambiguation complete', {
       totalFields: result.fields.length,
       autoResolved,
+      cached: result.aiStats?.cachedCount ?? 0,
       questionsGenerated: questionsCount,
       aiFallback: result.aiFallback,
     });
@@ -93,6 +104,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
           confidence: f.confidence,
           reasoning: f.reasoning,
           resolutionSource: f.resolutionSource,
+          cached: f.cached,
         }));
 
       await logAuditEntry({
@@ -102,6 +114,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
         oldValue: JSON.stringify({ importType, rowCount: rows.length }),
         newValue: JSON.stringify({
           autoResolved,
+          cached: result.aiStats?.cachedCount ?? 0,
           questionsGenerated: questionsCount,
           resolutions: aiResolutions.slice(0, 50),
         }),
@@ -122,7 +135,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
 router.post('/resolve', requireRole('admin'), async (req, res) => {
   try {
     const { importType, answers, originalFields, rows } = req.body as {
-      importType: ImportType;
+      importType: string;
       answers: ClarificationAnswer[];
       originalFields: DisambiguationFieldResult[];
       rows: Record<string, unknown>[];
@@ -145,7 +158,6 @@ router.post('/resolve', requireRole('admin'), async (req, res) => {
       const field = updatedFields[i];
       if (!field.needsHuman) continue;
 
-      // Check direct match or "apply to all" pattern match
       for (const answer of answers) {
         const directMatch = answer.questionId.includes(`${field.rowIndex}-${field.field}`);
         const patternMatch = answer.applyToAll && answer.questionId.includes(field.field) &&
@@ -170,7 +182,6 @@ router.post('/resolve', requireRole('admin'), async (req, res) => {
       }
     }
 
-    // If there are still unresolved rows, re-run AI on just those
     const stillUnresolved = updatedFields.filter(f => f.needsHuman);
     if (stillUnresolved.length > 0 && rows && rows.length > 0) {
       const db = admin.firestore();
@@ -184,7 +195,9 @@ router.post('/resolve', requireRole('admin'), async (req, res) => {
       const affectedRows = rows.filter((_, i) => unresolvedRowIndices.has(i));
 
       if (affectedRows.length > 0) {
-        const reResult = await disambiguate(importType, affectedRows, partners);
+        const reResult = await disambiguateWithFieldTypeBatching(
+          importType, affectedRows, partners,
+        );
         for (const newField of reResult.fields) {
           const idx = updatedFields.findIndex(
             f => f.rowIndex === newField.rowIndex && f.field === newField.field,
@@ -196,7 +209,6 @@ router.post('/resolve', requireRole('admin'), async (req, res) => {
       }
     }
 
-    // Log admin resolutions to audit
     const adminResolutions = updatedFields.filter(f => f.overriddenByAdmin);
     if (adminResolutions.length > 0) {
       await logAuditEntry({
@@ -228,7 +240,7 @@ router.post('/resolve', requireRole('admin'), async (req, res) => {
 
     res.json({
       fields: updatedFields,
-      questions: [], // Re-derive on client from fields with needsHuman
+      questions: [],
       remainingCount: remaining,
     });
   } catch (err) {

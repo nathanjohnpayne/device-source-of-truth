@@ -26,6 +26,7 @@ import type {
   PartnerKeyImportPreview,
   PartnerKeyImportBatch,
   DisambiguationResponse,
+  DisambiguationFieldResult,
   ClarificationAnswer,
   ConflictResolution,
 } from '../lib/types';
@@ -40,7 +41,7 @@ export default function PartnerKeyRegistryPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Partner Key Registry</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Manage the mapping between Datadog partner keys and canonical partner records.
+          Manage the mapping between observability partner keys and canonical partner records.
         </p>
       </div>
 
@@ -513,7 +514,7 @@ function ImportTab() {
             <div className="group relative">
               <Info className="h-4 w-4 text-gray-400" />
               <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover:block">
-                Runs an AI pass to automatically resolve ambiguous field values before review. May incur additional Anthropic API costs.
+                Runs an AI pass to automatically resolve ambiguous values. May incur additional Anthropic API costs.
               </div>
             </div>
           </div>
@@ -587,8 +588,29 @@ function ImportTab() {
                   <XCircle className="h-4 w-4" /> {preview.errorCount} errors
                 </span>
               )}
+              {disambiguation?.aiStats && disambiguation.aiStats.totalResolved > 0 && (
+                <span className="flex items-center gap-1 text-indigo-700">
+                  <Sparkles className="h-4 w-4" />
+                  {disambiguation.aiStats.totalResolved} values resolved by AI
+                  {disambiguation.aiStats.cachedCount > 0 && (
+                    <span className="text-indigo-500">
+                      ({disambiguation.aiStats.cachedCount} cached)
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
           </div>
+
+          {disambiguation?.fieldTypeFallbacks && disambiguation.fieldTypeFallbacks.length > 0 && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <p className="text-sm text-amber-800">
+                AI disambiguation fell back to rule-based handling for: {disambiguation.fieldTypeFallbacks.join(', ')}.
+                Those fields require manual review.
+              </p>
+            </div>
+          )}
 
           {unresolvedConflicts > 0 && (
             <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
@@ -646,9 +668,15 @@ function ImportTab() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {sortedRows.map((row, i) => (
-                    <PreviewRow key={i} row={row} onResolution={handleResolution} />
-                  ))}
+                  {sortedRows.map((row, i) => {
+                    const csvIdx = rawCsvRows.findIndex(r => String(r['partner_key'] ?? '').trim() === row.key);
+                    const rowAiResults = csvIdx >= 0 && disambiguation
+                      ? disambiguation.fields.filter(f => f.rowIndex === csvIdx)
+                      : undefined;
+                    return (
+                      <PreviewRow key={i} row={row} onResolution={handleResolution} aiResults={rowAiResults} />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -781,7 +809,7 @@ function ImportTab() {
         </p>
       </Modal>
 
-      {/* AI Cost Disclosure Modal (DST-040) */}
+      {/* AI Cost Disclosure Modal (DST-042) */}
       <Modal
         open={showAICostModal}
         onClose={() => {
@@ -815,22 +843,64 @@ function ImportTab() {
         }
       >
         <p className="text-sm text-gray-700">
-          Enabling AI Import runs your file through Claude to automatically resolve ambiguous values
-          such as country codes, region names, and partner name variations.
-          This uses the Anthropic API and may incur additional usage costs billed to your
-          organization's API account. Costs scale with file size — most standard imports are
-          a few cents or less.
+          Enabling AI Import runs ambiguous field values through Claude to automatically resolve
+          issues like country codes, region names, and partner name variations. Only values that
+          fail standard validation are sent — clean data is never transmitted. This uses the
+          Anthropic API and may incur additional usage costs billed to your organization's API
+          account.
         </p>
       </Modal>
     </div>
   );
 }
 
-function PreviewRow({ row, onResolution }: { row: PartnerKeyImportRow; onResolution: (key: string, resolution: ConflictResolution) => void }) {
+function AIResolveBadge({ result }: { result: DisambiguationFieldResult }) {
+  if (result.resolutionSource === 'human') {
+    return (
+      <span className="group/ai relative ml-1 inline-flex">
+        <span className="cursor-default rounded bg-blue-100 px-1 py-0.5 text-[10px] font-semibold text-blue-700">
+          Manual
+        </span>
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-48 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover/ai:block">
+          <span className="block font-medium">Admin override</span>
+          <span className="block mt-1 text-gray-300">Raw: {result.rawValue}</span>
+          <span className="block text-gray-300">Resolved: {result.resolvedValue}</span>
+        </span>
+      </span>
+    );
+  }
+  const isAuto = result.confidence >= 0.90;
+  return (
+    <span className="group/ai relative ml-1 inline-flex">
+      <span className={`cursor-default rounded px-1 py-0.5 text-[10px] font-semibold ${
+        isAuto ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+      }`}>
+        {isAuto ? 'AI' : 'AI \u26A0'}
+        {result.cached && ' (cached)'}
+      </span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-56 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover/ai:block">
+        <span className="block font-medium">{isAuto ? 'AI auto-resolved' : 'AI suggested — verify'}</span>
+        <span className="block mt-1 text-gray-300">Raw: {result.rawValue}</span>
+        <span className="block text-gray-300">Resolved: {result.resolvedValue}</span>
+        <span className="block text-gray-300">Confidence: {(result.confidence * 100).toFixed(0)}%</span>
+        <span className="block text-gray-400 mt-0.5">{result.reasoning}</span>
+      </span>
+    </span>
+  );
+}
+
+function PreviewRow({ row, onResolution, aiResults }: {
+  row: PartnerKeyImportRow;
+  onResolution: (key: string, resolution: ConflictResolution) => void;
+  aiResults?: DisambiguationFieldResult[];
+}) {
   const dedup = row.dedupInfo;
   const isDuplicate = dedup?.dedupStatus === 'duplicate';
   const isConflict = dedup?.dedupStatus === 'conflict';
   const isInFileDupe = dedup?.dedupStatus === 'duplicate_in_file';
+
+  const aiByField = (field: string) =>
+    aiResults?.find(r => r.field === field && !r.needsHuman);
 
   const bgClass =
     isInFileDupe
@@ -869,6 +939,11 @@ function PreviewRow({ row, onResolution }: { row: PartnerKeyImportRow; onResolut
       <Badge variant="danger">None</Badge>
     );
 
+  const countryAi = aiByField('countries_operate_iso2');
+  const regionAi = aiByField('regions_operate');
+  const partnerAi = aiByField('friendly_partner_name');
+  const chipsetAi = aiByField('chipset');
+
   return (
     <>
       <tr className={bgClass}>
@@ -876,11 +951,21 @@ function PreviewRow({ row, onResolution }: { row: PartnerKeyImportRow; onResolut
         <td className="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-900">{row.key || '—'}</td>
         <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">
           {row.partnerDisplayName ?? row.friendlyPartnerName ?? '—'}
+          {partnerAi && <AIResolveBadge result={partnerAi} />}
         </td>
         <td className="whitespace-nowrap px-3 py-2 text-sm">{matchBadge}</td>
-        <td className="px-3 py-2 text-sm text-gray-700">{(row.countries ?? []).join(', ') || '—'}</td>
-        <td className="px-3 py-2 text-sm text-gray-700">{(row.regions ?? []).join(', ') || '—'}</td>
-        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.chipset ?? '—'}</td>
+        <td className="px-3 py-2 text-sm text-gray-700">
+          {(row.countries ?? []).join(', ') || '—'}
+          {countryAi && <AIResolveBadge result={countryAi} />}
+        </td>
+        <td className="px-3 py-2 text-sm text-gray-700">
+          {(row.regions ?? []).join(', ') || '—'}
+          {regionAi && <AIResolveBadge result={regionAi} />}
+        </td>
+        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">
+          {row.chipset ?? '—'}
+          {chipsetAi && <AIResolveBadge result={chipsetAi} />}
+        </td>
         <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.oem ?? '—'}</td>
         <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.os ?? '—'}</td>
         <td className="px-3 py-2 text-sm">

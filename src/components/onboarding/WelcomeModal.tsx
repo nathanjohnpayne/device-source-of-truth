@@ -18,7 +18,7 @@ const STEPS: Step[] = [
   },
   {
     title: 'Find a Device',
-    body: 'Use the search bar or browse the device catalog to find any device by name or Datadog ID.',
+    body: 'Use the search bar or browse the device catalog to find any device by name or device ID.',
     icon: <Search className="h-10 w-10" />,
   },
   {
