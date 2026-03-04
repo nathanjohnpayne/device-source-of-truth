@@ -40,7 +40,9 @@ export type AnalyticsEvent =
   | 'partner_key_ai_disambiguation'
   | 'partner_key_clarification_resolved'
   | 'intake_ai_disambiguation'
-  | 'intake_clarification_resolved';
+  | 'intake_clarification_resolved'
+  | 'partner_alias_saved'
+  | 'partner_aliases_seeded';
 
 export interface AnalyticsParams {
   page_view: { page_title: string; page_path: string };
@@ -83,6 +85,8 @@ export interface AnalyticsParams {
   partner_key_clarification_resolved: { answered: number };
   intake_ai_disambiguation: { auto_resolved: number; questions: number; fallback: boolean };
   intake_clarification_resolved: { answered: number };
+  partner_alias_saved: { resolutionType: string };
+  partner_aliases_seeded: { created: number };
 }
 
 export function trackEvent<E extends AnalyticsEvent>(

@@ -8,6 +8,7 @@ import {
   jaroWinklerSimilarity,
 } from '../services/intakeParser.js';
 import type { IntakeRegion, MatchConfidence, FieldDiff, DeduplicationInfo } from '../types/index.js';
+import { loadActiveAliases, resolvePartnerAlias } from '../services/partnerAliasResolver.js';
 
 const router = Router();
 
@@ -119,6 +120,10 @@ router.post('/preview', requireRole('admin'), async (req, res) => {
       displayNameLower: (doc.data().displayName || '').toLowerCase().trim(),
     }));
 
+    const aliases = await loadActiveAliases(db);
+    const partnerLookup = new Map<string, string>();
+    for (const p of partners) partnerLookup.set(p.id, p.displayName);
+
     // Load all existing intake requests for dedup comparison
     const existingSnap = await db.collection('intakeRequests').get();
     const existingByKey = new Map<string, { id: string; data: Record<string, unknown> }>();
@@ -162,6 +167,10 @@ router.post('/preview', requireRole('admin'), async (req, res) => {
         });
       }
 
+      const rowRegion = row.regions?.[0] ?? undefined;
+      const rowCountry = row.countries?.[0] ?? undefined;
+      const aliasContext = { region: rowRegion, country_iso: rowCountry };
+
       const partnerMatches: PreviewPartnerMatch[] = row.rawPartnerNames.map(rawName => {
         const trimmed = rawName.trim();
         if (!trimmed) return { partnerNameRaw: rawName, partnerId: null, partnerDisplayName: null, matchConfidence: 'unmatched' as MatchConfidence };
@@ -175,6 +184,16 @@ router.post('/preview', requireRole('admin'), async (req, res) => {
             partnerId: exact.id,
             partnerDisplayName: exact.displayName,
             matchConfidence: 'exact' as MatchConfidence,
+          };
+        }
+
+        const aliasResult = resolvePartnerAlias(trimmed, aliases, partnerLookup, aliasContext);
+        if (aliasResult) {
+          return {
+            partnerNameRaw: trimmed,
+            partnerId: aliasResult.partnerId,
+            partnerDisplayName: aliasResult.partnerDisplayName,
+            matchConfidence: aliasResult.matchConfidence as MatchConfidence,
           };
         }
 

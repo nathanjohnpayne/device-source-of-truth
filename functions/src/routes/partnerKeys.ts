@@ -4,7 +4,8 @@ import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
 import { stripEmoji } from '../services/intakeParser.js';
-import type { PartnerKeyRegion, DeduplicationInfo, FieldDiff } from '../types/index.js';
+import type { PartnerKeyRegion, DeduplicationInfo, FieldDiff, MatchConfidence } from '../types/index.js';
+import { loadActiveAliases, resolvePartnerAlias } from '../services/partnerAliasResolver.js';
 
 const router = Router();
 
@@ -490,6 +491,10 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
       displayName: d.data().displayName as string,
     }));
 
+    const aliases = await loadActiveAliases(db);
+    const partnerLookup = new Map<string, string>();
+    for (const p of partners) partnerLookup.set(p.id, p.displayName);
+
     const existingKeysSnap = await db.collection('partnerKeys').get();
     const existingKeyMap = new Map<string, { id: string; data: Record<string, unknown> }>();
     for (const doc of existingKeysSnap.docs) {
@@ -521,7 +526,7 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
 
       let partnerId: string | null = null;
       let partnerDisplayName: string | null = null;
-      let matchConfidence: 'exact' | 'fuzzy' | 'unmatched' = 'unmatched';
+      let matchConfidence: MatchConfidence = 'unmatched';
 
       if (friendlyName) {
         const lowerName = friendlyName.toLowerCase();
@@ -531,20 +536,29 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
           partnerDisplayName = exactMatch.displayName;
           matchConfidence = 'exact';
         } else {
-          let bestScore = 0;
-          let bestMatch: typeof partners[0] | null = null;
-          for (const p of partners) {
-            const score = jaroWinkler(lowerName, p.displayName.toLowerCase());
-            if (score > bestScore) {
-              bestScore = score;
-              bestMatch = p;
+          const aliasContext = { region: regions[0], country_iso: countries[0] };
+          const aliasResult = resolvePartnerAlias(friendlyName, aliases, partnerLookup, aliasContext);
+          if (aliasResult) {
+            partnerId = aliasResult.partnerId;
+            partnerDisplayName = aliasResult.partnerDisplayName;
+            matchConfidence = aliasResult.matchConfidence;
+            warnings.push(`Resolved via alias: "${friendlyName}" → "${aliasResult.partnerDisplayName}"`);
+          } else {
+            let bestScore = 0;
+            let bestMatch: typeof partners[0] | null = null;
+            for (const p of partners) {
+              const score = jaroWinkler(lowerName, p.displayName.toLowerCase());
+              if (score > bestScore) {
+                bestScore = score;
+                bestMatch = p;
+              }
             }
-          }
-          if (bestMatch && bestScore >= 0.90) {
-            partnerId = bestMatch.id;
-            partnerDisplayName = bestMatch.displayName;
-            matchConfidence = 'fuzzy';
-            warnings.push(`Fuzzy match: "${friendlyName}" → "${bestMatch.displayName}" (score: ${bestScore.toFixed(2)})`);
+            if (bestMatch && bestScore >= 0.90) {
+              partnerId = bestMatch.id;
+              partnerDisplayName = bestMatch.displayName;
+              matchConfidence = 'fuzzy';
+              warnings.push(`Fuzzy match: "${friendlyName}" → "${bestMatch.displayName}" (score: ${bestScore.toFixed(2)})`);
+            }
           }
         }
       }

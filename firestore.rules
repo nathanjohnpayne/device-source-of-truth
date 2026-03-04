@@ -98,5 +98,10 @@ service cloud.firestore {
       allow read: if isAllowedUser();
       allow write: if isAllowedUser();
     }
+
+    match /partnerAliases/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser();
+    }
   }
 }
