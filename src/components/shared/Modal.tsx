@@ -9,6 +9,8 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  /** When false, hides the X button and prevents Escape/overlay-click dismissal. */
+  dismissable?: boolean;
 }
 
 export default function Modal({
@@ -18,6 +20,7 @@ export default function Modal({
   children,
   footer,
   wide,
+  dismissable = true,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -26,7 +29,7 @@ export default function Modal({
     if (!open) return;
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && dismissable) onClose();
     };
     document.addEventListener('keydown', handleKey);
 
@@ -37,7 +40,7 @@ export default function Modal({
       document.removeEventListener('keydown', handleKey);
       prev?.focus();
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissable]);
 
   if (!open) return null;
 
@@ -46,7 +49,7 @@ export default function Modal({
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={(e) => {
-        if (e.target === overlayRef.current) onClose();
+        if (e.target === overlayRef.current && dismissable) onClose();
       }}
     >
       <div
@@ -59,12 +62,14 @@ export default function Modal({
         {title && (
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-            <button
-              onClick={onClose}
-              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {dismissable && (
+              <button
+                onClick={onClose}
+                className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
         )}
         <div className="px-6 py-4">{children}</div>

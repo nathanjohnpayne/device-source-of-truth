@@ -236,6 +236,7 @@ export default function QuestionnaireDetailPage() {
   const [extracting, setExtracting] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [showAICostModal, setShowAICostModal] = useState(false);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
   const [savingPartner, setSavingPartner] = useState(false);
@@ -289,7 +290,7 @@ export default function QuestionnaireDetailPage() {
     return () => clearInterval(interval);
   }, [id, job?.status, fetchJob]);
 
-  const handleTriggerExtraction = async () => {
+  const runExtraction = async () => {
     if (!id) return;
     setExtracting(true);
     try {
@@ -300,6 +301,20 @@ export default function QuestionnaireDetailPage() {
     } finally {
       setExtracting(false);
     }
+  };
+
+  const handleTriggerExtraction = () => {
+    if (sessionStorage.getItem('dst_questionnaire_ai_disclosed') === 'true') {
+      runExtraction();
+    } else {
+      setShowAICostModal(true);
+    }
+  };
+
+  const handleAICostConfirm = () => {
+    sessionStorage.setItem('dst_questionnaire_ai_disclosed', 'true');
+    setShowAICostModal(false);
+    runExtraction();
   };
 
   const handleDownload = async () => {
@@ -521,6 +536,30 @@ export default function QuestionnaireDetailPage() {
           </button>
         )}
       </div>
+
+      {/* AI Cost Disclosure Modal (DST-050) */}
+      <Modal
+        open={showAICostModal}
+        onClose={() => {}}
+        dismissable={false}
+        title="AI Extraction Required"
+        footer={
+          <button
+            onClick={handleAICostConfirm}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Got It — Run Extraction
+          </button>
+        }
+      >
+        <p className="text-sm text-gray-700">
+          Questionnaire extraction uses Claude to map each question-answer pair to a normalized
+          spec field. This step is required to produce reliable structured data from partner
+          questionnaires and cannot be skipped. It uses the Anthropic API and will incur usage
+          costs billed to your organization's API account. Costs scale with the number of devices
+          in the file — most questionnaires are a few cents or less.
+        </p>
+      </Modal>
 
       {/* Partner change modal */}
       <Modal

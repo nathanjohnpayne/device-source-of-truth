@@ -33,7 +33,6 @@ export default function QuestionnaireUploadPage() {
   const [partnersLoading, setPartnersLoading] = useState(true);
 
   const [showAICostModal, setShowAICostModal] = useState(false);
-  const aiModalShownRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canUpload = isAdmin || isEditor;
@@ -122,8 +121,11 @@ export default function QuestionnaireUploadPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
+  const isAIDisclosed = () =>
+    sessionStorage.getItem('dst_questionnaire_ai_disclosed') === 'true';
+
   const handleAICheckboxChange = (checked: boolean) => {
-    if (checked && !aiModalShownRef.current) {
+    if (checked && !isAIDisclosed()) {
       setShowAICostModal(true);
     } else {
       setUseAI(checked);
@@ -131,14 +133,9 @@ export default function QuestionnaireUploadPage() {
   };
 
   const handleAIModalConfirm = () => {
+    sessionStorage.setItem('dst_questionnaire_ai_disclosed', 'true');
     setShowAICostModal(false);
     setUseAI(true);
-    aiModalShownRef.current = true;
-  };
-
-  const handleAIModalCancel = () => {
-    setShowAICostModal(false);
-    setUseAI(false);
   };
 
   return (
@@ -296,33 +293,27 @@ export default function QuestionnaireUploadPage() {
         </div>
       </div>
 
-      {/* AI Cost Disclosure Modal */}
+      {/* AI Cost Disclosure Modal (DST-050) */}
       <Modal
         open={showAICostModal}
-        onClose={handleAIModalCancel}
-        title="AI-Assisted Extraction"
+        onClose={() => {}}
+        dismissable={false}
+        title="AI Extraction Required"
         footer={
-          <>
-            <button
-              onClick={handleAIModalCancel}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAIModalConfirm}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-            >
-              Enable AI Extraction
-            </button>
-          </>
+          <button
+            onClick={handleAIModalConfirm}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Got It — Continue Upload
+          </button>
         }
       >
         <p className="text-sm text-gray-700">
-          Enabling AI Extraction runs questionnaire answers through Claude to
-          automatically map them to normalized spec fields. Only ambiguous
-          values are sent to the API. This uses the Anthropic API and may incur
-          additional usage costs.
+          Questionnaire extraction uses Claude to map each question-answer pair to a normalized
+          spec field. This step is required to produce reliable structured data from partner
+          questionnaires and cannot be skipped. It uses the Anthropic API and will incur usage
+          costs billed to your organization's API account. Costs scale with the number of devices
+          in the file — most questionnaires are a few cents or less.
         </p>
       </Modal>
     </div>
