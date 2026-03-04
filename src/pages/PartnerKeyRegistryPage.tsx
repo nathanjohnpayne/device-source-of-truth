@@ -27,6 +27,7 @@ import type {
   PartnerKeyImportBatch,
   DisambiguationResponse,
   ClarificationAnswer,
+  ConflictResolution,
 } from '../lib/types';
 
 type Tab = 'registry' | 'import';
@@ -318,12 +319,46 @@ function ImportTab() {
     }
   };
 
+  const handleResolution = useCallback((key: string, resolution: ConflictResolution) => {
+    if (!preview) return;
+    setPreview({
+      ...preview,
+      rows: preview.rows.map(r =>
+        r.key === key && r.dedupInfo
+          ? { ...r, dedupInfo: { ...r.dedupInfo, resolution } }
+          : r,
+      ),
+    });
+  }, [preview]);
+
+  const handleApplyToAllConflicts = useCallback((resolution: ConflictResolution) => {
+    if (!preview) return;
+    setPreview({
+      ...preview,
+      rows: preview.rows.map(r =>
+        r.dedupInfo?.dedupStatus === 'conflict' && !r.dedupInfo.resolution
+          ? { ...r, dedupInfo: { ...r.dedupInfo, resolution } }
+          : r,
+      ),
+    });
+  }, [preview]);
+
+  const unresolvedConflicts = preview?.rows.filter(r =>
+    r.dedupInfo?.dedupStatus === 'conflict' && !r.dedupInfo.resolution,
+  ).length ?? 0;
+
   const runImport = async () => {
-    if (!preview || !file) return;
+    if (!preview || !file || unresolvedConflicts > 0) return;
     setImporting(true);
     setError(null);
     try {
-      const importable = preview.rows.filter((r) => r.status !== 'error' && r.status !== 'skipped');
+      const importable = preview.rows.filter((r) => {
+        if (r.status === 'error' || r.status === 'skipped' || !r.key) return false;
+        if (r.dedupInfo?.dedupStatus === 'duplicate_in_file') return false;
+        if (r.dedupInfo?.dedupStatus === 'duplicate' && r.dedupInfo.resolution !== 'overwrite') return false;
+        if (r.dedupInfo?.dedupStatus === 'conflict' && r.dedupInfo.resolution === 'skip') return false;
+        return true;
+      });
       const res = await api.partnerKeys.importConfirm(importable as PartnerKeyImportPreview['rows'], file.name);
       setResult(res);
       setStep('done');
@@ -507,7 +542,18 @@ function ImportTab() {
       )}
 
       {/* Preview step */}
-      {step === 'preview' && preview && (
+      {step === 'preview' && preview && (() => {
+        const duplicateCount = preview.rows.filter(r => r.dedupInfo?.dedupStatus === 'duplicate').length;
+        const conflictCount = preview.rows.filter(r => r.dedupInfo?.dedupStatus === 'conflict').length;
+        const inFileDuplicateCount = preview.rows.filter(r => r.dedupInfo?.dedupStatus === 'duplicate_in_file').length;
+        const dedupOrder: Record<string, number> = { conflict: 0, duplicate: 1, duplicate_in_file: 2 };
+        const sortedRows = [...preview.rows].sort((a, b) => {
+          const aO = a.dedupInfo ? (dedupOrder[a.dedupInfo.dedupStatus] ?? 3) : 3;
+          const bO = b.dedupInfo ? (dedupOrder[b.dedupInfo.dedupStatus] ?? 3) : 3;
+          return aO !== bO ? aO - bO : 0;
+        });
+
+        return (
         <div className="space-y-4">
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -515,14 +561,53 @@ function ImportTab() {
               <span className="flex items-center gap-1 text-emerald-700">
                 <CheckCircle2 className="h-4 w-4" /> {preview.readyCount} ready
               </span>
-              <span className="flex items-center gap-1 text-amber-700">
-                <AlertTriangle className="h-4 w-4" /> {preview.warningCount} warnings
-              </span>
-              <span className="flex items-center gap-1 text-red-700">
-                <XCircle className="h-4 w-4" /> {preview.errorCount} errors (will skip)
-              </span>
+              {duplicateCount > 0 && (
+                <span className="text-blue-700">
+                  {duplicateCount} duplicates (will skip)
+                </span>
+              )}
+              {conflictCount > 0 && (
+                <span className="flex items-center gap-1 text-amber-700">
+                  <AlertTriangle className="h-4 w-4" /> {conflictCount} conflicts
+                  {unresolvedConflicts > 0 ? ` (${unresolvedConflicts} unresolved)` : ' (all resolved)'}
+                </span>
+              )}
+              {inFileDuplicateCount > 0 && (
+                <span className="text-red-700">
+                  {inFileDuplicateCount} duplicate in file
+                </span>
+              )}
+              {preview.warningCount > 0 && (
+                <span className="flex items-center gap-1 text-amber-700">
+                  <AlertTriangle className="h-4 w-4" /> {preview.warningCount} warnings
+                </span>
+              )}
+              {preview.errorCount > 0 && (
+                <span className="flex items-center gap-1 text-red-700">
+                  <XCircle className="h-4 w-4" /> {preview.errorCount} errors
+                </span>
+              )}
             </div>
           </div>
+
+          {unresolvedConflicts > 0 && (
+            <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <span className="text-sm text-amber-800">
+                {unresolvedConflicts} conflict{unresolvedConflicts !== 1 ? 's' : ''} require resolution.
+              </span>
+              <span className="text-sm text-amber-700">Apply to all:</span>
+              {(['skip', 'overwrite', 'merge'] as ConflictResolution[]).map(r => (
+                <button
+                  key={r}
+                  onClick={() => handleApplyToAllConflicts(r)}
+                  className="rounded border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                >
+                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* AI Disambiguation Panel */}
           {disambiguating && (
@@ -561,8 +646,8 @@ function ImportTab() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {preview.rows.map((row, i) => (
-                    <PreviewRow key={i} row={row} />
+                  {sortedRows.map((row, i) => (
+                    <PreviewRow key={i} row={row} onResolution={handleResolution} />
                   ))}
                 </tbody>
               </table>
@@ -584,7 +669,7 @@ function ImportTab() {
             </button>
             <button
               onClick={runImport}
-              disabled={importing || (preview.readyCount + preview.warningCount) === 0}
+              disabled={importing || unresolvedConflicts > 0 || (preview.readyCount + preview.warningCount) === 0}
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {importing ? (
@@ -598,7 +683,8 @@ function ImportTab() {
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Done step */}
       {step === 'done' && result && (
@@ -691,7 +777,7 @@ function ImportTab() {
         }
       >
         <p className="text-sm text-gray-700">
-          This will delete all partner keys imported in this batch. This action cannot be undone.
+          This will delete all new partner keys imported in this batch and restore any overwritten or merged records to their pre-import state. This action cannot be undone.
         </p>
       </Modal>
 
@@ -740,21 +826,38 @@ function ImportTab() {
   );
 }
 
-function PreviewRow({ row }: { row: PartnerKeyImportRow }) {
+function PreviewRow({ row, onResolution }: { row: PartnerKeyImportRow; onResolution: (key: string, resolution: ConflictResolution) => void }) {
+  const dedup = row.dedupInfo;
+  const isDuplicate = dedup?.dedupStatus === 'duplicate';
+  const isConflict = dedup?.dedupStatus === 'conflict';
+  const isInFileDupe = dedup?.dedupStatus === 'duplicate_in_file';
+
   const bgClass =
-    row.status === 'error'
-      ? 'bg-red-50'
-      : row.status === 'warning'
-        ? 'bg-amber-50'
-        : '';
+    isInFileDupe
+      ? 'bg-red-50 opacity-60'
+      : isDuplicate
+        ? 'bg-blue-50 opacity-70'
+        : isConflict
+          ? 'bg-amber-50'
+          : row.status === 'error'
+            ? 'bg-red-50'
+            : row.status === 'warning'
+              ? 'bg-amber-50'
+              : '';
 
   const statusBadge =
-    row.status === 'error' ? (
+    isInFileDupe ? (
+      <Badge variant="danger">Dup in file</Badge>
+    ) : isDuplicate ? (
+      <Badge variant="info">Duplicate</Badge>
+    ) : isConflict ? (
+      <Badge variant="warning">Conflict</Badge>
+    ) : row.status === 'error' ? (
       <Badge variant="danger">Skip</Badge>
     ) : row.status === 'warning' ? (
       <Badge variant="warning">Warning</Badge>
     ) : (
-      <Badge variant="success">Ready</Badge>
+      <Badge variant="success">New</Badge>
     );
 
   const matchBadge =
@@ -767,25 +870,58 @@ function PreviewRow({ row }: { row: PartnerKeyImportRow }) {
     );
 
   return (
-    <tr className={bgClass}>
-      <td className="whitespace-nowrap px-3 py-2 text-sm">{statusBadge}</td>
-      <td className="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-900">{row.key || '—'}</td>
-      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">
-        {row.partnerDisplayName ?? row.friendlyPartnerName ?? '—'}
-      </td>
-      <td className="whitespace-nowrap px-3 py-2 text-sm">{matchBadge}</td>
-      <td className="px-3 py-2 text-sm text-gray-700">{(row.countries ?? []).join(', ') || '—'}</td>
-      <td className="px-3 py-2 text-sm text-gray-700">{(row.regions ?? []).join(', ') || '—'}</td>
-      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.chipset ?? '—'}</td>
-      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.oem ?? '—'}</td>
-      <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.os ?? '—'}</td>
-      <td className="px-3 py-2 text-sm">
-        {[...row.warnings, ...row.errors].map((note, i) => (
-          <p key={i} className={`text-xs ${row.errors.includes(note) ? 'text-red-600' : 'text-amber-600'}`}>
-            {note}
-          </p>
-        ))}
-      </td>
-    </tr>
+    <>
+      <tr className={bgClass}>
+        <td className="whitespace-nowrap px-3 py-2 text-sm">{statusBadge}</td>
+        <td className="whitespace-nowrap px-3 py-2 text-sm font-medium text-gray-900">{row.key || '—'}</td>
+        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">
+          {row.partnerDisplayName ?? row.friendlyPartnerName ?? '—'}
+        </td>
+        <td className="whitespace-nowrap px-3 py-2 text-sm">{matchBadge}</td>
+        <td className="px-3 py-2 text-sm text-gray-700">{(row.countries ?? []).join(', ') || '—'}</td>
+        <td className="px-3 py-2 text-sm text-gray-700">{(row.regions ?? []).join(', ') || '—'}</td>
+        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.chipset ?? '—'}</td>
+        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.oem ?? '—'}</td>
+        <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700">{row.os ?? '—'}</td>
+        <td className="px-3 py-2 text-sm">
+          {isInFileDupe && (
+            <p className="text-xs text-red-600">Duplicate within file — row {dedup.duplicateOfRow} kept</p>
+          )}
+          {(isConflict || isDuplicate) && (
+            <select
+              className="rounded border border-gray-300 px-2 py-1 text-xs"
+              value={dedup?.resolution ?? ''}
+              onChange={(e) => onResolution(row.key, e.target.value as ConflictResolution)}
+            >
+              {!dedup?.resolution && <option value="" disabled>Choose…</option>}
+              <option value="skip">Skip</option>
+              <option value="overwrite">Overwrite</option>
+              {isConflict && <option value="merge">Merge</option>}
+            </select>
+          )}
+          {[...row.warnings, ...row.errors].map((note, i) => (
+            <p key={i} className={`text-xs ${row.errors.includes(note) ? 'text-red-600' : 'text-amber-600'}`}>
+              {note}
+            </p>
+          ))}
+        </td>
+      </tr>
+      {isConflict && dedup.diffs && dedup.diffs.length > 0 && (
+        <tr className="bg-amber-50/50">
+          <td />
+          <td colSpan={9} className="px-3 py-2">
+            <div className="flex flex-wrap gap-3 text-xs">
+              {dedup.diffs.map((d, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 rounded bg-white px-2 py-1 border border-amber-200">
+                  <span className="font-medium text-gray-700">{d.field}:</span>
+                  <span className="text-gray-400 line-through">{d.existingValue || '(blank)'}</span>
+                  <span className="text-amber-700">{d.incomingValue || '(blank)'}</span>
+                </span>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

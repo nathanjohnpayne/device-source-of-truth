@@ -7,7 +7,7 @@ import {
   isValidRequestType,
   jaroWinklerSimilarity,
 } from '../services/intakeParser.js';
-import type { IntakeRegion, MatchConfidence } from '../types/index.js';
+import type { IntakeRegion, MatchConfidence, FieldDiff, DeduplicationInfo } from '../types/index.js';
 
 const router = Router();
 
@@ -56,6 +56,46 @@ interface PreviewRow extends ParsedRow {
   errors: PreviewWarning[];
   status: 'ready' | 'warning' | 'error';
   skipped?: boolean;
+  dedupInfo?: DeduplicationInfo;
+}
+
+// ── Natural key helpers ──
+
+function computeIntakeNaturalKey(subject: string, partnerName: string, launchDate: string | null): string {
+  return [
+    (subject || '').toLowerCase().trim(),
+    (partnerName || '').toLowerCase().trim(),
+    (launchDate || ''),
+  ].join('|');
+}
+
+const INTAKE_COMPARE_FIELDS = [
+  'requestType', 'requestStatus', 'requestPhase',
+] as const;
+
+function diffIntakeRow(
+  existing: Record<string, unknown>,
+  incoming: ParsedRow,
+): FieldDiff[] {
+  const diffs: FieldDiff[] = [];
+  for (const field of INTAKE_COMPARE_FIELDS) {
+    const ev = String(existing[field] ?? '');
+    const iv = String(incoming[field] ?? '');
+    if (ev !== iv) {
+      diffs.push({ field, existingValue: ev || null, incomingValue: iv || null });
+    }
+  }
+  const existingCountries = JSON.stringify((existing.countries as string[]) ?? []);
+  const incomingCountries = JSON.stringify(incoming.countries ?? []);
+  if (existingCountries !== incomingCountries) {
+    diffs.push({ field: 'countries', existingValue: existingCountries, incomingValue: incomingCountries });
+  }
+  const existingRegions = JSON.stringify((existing.regions as string[]) ?? []);
+  const incomingRegions = JSON.stringify(incoming.regions ?? []);
+  if (existingRegions !== incomingRegions) {
+    diffs.push({ field: 'regions', existingValue: existingRegions, incomingValue: incomingRegions });
+  }
+  return diffs;
 }
 
 // ── POST /preview — Partner matching + enriched preview ──
@@ -78,6 +118,27 @@ router.post('/preview', requireRole('admin'), async (req, res) => {
       displayName: doc.data().displayName || '',
       displayNameLower: (doc.data().displayName || '').toLowerCase().trim(),
     }));
+
+    // Load all existing intake requests for dedup comparison
+    const existingSnap = await db.collection('intakeRequests').get();
+    const existingByKey = new Map<string, { id: string; data: Record<string, unknown> }>();
+    for (const doc of existingSnap.docs) {
+      const d = doc.data();
+      const partnerLinks = await db.collection('intakeRequestPartners')
+        .where('intakeRequestId', '==', doc.id)
+        .limit(1)
+        .get();
+      const partnerNameRaw = partnerLinks.empty ? '' : partnerLinks.docs[0].data().partnerNameRaw ?? '';
+      const key = computeIntakeNaturalKey(
+        d.airtableSubject as string,
+        partnerNameRaw,
+        d.targetLaunchDate as string | null,
+      );
+      existingByKey.set(key, { id: doc.id, data: d as Record<string, unknown> });
+    }
+
+    // Track within-file natural keys for intra-file dedup
+    const seenInFile = new Map<string, number>();
 
     const previewRows: PreviewRow[] = rows.map(row => {
       const warnings: PreviewWarning[] = [];
@@ -156,23 +217,51 @@ router.post('/preview', requireRole('admin'), async (req, res) => {
         });
       }
 
-      // Pass through any warnings from client-side normalization
-      if (row.overrides) {
-        // Warnings are already embedded in the row from client-side parsing
+      // Deduplication check
+      let dedupInfo: DeduplicationInfo | undefined;
+      const primaryPartner = row.rawPartnerNames[0] ?? '';
+      const naturalKey = computeIntakeNaturalKey(row.airtableSubject, primaryPartner, row.targetLaunchDate);
+
+      // Within-file dedup
+      if (seenInFile.has(naturalKey)) {
+        dedupInfo = {
+          dedupStatus: 'duplicate_in_file',
+          duplicateOfRow: seenInFile.get(naturalKey)!,
+        };
+      } else {
+        seenInFile.set(naturalKey, row.rowIndex);
+
+        // Check against existing DST records
+        const existing = existingByKey.get(naturalKey);
+        if (existing) {
+          const diffs = diffIntakeRow(existing.data, row);
+          if (diffs.length === 0) {
+            dedupInfo = { dedupStatus: 'duplicate', existingId: existing.id, resolution: 'skip' };
+          } else {
+            dedupInfo = { dedupStatus: 'conflict', existingId: existing.id, diffs };
+          }
+        }
       }
 
       let status: 'ready' | 'warning' | 'error' = 'ready';
       if (errors.length > 0) status = 'error';
       else if (warnings.length > 0) status = 'warning';
 
-      return { ...row, partnerMatches, warnings, errors, status };
+      return { ...row, partnerMatches, warnings, errors, status, dedupInfo };
     });
 
-    const readyCount = previewRows.filter(r => r.status === 'ready').length;
+    const readyCount = previewRows.filter(r => r.status === 'ready' || r.status === 'warning').length;
     const warningCount = previewRows.filter(r => r.status === 'warning').length;
     const errorCount = previewRows.filter(r => r.status === 'error').length;
+    const newCount = previewRows.filter(r => !r.dedupInfo || r.dedupInfo.dedupStatus === 'new').length;
+    const duplicateCount = previewRows.filter(r => r.dedupInfo?.dedupStatus === 'duplicate').length;
+    const conflictCount = previewRows.filter(r => r.dedupInfo?.dedupStatus === 'conflict').length;
+    const inFileDuplicateCount = previewRows.filter(r => r.dedupInfo?.dedupStatus === 'duplicate_in_file').length;
 
-    req.log?.info('Intake preview complete', { readyCount, warningCount, errorCount });
+    req.log?.info('Intake preview complete', {
+      readyCount, warningCount, errorCount,
+      newCount, duplicateCount, conflictCount, inFileDuplicateCount,
+    });
 
     res.json({
       rows: previewRows,
@@ -181,6 +270,10 @@ router.post('/preview', requireRole('admin'), async (req, res) => {
         ready: readyCount,
         warnings: warningCount,
         errors: errorCount,
+        newCount,
+        duplicateCount,
+        conflictCount,
+        inFileDuplicateCount,
       },
     });
   } catch (err) {
@@ -207,12 +300,22 @@ router.post('/import', requireRole('admin'), async (req, res) => {
     const now = new Date().toISOString();
     const importedBy = req.user!.email;
 
-    const importableRows = rows.filter(r => !r.skipped && r.errors.length === 0);
+    // Filter rows: skip errors, explicitly skipped, within-file dupes, and dedup rows resolved as 'skip'
+    const importableRows = rows.filter(r => {
+      if (r.skipped || r.errors.length > 0) return false;
+      if (r.dedupInfo?.dedupStatus === 'duplicate_in_file') return false;
+      if (r.dedupInfo?.dedupStatus === 'duplicate' && r.dedupInfo.resolution !== 'overwrite') return false;
+      if (r.dedupInfo?.dedupStatus === 'conflict' && r.dedupInfo.resolution === 'skip') return false;
+      return true;
+    });
     const skippedCount = rows.length - importableRows.length;
 
     const MAX_BATCH_OPS = 450;
-    let totalImported = 0;
+    let newCount = 0;
+    let overwrittenCount = 0;
+    let mergedCount = 0;
     const allErrors: string[] = [];
+    const preImportSnapshots: Array<{ existingId: string; oldData: Record<string, unknown>; operation: 'overwrite' | 'merge' }> = [];
 
     for (let i = 0; i < importableRows.length; i += MAX_BATCH_OPS) {
       const chunk = importableRows.slice(i, i + MAX_BATCH_OPS);
@@ -220,13 +323,11 @@ router.post('/import', requireRole('admin'), async (req, res) => {
 
       for (const row of chunk) {
         try {
-          const requestRef = db.collection('intakeRequests').doc();
-
           const countries = row.overrides
             ? applyCountryOverrides(row.countries, row.overrides)
             : row.countries;
 
-          batch.set(requestRef, {
+          const incomingData: Record<string, unknown> = {
             airtableSubject: row.airtableSubject,
             requestType: row.requestType,
             requestStatus: row.requestStatus || 'Approved & Provisioned',
@@ -237,22 +338,63 @@ router.post('/import', requireRole('admin'), async (req, res) => {
             ieLeadNames: row.ieLeadNames || null,
             targetLaunchDate: row.targetLaunchDate || null,
             releaseTargets: row.releaseTargets || null,
-            importedAt: now,
-            importedBy,
-            importBatchId,
-          });
+          };
 
-          for (const pm of row.partnerMatches) {
-            const partnerRef = db.collection('intakeRequestPartners').doc();
-            batch.set(partnerRef, {
-              intakeRequestId: requestRef.id,
-              partnerNameRaw: pm.partnerNameRaw,
-              partnerId: pm.partnerId || null,
-              matchConfidence: pm.matchConfidence,
+          const resolution = row.dedupInfo?.resolution;
+          const existingId = row.dedupInfo?.existingId;
+
+          if (existingId && (resolution === 'overwrite' || resolution === 'merge')) {
+            // Capture pre-import state for rollback
+            const existingDoc = await db.collection('intakeRequests').doc(existingId).get();
+            if (existingDoc.exists) {
+              preImportSnapshots.push({
+                existingId,
+                oldData: existingDoc.data() as Record<string, unknown>,
+                operation: resolution,
+              });
+            }
+
+            const updateData: Record<string, unknown> = {
+              updatedAt: now,
+              updatedBy: importedBy,
+              importBatchId,
+            };
+
+            if (resolution === 'overwrite') {
+              Object.assign(updateData, incomingData);
+              overwrittenCount++;
+            } else {
+              // Merge: only apply non-blank incoming values
+              for (const [key, value] of Object.entries(incomingData)) {
+                if (value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
+                  updateData[key] = value;
+                }
+              }
+              mergedCount++;
+            }
+
+            batch.update(db.collection('intakeRequests').doc(existingId), updateData);
+          } else {
+            // New record
+            const requestRef = db.collection('intakeRequests').doc();
+            batch.set(requestRef, {
+              ...incomingData,
+              importedAt: now,
+              importedBy,
+              importBatchId,
             });
-          }
 
-          totalImported++;
+            for (const pm of row.partnerMatches) {
+              const partnerRef = db.collection('intakeRequestPartners').doc();
+              batch.set(partnerRef, {
+                intakeRequestId: requestRef.id,
+                partnerNameRaw: pm.partnerNameRaw,
+                partnerId: pm.partnerId || null,
+                matchConfidence: pm.matchConfidence,
+              });
+            }
+            newCount++;
+          }
         } catch (rowErr) {
           allErrors.push(`Row ${row.rowIndex}: ${String(rowErr)}`);
         }
@@ -260,6 +402,8 @@ router.post('/import', requireRole('admin'), async (req, res) => {
 
       await batch.commit();
     }
+
+    const totalImported = newCount + overwrittenCount + mergedCount;
 
     const batchRef = db.collection('intakeImportHistory').doc();
     await batchRef.set({
@@ -270,6 +414,12 @@ router.post('/import', requireRole('admin'), async (req, res) => {
       totalRows: rows.length,
       importedCount: totalImported,
       skippedCount,
+      newCount,
+      overwrittenCount,
+      mergedCount,
+      preImportSnapshots: preImportSnapshots.length > 0
+        ? JSON.stringify(preImportSnapshots)
+        : null,
     });
 
     await logAuditEntry({
@@ -282,18 +432,27 @@ router.post('/import', requireRole('admin'), async (req, res) => {
         totalRows: rows.length,
         imported: totalImported,
         skipped: skippedCount,
+        new: newCount,
+        overwritten: overwrittenCount,
+        merged: mergedCount,
       }),
       userId: req.user!.uid,
       userEmail: req.user!.email,
     });
 
-    req.log?.info('Intake import complete', { importBatchId, totalImported, skippedCount });
+    req.log?.info('Intake import complete', {
+      importBatchId, totalImported, skippedCount,
+      newCount, overwrittenCount, mergedCount,
+    });
 
     res.json({
       success: true,
       importBatchId,
       importedCount: totalImported,
       skippedCount,
+      newCount,
+      overwrittenCount,
+      mergedCount,
       errorCount: allErrors.length,
       errors: allErrors.slice(0, 100),
     });
@@ -412,17 +571,46 @@ router.delete('/rollback/:batchId', requireRole('admin'), async (req, res) => {
       return;
     }
 
+    // Restore overwritten/merged records from pre-import snapshots
+    let restoredCount = 0;
+    if (historyData.preImportSnapshots) {
+      const snapshots: Array<{ existingId: string; oldData: Record<string, unknown>; operation: string }> =
+        JSON.parse(historyData.preImportSnapshots);
+
+      for (let i = 0; i < snapshots.length; i += 450) {
+        const chunk = snapshots.slice(i, i + 450);
+        const batch = db.batch();
+        for (const snap of chunk) {
+          const docRef = db.collection('intakeRequests').doc(snap.existingId);
+          // Remove the fields we added during import and restore original data
+          const restoreData = { ...snap.oldData };
+          delete restoreData.updatedAt;
+          delete restoreData.updatedBy;
+          batch.set(docRef, restoreData);
+          restoredCount++;
+        }
+        await batch.commit();
+      }
+    }
+
+    // Delete new records added in this batch (those that have importBatchId matching and weren't updates)
     const requestsSnap = await db.collection('intakeRequests')
       .where('importBatchId', '==', batchId)
       .get();
 
-    const requestIds = requestsSnap.docs.map(d => d.id);
+    // Only delete records that were newly created (have importedAt, not updatedAt as primary timestamp)
+    const newRecordDocs = requestsSnap.docs.filter(d => {
+      const data = d.data();
+      return data.importedAt && !data.updatedAt;
+    });
+
+    const requestIds = newRecordDocs.map(d => d.id);
 
     let deletedRequests = 0;
     let deletedPartners = 0;
 
-    for (let i = 0; i < requestsSnap.docs.length; i += 450) {
-      const chunk = requestsSnap.docs.slice(i, i + 450);
+    for (let i = 0; i < newRecordDocs.length; i += 450) {
+      const chunk = newRecordDocs.slice(i, i + 450);
       const batch = db.batch();
       for (const doc of chunk) {
         batch.delete(doc.ref);
@@ -465,12 +653,13 @@ router.delete('/rollback/:batchId', requireRole('admin'), async (req, res) => {
       userEmail: req.user!.email,
     });
 
-    req.log?.info('Intake rollback complete', { batchId, deletedRequests, deletedPartners });
+    req.log?.info('Intake rollback complete', { batchId, deletedRequests, deletedPartners, restoredCount });
 
     res.json({
       success: true,
       deletedRequests,
       deletedPartners,
+      restoredCount,
     });
   } catch (err) {
     req.log?.error('Intake rollback failed', formatError(err));

@@ -90,6 +90,7 @@ const ReadinessPage = lazyRetry(() => import('./pages/ReadinessPage'));
 const ReferenceDataPage = lazyRetry(() => import('./pages/ReferenceDataPage'));
 const IntakeImportPage = lazyRetry(() => import('./pages/IntakeImportPage'));
 const PartnerKeyRegistryPage = lazyRetry(() => import('./pages/PartnerKeyRegistryPage'));
+const DangerZonePage = lazyRetry(() => import('./pages/DangerZonePage'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -284,6 +285,14 @@ function AppRoutes() {
               element={
                 <AdminRoute>
                   <IntakeImportPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="admin/danger-zone"
+              element={
+                <AdminRoute>
+                  <DangerZonePage />
                 </AdminRoute>
               }
             />

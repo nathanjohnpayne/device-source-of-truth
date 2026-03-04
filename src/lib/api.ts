@@ -149,7 +149,7 @@ export const api = {
     importBatches: () =>
       apiFetch<{ data: PartnerKeyImportBatch[] }>('/partner-keys/import-batches'),
     rollbackBatch: (batchId: string) =>
-      apiFetch<{ success: boolean; deleted: number }>(`/partner-keys/import-batches/${batchId}/rollback`, {
+      apiFetch<{ success: boolean; deleted: number; restored?: number }>(`/partner-keys/import-batches/${batchId}/rollback`, {
         method: 'POST',
       }),
   },
@@ -316,7 +316,10 @@ export const api = {
     preview: (rows: Omit<IntakePreviewRow, 'partnerMatches' | 'warnings' | 'errors' | 'status'>[]) =>
       apiFetch<{
         rows: IntakePreviewRow[];
-        summary: { total: number; ready: number; warnings: number; errors: number };
+        summary: {
+          total: number; ready: number; warnings: number; errors: number;
+          newCount?: number; duplicateCount?: number; conflictCount?: number; inFileDuplicateCount?: number;
+        };
       }>('/intake/preview', { method: 'POST', body: JSON.stringify({ rows }) }),
     import: (rows: IntakePreviewRow[], fileName: string) =>
       apiFetch<IntakeImportResult>('/intake/import', {
@@ -332,7 +335,7 @@ export const api = {
     history: () =>
       apiFetch<{ data: IntakeImportBatch[] }>('/intake/history'),
     rollback: (batchId: string) =>
-      apiFetch<{ success: boolean; deletedRequests: number; deletedPartners: number }>(
+      apiFetch<{ success: boolean; deletedRequests: number; deletedPartners: number; restoredCount?: number }>(
         `/intake/rollback/${batchId}`,
         { method: 'DELETE' },
       ),

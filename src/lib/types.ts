@@ -105,6 +105,7 @@ export interface PartnerKeyImportRow {
   warnings: string[];
   errors: string[];
   status: 'ready' | 'warning' | 'error' | 'skipped';
+  dedupInfo?: DeduplicationInfo;
 }
 
 export interface PartnerKeyImportPreview {
@@ -745,6 +746,7 @@ export interface IntakePreviewRow {
   status: 'ready' | 'warning' | 'error';
   skipped?: boolean;
   overrides?: Record<string, string>;
+  dedupInfo?: DeduplicationInfo;
 }
 
 export interface IntakeImportResult {
@@ -765,6 +767,9 @@ export interface IntakeImportBatch {
   totalRows: number;
   importedCount: number;
   skippedCount: number;
+  newCount?: number;
+  overwrittenCount?: number;
+  mergedCount?: number;
 }
 
 // ── AI Disambiguation (DST-039) ──
@@ -841,6 +846,26 @@ export interface MigrationBatch {
   duplicates: number;
   errored: number;
   rollbackAvailable: boolean;
+}
+
+// ── Import Deduplication (DST-041) ──
+
+export type DeduplicationStatus = 'new' | 'duplicate' | 'conflict' | 'duplicate_in_file';
+
+export type ConflictResolution = 'skip' | 'overwrite' | 'merge';
+
+export interface FieldDiff {
+  field: string;
+  existingValue: string | null;
+  incomingValue: string | null;
+}
+
+export interface DeduplicationInfo {
+  dedupStatus: DeduplicationStatus;
+  existingId?: string;
+  diffs?: FieldDiff[];
+  resolution?: ConflictResolution;
+  duplicateOfRow?: number;
 }
 
 // ── Config ──

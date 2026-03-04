@@ -134,8 +134,6 @@ export default function MigrationPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [rollbackModal, setRollbackModal] = useState<MigrationBatch | null>(null);
   const [rollbackLoading, setRollbackLoading] = useState(false);
-  const [clearing, setClearing] = useState(false);
-
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadHistory = useCallback(async () => {
@@ -262,26 +260,6 @@ export default function MigrationPage() {
     }
     setRollbackLoading(false);
   }, [loadHistory]);
-
-  const handleClearAll = async () => {
-    if (!window.confirm('This will permanently delete ALL devices, partners, partner keys, telemetry, alerts, and audit logs. Are you sure?')) return;
-    if (!window.confirm('This action cannot be undone. Type OK in your mind and click OK to proceed.')) return;
-    setClearing(true);
-    setParseError(null);
-    try {
-      const res = await api.upload.clearAll();
-      const summaryText = Object.entries(res.deleted)
-        .filter(([, v]) => v > 0)
-        .map(([k, v]) => `${k}: ${v}`)
-        .join(', ');
-      alert(`Data cleared: ${summaryText || 'nothing to delete'}`);
-      trackEvent('migration_run', { row_count: 0 });
-    } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'Clear failed');
-    } finally {
-      setClearing(false);
-    }
-  };
 
   const reset = () => {
     setStep('upload');
@@ -587,31 +565,6 @@ export default function MigrationPage() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Danger Zone */}
-      <div className="rounded-lg border border-red-200 bg-white p-6">
-        <h2 className="mb-2 text-base font-semibold text-red-700">Danger Zone</h2>
-        <p className="text-sm text-gray-500">
-          Clear all devices, partners, partner keys, telemetry, alerts, and audit logs. Use this before a fresh re-import.
-        </p>
-        <button
-          onClick={handleClearAll}
-          disabled={clearing}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
-        >
-          {clearing ? (
-            <>
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-400/30 border-t-red-600" />
-              Clearing...
-            </>
-          ) : (
-            <>
-              <XCircle className="h-4 w-4" />
-              Clear All Data
-            </>
-          )}
-        </button>
       </div>
 
       {/* Rollback Confirmation Modal */}

@@ -16,6 +16,7 @@ import {
   Key,
   LogOut,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import Badge from '../shared/Badge';
@@ -117,6 +118,12 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Readiness',
         path: '/admin/readiness',
         icon: <CheckCircle className="h-5 w-5" />,
+        adminOnly: true,
+      },
+      {
+        label: 'Danger Zone',
+        path: '/admin/danger-zone',
+        icon: <Trash2 className="h-5 w-5" />,
         adminOnly: true,
       },
     ],

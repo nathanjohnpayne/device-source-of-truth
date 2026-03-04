@@ -14,6 +14,7 @@ import type {
   IntakePreviewRow, IntakePreviewWarning,
   IntakePreviewPartnerMatch, IntakeImportBatch, IntakeRegion,
   DisambiguationResponse, ClarificationAnswer,
+  ConflictResolution,
 } from '../lib/types';
 
 const EXPECTED_COLUMNS = [
@@ -131,6 +132,7 @@ export default function IntakeImportPage() {
 
   const [importResult, setImportResult] = useState<{
     importBatchId: string; importedCount: number; skippedCount: number; errorCount: number;
+    newCount?: number; overwrittenCount?: number; mergedCount?: number;
   } | null>(null);
 
   const [history, setHistory] = useState<IntakeImportBatch[]>([]);
@@ -308,6 +310,21 @@ export default function IntakeImportPage() {
     ));
   }, []);
 
+  const handleResolution = useCallback((rowIndex: number, resolution: ConflictResolution) => {
+    setPreviewRows(prev => prev.map(r => {
+      if (r.rowIndex !== rowIndex || !r.dedupInfo) return r;
+      return { ...r, dedupInfo: { ...r.dedupInfo, resolution } };
+    }));
+  }, []);
+
+  const handleApplyToAllConflicts = useCallback((resolution: ConflictResolution) => {
+    setPreviewRows(prev => prev.map(r => {
+      if (!r.dedupInfo || r.dedupInfo.dedupStatus !== 'conflict') return r;
+      if (r.dedupInfo.resolution) return r;
+      return { ...r, dedupInfo: { ...r.dedupInfo, resolution } };
+    }));
+  }, []);
+
   const handleOverride = useCallback((rowIndex: number, key: string, value: string) => {
     setPreviewRows(prev => prev.map(r => {
       if (r.rowIndex !== rowIndex) return r;
@@ -336,11 +353,19 @@ export default function IntakeImportPage() {
       });
     }).length;
 
-    const ready = total - skipped - errorRows - unresolvedWarnings;
-    return { total, ready, warnings: unresolvedWarnings, errors: errorRows, skipped };
+    const duplicates = previewRows.filter(r => r.dedupInfo?.dedupStatus === 'duplicate').length;
+    const conflicts = previewRows.filter(r => r.dedupInfo?.dedupStatus === 'conflict').length;
+    const unresolvedConflicts = previewRows.filter(r =>
+      r.dedupInfo?.dedupStatus === 'conflict' && !r.dedupInfo.resolution,
+    ).length;
+    const inFileDuplicates = previewRows.filter(r => r.dedupInfo?.dedupStatus === 'duplicate_in_file').length;
+    const newRows = previewRows.filter(r => !r.dedupInfo || r.dedupInfo.dedupStatus === 'new').length;
+
+    const ready = total - skipped - errorRows - unresolvedWarnings - duplicates - inFileDuplicates - unresolvedConflicts;
+    return { total, ready, warnings: unresolvedWarnings, errors: errorRows, skipped, duplicates, conflicts, unresolvedConflicts, inFileDuplicates, newRows };
   }, [previewRows]);
 
-  const canImport = summary.warnings === 0 && summary.ready > 0;
+  const canImport = summary.warnings === 0 && summary.unresolvedConflicts === 0 && summary.ready > 0;
 
   const handleImport = useCallback(async () => {
     if (!canImport || !file) return;
@@ -369,10 +394,24 @@ export default function IntakeImportPage() {
     setRollbackLoading(false);
   }, [loadHistory]);
 
+  const sortedRows = useMemo(() => {
+    const dedupOrder: Record<string, number> = {
+      conflict: 0,
+      duplicate: 1,
+      duplicate_in_file: 2,
+    };
+    return [...previewRows].sort((a, b) => {
+      const aOrder = a.dedupInfo ? (dedupOrder[a.dedupInfo.dedupStatus] ?? 3) : 3;
+      const bOrder = b.dedupInfo ? (dedupOrder[b.dedupInfo.dedupStatus] ?? 3) : 3;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.rowIndex - b.rowIndex;
+    });
+  }, [previewRows]);
+
   const paginatedRows = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return previewRows.slice(start, start + PAGE_SIZE);
-  }, [previewRows, page]);
+    return sortedRows.slice(start, start + PAGE_SIZE);
+  }, [sortedRows, page]);
 
   const totalPages = Math.ceil(previewRows.length / PAGE_SIZE);
 
@@ -540,14 +579,44 @@ export default function IntakeImportPage() {
             <span className="text-gray-300">|</span>
             <span className="flex items-center gap-1.5 text-sm">
               <CheckCircle className="h-4 w-4 text-emerald-500" />
-              <span className="font-medium text-emerald-700">{summary.ready}</span> ready to import
+              <span className="font-medium text-emerald-700">{summary.newRows}</span> new
             </span>
+            {summary.duplicates > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="flex items-center gap-1.5 text-sm">
+                  <span className="font-medium text-blue-700">{summary.duplicates}</span>
+                  <span className="text-blue-600">duplicates (will skip)</span>
+                </span>
+              </>
+            )}
+            {summary.conflicts > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="flex items-center gap-1.5 text-sm">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <span className="font-medium text-amber-700">{summary.conflicts}</span>
+                  <span className="text-amber-600">
+                    conflicts{summary.unresolvedConflicts > 0 ? ` (${summary.unresolvedConflicts} unresolved)` : ' (all resolved)'}
+                  </span>
+                </span>
+              </>
+            )}
+            {summary.inFileDuplicates > 0 && (
+              <>
+                <span className="text-gray-300">|</span>
+                <span className="flex items-center gap-1.5 text-sm">
+                  <span className="font-medium text-red-700">{summary.inFileDuplicates}</span>
+                  <span className="text-red-600">duplicate in file</span>
+                </span>
+              </>
+            )}
             {summary.warnings > 0 && (
               <>
                 <span className="text-gray-300">|</span>
                 <span className="flex items-center gap-1.5 text-sm">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  <span className="font-medium text-amber-700">{summary.warnings}</span> with warnings (review required)
+                  <span className="font-medium text-amber-700">{summary.warnings}</span> with warnings
                 </span>
               </>
             )}
@@ -556,17 +625,31 @@ export default function IntakeImportPage() {
                 <span className="text-gray-300">|</span>
                 <span className="flex items-center gap-1.5 text-sm">
                   <XCircle className="h-4 w-4 text-red-500" />
-                  <span className="font-medium text-red-700">{summary.errors}</span> skipped (errors)
+                  <span className="font-medium text-red-700">{summary.errors}</span> errors
                 </span>
               </>
             )}
-            {summary.skipped > 0 && (
-              <>
-                <span className="text-gray-300">|</span>
-                <span className="text-sm text-gray-500">{summary.skipped} manually skipped</span>
-              </>
-            )}
           </div>
+
+          {/* Apply to all conflicts */}
+          {summary.unresolvedConflicts > 0 && (
+            <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <span className="text-sm text-amber-800">
+                {summary.unresolvedConflicts} conflict{summary.unresolvedConflicts !== 1 ? 's' : ''} require resolution before import.
+              </span>
+              <span className="text-sm text-amber-700">Apply to all:</span>
+              {(['skip', 'overwrite', 'merge'] as ConflictResolution[]).map(r => (
+                <button
+                  key={r}
+                  onClick={() => handleApplyToAllConflicts(r)}
+                  className="rounded border border-amber-300 bg-white px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                >
+                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* AI Disambiguation Panel */}
           {disambiguating && (
@@ -611,6 +694,7 @@ export default function IntakeImportPage() {
                       row={row}
                       onSkip={handleSkipRow}
                       onOverride={handleOverride}
+                      onResolution={handleResolution}
                     />
                   ))}
                 </tbody>
@@ -672,6 +756,11 @@ export default function IntakeImportPage() {
             <p className="mt-2 text-sm text-gray-600">
               {importResult.importedCount} records imported, {importResult.skippedCount} skipped.
             </p>
+            {(importResult.newCount != null || importResult.overwrittenCount != null) && (
+              <p className="mt-1 text-xs text-gray-500">
+                {importResult.newCount ?? 0} new, {importResult.overwrittenCount ?? 0} overwritten, {importResult.mergedCount ?? 0} merged
+              </p>
+            )}
             <p className="mt-1 text-xs text-gray-400">
               Batch ID: {importResult.importBatchId}
             </p>
@@ -714,12 +803,21 @@ export default function IntakeImportPage() {
       >
         {rollbackModal && (
           <div className="space-y-3 text-sm text-gray-700">
-            <p>This will permanently delete all records from this import batch:</p>
+            <p>
+              {(rollbackModal.overwrittenCount || rollbackModal.mergedCount)
+                ? 'This will delete new records and restore overwritten/merged records to their pre-import state:'
+                : 'This will permanently delete all records from this import batch:'}
+            </p>
             <div className="rounded-lg bg-gray-50 p-4 space-y-1">
               <p><span className="font-medium">Imported by:</span> {rollbackModal.importedBy}</p>
               <p><span className="font-medium">Date:</span> {new Date(rollbackModal.importedAt).toLocaleDateString()}</p>
               <p><span className="font-medium">File:</span> {rollbackModal.fileName}</p>
               <p><span className="font-medium">Records:</span> {rollbackModal.importedCount} imported, {rollbackModal.skippedCount} skipped</p>
+              {rollbackModal.newCount != null && (
+                <p className="text-xs text-gray-500">
+                  {rollbackModal.newCount} new, {rollbackModal.overwrittenCount ?? 0} overwritten, {rollbackModal.mergedCount ?? 0} merged
+                </p>
+              )}
               <p><span className="font-medium">Batch ID:</span> {rollbackModal.importBatchId}</p>
             </div>
             <p className="text-red-600 font-medium">This action cannot be undone.</p>
@@ -781,18 +879,31 @@ function PreviewTableRow({
   row,
   onSkip,
   onOverride,
+  onResolution,
 }: {
   row: IntakePreviewRow;
   onSkip: (rowIndex: number) => void;
   onOverride: (rowIndex: number, key: string, value: string) => void;
+  onResolution: (rowIndex: number, resolution: ConflictResolution) => void;
 }) {
-  const bgClass = row.skipped
-    ? 'bg-gray-50 opacity-60'
-    : row.status === 'error'
-      ? 'bg-red-50'
-      : row.status === 'warning'
+  const dedup = row.dedupInfo;
+  const isDuplicate = dedup?.dedupStatus === 'duplicate';
+  const isConflict = dedup?.dedupStatus === 'conflict';
+  const isInFileDupe = dedup?.dedupStatus === 'duplicate_in_file';
+
+  const bgClass = isInFileDupe
+    ? 'bg-red-50 opacity-60'
+    : isDuplicate
+      ? 'bg-blue-50 opacity-70'
+      : isConflict
         ? 'bg-amber-50'
-        : '';
+        : row.skipped
+          ? 'bg-gray-50 opacity-60'
+          : row.status === 'error'
+            ? 'bg-red-50'
+            : row.status === 'warning'
+              ? 'bg-amber-50'
+              : '';
 
   const hasUnmatched = row.partnerMatches?.some((m: IntakePreviewPartnerMatch) => m.matchConfidence === 'unmatched');
   const hasFuzzy = row.partnerMatches?.some((m: IntakePreviewPartnerMatch) => m.matchConfidence === 'fuzzy');
@@ -801,107 +912,148 @@ function PreviewTableRow({
   const unresolvedUnknown = row.warnings?.filter(w => w.type === 'unknown_country' && !row.overrides?.[`UNKNOWN:${w.rawValue}`]);
 
   return (
-    <tr className={bgClass}>
-      <td className="px-3 py-2 text-xs text-gray-500">{row.rowIndex}</td>
-      <td className="px-3 py-2">
-        {row.skipped ? (
-          <Badge variant="default">Skipped</Badge>
-        ) : row.status === 'error' ? (
-          <Badge variant="danger">Error</Badge>
-        ) : row.status === 'warning' ? (
-          <Badge variant="warning">Warning</Badge>
-        ) : (
-          <Badge variant="success">Ready</Badge>
-        )}
-      </td>
-      <td className="max-w-[200px] truncate px-3 py-2 text-sm text-gray-700" title={row.airtableSubject}>
-        {row.airtableSubject || <span className="italic text-gray-400">blank</span>}
-      </td>
-      <td className="px-3 py-2 text-sm text-gray-700">{row.requestType || '—'}</td>
-      <td className="max-w-[180px] px-3 py-2 text-sm">
-        {row.partnerMatches?.map((m: IntakePreviewPartnerMatch, i: number) => (
-          <span key={i} className="block">
-            <span className={
-              m.matchConfidence === 'exact' ? 'text-emerald-700' :
-              m.matchConfidence === 'fuzzy' ? 'text-blue-700' :
-              'text-amber-700'
-            }>
-              {m.partnerNameRaw}
-            </span>
-            {m.matchConfidence === 'fuzzy' && m.partnerDisplayName && (
-              <span className="ml-1 text-xs text-gray-400">
-                ~{m.partnerDisplayName} ({Math.round((m.similarityScore || 0) * 100)}%)
+    <>
+      <tr className={bgClass}>
+        <td className="px-3 py-2 text-xs text-gray-500">{row.rowIndex}</td>
+        <td className="px-3 py-2">
+          {isInFileDupe ? (
+            <Badge variant="danger">Dup in file</Badge>
+          ) : isDuplicate ? (
+            <Badge variant="info">Duplicate</Badge>
+          ) : isConflict ? (
+            <Badge variant="warning">Conflict</Badge>
+          ) : row.skipped ? (
+            <Badge variant="default">Skipped</Badge>
+          ) : row.status === 'error' ? (
+            <Badge variant="danger">Error</Badge>
+          ) : row.status === 'warning' ? (
+            <Badge variant="warning">Warning</Badge>
+          ) : (
+            <Badge variant="success">New</Badge>
+          )}
+        </td>
+        <td className="max-w-[200px] truncate px-3 py-2 text-sm text-gray-700" title={row.airtableSubject}>
+          {row.airtableSubject || <span className="italic text-gray-400">blank</span>}
+        </td>
+        <td className="px-3 py-2 text-sm text-gray-700">{row.requestType || '—'}</td>
+        <td className="max-w-[180px] px-3 py-2 text-sm">
+          {row.partnerMatches?.map((m: IntakePreviewPartnerMatch, i: number) => (
+            <span key={i} className="block">
+              <span className={
+                m.matchConfidence === 'exact' ? 'text-emerald-700' :
+                m.matchConfidence === 'fuzzy' ? 'text-blue-700' :
+                'text-amber-700'
+              }>
+                {m.partnerNameRaw}
               </span>
-            )}
-            {m.matchConfidence === 'unmatched' && (
-              <span className="ml-1 text-xs text-amber-500">unmatched</span>
-            )}
-          </span>
-        )) || '—'}
-        {(hasUnmatched || hasFuzzy) && !row.skipped && (
-          <span className="block text-xs text-yellow-600 mt-0.5">
-            {hasUnmatched ? 'Unmatched partners will be linked post-import' : 'Fuzzy matches — confirm in review'}
-          </span>
-        )}
-      </td>
-      <td className="px-3 py-2 text-sm text-gray-700">
-        {row.countries?.map((c, i) => (
-          <span key={i} className={`mr-1 ${c.startsWith('UNKNOWN:') ? 'text-amber-600' : ''}`}>
-            {c.startsWith('UNKNOWN:') ? c.replace('UNKNOWN:', '') : c}
-          </span>
-        )) || '—'}
-        {unresolvedSK && !row.skipped && (
-          <div className="mt-1">
+              {m.matchConfidence === 'fuzzy' && m.partnerDisplayName && (
+                <span className="ml-1 text-xs text-gray-400">
+                  ~{m.partnerDisplayName} ({Math.round((m.similarityScore || 0) * 100)}%)
+                </span>
+              )}
+              {m.matchConfidence === 'unmatched' && (
+                <span className="ml-1 text-xs text-amber-500">unmatched</span>
+              )}
+            </span>
+          )) || '—'}
+          {(hasUnmatched || hasFuzzy) && !row.skipped && (
+            <span className="block text-xs text-yellow-600 mt-0.5">
+              {hasUnmatched ? 'Unmatched partners will be linked post-import' : 'Fuzzy matches — confirm in review'}
+            </span>
+          )}
+        </td>
+        <td className="px-3 py-2 text-sm text-gray-700">
+          {row.countries?.map((c, i) => (
+            <span key={i} className={`mr-1 ${c.startsWith('UNKNOWN:') ? 'text-amber-600' : ''}`}>
+              {c.startsWith('UNKNOWN:') ? c.replace('UNKNOWN:', '') : c}
+            </span>
+          )) || '—'}
+          {unresolvedSK && !row.skipped && (
+            <div className="mt-1">
+              <select
+                className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs"
+                defaultValue=""
+                onChange={(e) => onOverride(row.rowIndex, 'SK', e.target.value)}
+              >
+                <option value="" disabled>SK = ?</option>
+                <option value="SK">Slovakia (SK)</option>
+                <option value="KR">South Korea (KR)</option>
+              </select>
+            </div>
+          )}
+          {unresolvedUnknown && unresolvedUnknown.length > 0 && !row.skipped && unresolvedUnknown.map((w, i) => (
+            <div key={i} className="mt-1">
+              <input
+                className="w-16 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs"
+                placeholder={`Fix: ${w.rawValue}`}
+                onChange={(e) => onOverride(row.rowIndex, `UNKNOWN:${w.rawValue}`, e.target.value.toUpperCase())}
+              />
+            </div>
+          ))}
+        </td>
+        <td className="px-3 py-2 text-sm text-gray-700">
+          {row.regions?.join(', ') || '—'}
+        </td>
+        <td className="px-3 py-2 text-xs text-gray-500">
+          {isInFileDupe && (
+            <span className="block text-red-600">Duplicate within file — row {dedup.duplicateOfRow} kept</span>
+          )}
+          {row.errors?.map((e: IntakePreviewWarning, i: number) => (
+            <span key={i} className="block text-red-600">{e.message}</span>
+          ))}
+          {row.warnings?.filter(w => {
+            if (w.type === 'sk_ambiguity' && row.overrides?.['SK']) return false;
+            if (w.type === 'unknown_country' && row.overrides?.[`UNKNOWN:${w.rawValue}`]) return false;
+            return true;
+          }).map((w: IntakePreviewWarning, i: number) => (
+            <span key={i} className="block text-amber-600">{w.message}</span>
+          ))}
+          {!isInFileDupe && row.errors?.length === 0 && row.warnings?.length === 0 && '—'}
+        </td>
+        <td className="px-3 py-2">
+          {isConflict || isDuplicate ? (
             <select
-              className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs"
-              defaultValue=""
-              onChange={(e) => onOverride(row.rowIndex, 'SK', e.target.value)}
+              className="rounded border border-gray-300 px-2 py-1 text-xs"
+              value={dedup?.resolution ?? ''}
+              onChange={(e) => onResolution(row.rowIndex, e.target.value as ConflictResolution)}
             >
-              <option value="" disabled>SK = ?</option>
-              <option value="SK">Slovakia (SK)</option>
-              <option value="KR">South Korea (KR)</option>
+              {!dedup?.resolution && <option value="" disabled>Choose…</option>}
+              <option value="skip">Skip</option>
+              <option value="overwrite">Overwrite</option>
+              {isConflict && <option value="merge">Merge</option>}
             </select>
-          </div>
-        )}
-        {unresolvedUnknown && unresolvedUnknown.length > 0 && !row.skipped && unresolvedUnknown.map((w, i) => (
-          <div key={i} className="mt-1">
-            <input
-              className="w-16 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-xs"
-              placeholder={`Fix: ${w.rawValue}`}
-              onChange={(e) => onOverride(row.rowIndex, `UNKNOWN:${w.rawValue}`, e.target.value.toUpperCase())}
-            />
-          </div>
-        ))}
-      </td>
-      <td className="px-3 py-2 text-sm text-gray-700">
-        {row.regions?.join(', ') || '—'}
-      </td>
-      <td className="px-3 py-2 text-xs text-gray-500">
-        {row.errors?.map((e: IntakePreviewWarning, i: number) => (
-          <span key={i} className="block text-red-600">{e.message}</span>
-        ))}
-        {row.warnings?.filter(w => {
-          if (w.type === 'sk_ambiguity' && row.overrides?.['SK']) return false;
-          if (w.type === 'unknown_country' && row.overrides?.[`UNKNOWN:${w.rawValue}`]) return false;
-          return true;
-        }).map((w: IntakePreviewWarning, i: number) => (
-          <span key={i} className="block text-amber-600">{w.message}</span>
-        ))}
-        {row.errors?.length === 0 && row.warnings?.length === 0 && '—'}
-      </td>
-      <td className="px-3 py-2">
-        <button
-          onClick={() => onSkip(row.rowIndex)}
-          className={`rounded px-2 py-1 text-xs font-medium ${
-            row.skipped
-              ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          }`}
-        >
-          {row.skipped ? 'Unskip' : 'Skip'}
-        </button>
-      </td>
-    </tr>
+          ) : !isInFileDupe ? (
+            <button
+              onClick={() => onSkip(row.rowIndex)}
+              className={`rounded px-2 py-1 text-xs font-medium ${
+                row.skipped
+                  ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {row.skipped ? 'Unskip' : 'Skip'}
+            </button>
+          ) : null}
+        </td>
+      </tr>
+      {/* Inline diff for conflict rows */}
+      {isConflict && dedup.diffs && dedup.diffs.length > 0 && (
+        <tr className="bg-amber-50/50">
+          <td />
+          <td colSpan={8} className="px-3 py-2">
+            <div className="flex flex-wrap gap-3 text-xs">
+              {dedup.diffs.map((d, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 rounded bg-white px-2 py-1 border border-amber-200">
+                  <span className="font-medium text-gray-700">{d.field}:</span>
+                  <span className="text-gray-400 line-through">{d.existingValue || '(blank)'}</span>
+                  <span className="text-amber-700">{d.incomingValue || '(blank)'}</span>
+                </span>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

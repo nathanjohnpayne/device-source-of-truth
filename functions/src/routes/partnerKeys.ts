@@ -4,7 +4,7 @@ import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
 import { stripEmoji } from '../services/intakeParser.js';
-import type { PartnerKeyRegion } from '../types/index.js';
+import type { PartnerKeyRegion, DeduplicationInfo, FieldDiff } from '../types/index.js';
 
 const router = Router();
 
@@ -233,10 +233,33 @@ router.post('/import-batches/:id/rollback', requireRole('admin'), async (req, re
       return;
     }
 
+    // Restore overwritten/merged records from pre-import snapshots
+    let restoredCount = 0;
+    if (batchData.preImportSnapshots) {
+      const snapshots: Array<{ existingId: string; oldData: Record<string, unknown>; operation: string }> =
+        JSON.parse(batchData.preImportSnapshots as string);
+
+      for (let si = 0; si < snapshots.length; si += 450) {
+        const chunk = snapshots.slice(si, si + 450);
+        const restoreBatch = db.batch();
+        for (const snap of chunk) {
+          restoreBatch.set(db.collection('partnerKeys').doc(snap.existingId), snap.oldData);
+          restoredCount++;
+        }
+        await restoreBatch.commit();
+      }
+    }
+
+    // Delete newly created keys (those with importBatchId matching and createdAt set)
     const keysSnap = await db.collection('partnerKeys').where('importBatchId', '==', batchId).get();
+    const newKeyDocs = keysSnap.docs.filter(d => {
+      const data = d.data();
+      return data.createdAt === data.updatedAt;
+    });
+
     const batch = db.batch();
     let deletedCount = 0;
-    for (const doc of keysSnap.docs) {
+    for (const doc of newKeyDocs) {
       batch.delete(doc.ref);
       deletedCount++;
     }
@@ -247,14 +270,14 @@ router.post('/import-batches/:id/rollback', requireRole('admin'), async (req, re
       entityType: 'partnerKey',
       entityId: batchId,
       field: 'importBatch',
-      oldValue: `${deletedCount} keys`,
+      oldValue: `${deletedCount} keys deleted, ${restoredCount} restored`,
       newValue: null,
       userId: req.user!.uid,
       userEmail: req.user!.email,
     });
 
-    req.log?.info('Import batch rolled back', { batchId, deletedCount });
-    res.json({ success: true, deleted: deletedCount });
+    req.log?.info('Import batch rolled back', { batchId, deletedCount, restoredCount });
+    res.json({ success: true, deleted: deletedCount, restored: restoredCount });
   } catch (err) {
     req.log?.error('Failed to rollback import batch', formatError(err));
     res.status(500).json({ error: 'Failed to rollback', detail: String(err) });
@@ -468,13 +491,18 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
     }));
 
     const existingKeysSnap = await db.collection('partnerKeys').get();
-    const existingKeys = new Map<string, string>();
+    const existingKeyMap = new Map<string, { id: string; data: Record<string, unknown> }>();
     for (const doc of existingKeysSnap.docs) {
       const data = doc.data();
-      existingKeys.set(data.key, data.partnerId);
+      existingKeyMap.set(data.key as string, { id: doc.id, data: data as Record<string, unknown> });
     }
 
-    const rows = rawRows.map((raw) => {
+    const PK_COMPARE_FIELDS = ['countries', 'regions', 'chipset', 'oem', 'kernel', 'os', 'partnerId'] as const;
+
+    // Track within-file duplicates
+    const seenInFile = new Map<string, number>();
+
+    const rows = rawRows.map((raw, rowIdx) => {
       const key = stripEmoji((raw['partner_key'] ?? '').trim());
       const friendlyName = stripEmoji(fixEncoding((raw['friendly_partner_name'] ?? '').trim()));
       const { countries, warnings: countryWarnings } = normalizeCountries(raw['countries_operate_iso2']);
@@ -489,10 +517,6 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
 
       if (!key) {
         errors.push('Missing partner_key');
-      }
-
-      if (key && existingKeys.has(key)) {
-        errors.push(`Key "${key}" already exists in the registry`);
       }
 
       let partnerId: string | null = null;
@@ -525,6 +549,46 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
         }
       }
 
+      // Deduplication check
+      let dedupInfo: DeduplicationInfo | undefined;
+
+      if (key) {
+        // Within-file dedup
+        if (seenInFile.has(key)) {
+          dedupInfo = {
+            dedupStatus: 'duplicate_in_file',
+            duplicateOfRow: seenInFile.get(key)!,
+          };
+        } else {
+          seenInFile.set(key, rowIdx + 1);
+
+          // Check against existing DST records
+          const existing = existingKeyMap.get(key);
+          if (existing) {
+            const incoming = { countries, regions, chipset, oem, kernel, os, partnerId };
+            const diffs: FieldDiff[] = [];
+
+            for (const field of PK_COMPARE_FIELDS) {
+              const ev = JSON.stringify(existing.data[field] ?? null);
+              const iv = JSON.stringify(incoming[field] ?? null);
+              if (ev !== iv) {
+                diffs.push({
+                  field,
+                  existingValue: typeof existing.data[field] === 'object' ? ev : String(existing.data[field] ?? ''),
+                  incomingValue: typeof incoming[field] === 'object' ? iv : String(incoming[field] ?? ''),
+                });
+              }
+            }
+
+            if (diffs.length === 0) {
+              dedupInfo = { dedupStatus: 'duplicate', existingId: existing.id, resolution: 'skip' };
+            } else {
+              dedupInfo = { dedupStatus: 'conflict', existingId: existing.id, diffs };
+            }
+          }
+        }
+      }
+
       let status: 'ready' | 'warning' | 'error' | 'skipped' = 'ready';
       if (errors.length > 0) status = 'error';
       else if (warnings.length > 0 || matchConfidence === 'unmatched') status = 'warning';
@@ -544,12 +608,17 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
         warnings,
         errors,
         status,
+        dedupInfo,
       };
     });
 
     const readyCount = rows.filter((r) => r.status === 'ready').length;
     const warningCount = rows.filter((r) => r.status === 'warning').length;
     const errorCount = rows.filter((r) => r.status === 'error').length;
+    const newCount = rows.filter((r) => !r.dedupInfo).length;
+    const duplicateCount = rows.filter((r) => r.dedupInfo?.dedupStatus === 'duplicate').length;
+    const conflictCount = rows.filter((r) => r.dedupInfo?.dedupStatus === 'conflict').length;
+    const inFileDuplicateCount = rows.filter((r) => r.dedupInfo?.dedupStatus === 'duplicate_in_file').length;
 
     res.json({
       rows,
@@ -558,6 +627,10 @@ router.post('/import/preview', requireRole('admin'), async (req, res) => {
       warningCount,
       errorCount,
       skippedCount: errorCount,
+      newCount,
+      duplicateCount,
+      conflictCount,
+      inFileDuplicateCount,
     });
   } catch (err) {
     req.log?.error('Failed to preview partner key import', formatError(err));
@@ -581,6 +654,7 @@ router.post('/import/confirm', requireRole('admin'), async (req, res) => {
         os: string | null;
         partnerId: string | null;
         status: string;
+        dedupInfo?: DeduplicationInfo;
       }>;
       fileName: string;
     };
@@ -590,7 +664,14 @@ router.post('/import/confirm', requireRole('admin'), async (req, res) => {
       return;
     }
 
-    const importable = rows.filter((r) => r.status !== 'error' && r.status !== 'skipped' && r.key);
+    // Filter out rows that should be skipped
+    const importable = rows.filter((r) => {
+      if (r.status === 'error' || r.status === 'skipped' || !r.key) return false;
+      if (r.dedupInfo?.dedupStatus === 'duplicate_in_file') return false;
+      if (r.dedupInfo?.dedupStatus === 'duplicate' && r.dedupInfo.resolution !== 'overwrite') return false;
+      if (r.dedupInfo?.dedupStatus === 'conflict' && r.dedupInfo.resolution === 'skip') return false;
+      return true;
+    });
     if (importable.length === 0) {
       res.status(400).json({ error: 'No valid rows to import' });
       return;
@@ -609,41 +690,89 @@ router.post('/import/confirm', requireRole('admin'), async (req, res) => {
     });
 
     const FIRESTORE_BATCH_LIMIT = 450;
-    let imported = 0;
+    let newCount = 0;
+    let overwrittenCount = 0;
+    let mergedCount = 0;
     let skipped = 0;
     const newKeys: Array<{ key: string; docId: string }> = [];
+    const preImportSnapshots: Array<{ existingId: string; oldData: Record<string, unknown>; operation: string }> = [];
 
     for (let i = 0; i < importable.length; i += FIRESTORE_BATCH_LIMIT) {
       const chunk = importable.slice(i, i + FIRESTORE_BATCH_LIMIT);
       const writeBatch = db.batch();
 
       for (const row of chunk) {
-        const existingSnap = await db.collection('partnerKeys').where('key', '==', row.key).limit(1).get();
-        if (!existingSnap.empty) {
-          skipped++;
-          continue;
-        }
+        const resolution = row.dedupInfo?.resolution;
+        const existingId = row.dedupInfo?.existingId;
 
-        const docRef = db.collection('partnerKeys').doc();
-        writeBatch.set(docRef, {
-          key: row.key,
-          partnerId: row.partnerId ?? null,
-          countries: row.countries ?? [],
-          regions: row.regions ?? [],
-          chipset: row.chipset ?? null,
-          oem: row.oem ?? null,
-          kernel: row.kernel ?? null,
-          os: row.os ?? null,
-          isActive: true,
-          source: 'csv_import',
-          importBatchId: batchId,
-          createdAt: now,
-          createdBy: req.user!.email,
-          updatedAt: now,
-          updatedBy: req.user!.email,
-        });
-        newKeys.push({ key: row.key, docId: docRef.id });
-        imported++;
+        if (existingId && (resolution === 'overwrite' || resolution === 'merge')) {
+          const existingDoc = await db.collection('partnerKeys').doc(existingId).get();
+          if (existingDoc.exists) {
+            preImportSnapshots.push({
+              existingId,
+              oldData: existingDoc.data() as Record<string, unknown>,
+              operation: resolution,
+            });
+          }
+
+          const incomingFields: Record<string, unknown> = {
+            countries: row.countries ?? [],
+            regions: row.regions ?? [],
+            chipset: row.chipset ?? null,
+            oem: row.oem ?? null,
+            kernel: row.kernel ?? null,
+            os: row.os ?? null,
+            partnerId: row.partnerId ?? null,
+          };
+
+          const updateData: Record<string, unknown> = {
+            updatedAt: now,
+            updatedBy: req.user!.email,
+            importBatchId: batchId,
+          };
+
+          if (resolution === 'overwrite') {
+            Object.assign(updateData, incomingFields);
+            overwrittenCount++;
+          } else {
+            for (const [key, value] of Object.entries(incomingFields)) {
+              if (value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
+                updateData[key] = value;
+              }
+            }
+            mergedCount++;
+          }
+
+          writeBatch.update(db.collection('partnerKeys').doc(existingId), updateData);
+        } else {
+          // Check one more time for safety (in case of race condition)
+          const existingSnap = await db.collection('partnerKeys').where('key', '==', row.key).limit(1).get();
+          if (!existingSnap.empty) {
+            skipped++;
+            continue;
+          }
+
+          const docRef = db.collection('partnerKeys').doc();
+          writeBatch.set(docRef, {
+            key: row.key,
+            partnerId: row.partnerId ?? null,
+            countries: row.countries ?? [],
+            regions: row.regions ?? [],
+            chipset: row.chipset ?? null,
+            oem: row.oem ?? null,
+            kernel: row.kernel ?? null,
+            os: row.os ?? null,
+            isActive: true,
+            source: 'csv_import',
+            importBatchId: batchId,
+            createdAt: now,
+            createdBy: req.user!.email,
+            updatedAt: now,
+            updatedBy: req.user!.email,
+          });
+          newKeys.push({ key: row.key, docId: docRef.id });
+          newCount++;
+        }
       }
 
       await writeBatch.commit();
@@ -673,20 +802,29 @@ router.post('/import/confirm', requireRole('admin'), async (req, res) => {
       req.log?.info('Auto-linked pending devices during bulk import', { linkedDevices });
     }
 
-    await batchRef.update({ importedCount: imported });
+    const imported = newCount + overwrittenCount + mergedCount;
+    await batchRef.update({
+      importedCount: imported,
+      newCount,
+      overwrittenCount,
+      mergedCount,
+      preImportSnapshots: preImportSnapshots.length > 0
+        ? JSON.stringify(preImportSnapshots)
+        : null,
+    });
 
     await logAuditEntry({
       entityType: 'partnerKey',
       entityId: batchId,
       field: 'csvImport',
       oldValue: null,
-      newValue: `${imported} keys imported from ${fileName ?? 'CSV'}`,
+      newValue: `${imported} keys imported from ${fileName ?? 'CSV'} (${newCount} new, ${overwrittenCount} overwritten, ${mergedCount} merged)`,
       userId: req.user!.uid,
       userEmail: req.user!.email,
     });
 
-    req.log?.info('Partner key import completed', { batchId, imported, skipped, linkedDevices });
-    res.json({ success: true, imported, skipped, batchId, linkedDevices });
+    req.log?.info('Partner key import completed', { batchId, imported, newCount, overwrittenCount, mergedCount, skipped, linkedDevices });
+    res.json({ success: true, imported, skipped, batchId, linkedDevices, newCount, overwrittenCount, mergedCount });
   } catch (err) {
     req.log?.error('Failed to import partner keys', formatError(err));
     res.status(500).json({ error: 'Failed to import partner keys', detail: String(err) });

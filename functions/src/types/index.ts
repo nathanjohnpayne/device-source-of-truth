@@ -350,6 +350,9 @@ export interface IntakeImportBatch {
   totalRows: number;
   importedCount: number;
   skippedCount: number;
+  newCount?: number;
+  overwrittenCount?: number;
+  mergedCount?: number;
 }
 
 // ── AI Disambiguation (DST-039) ──
@@ -410,6 +413,26 @@ export interface DisambiguationResponse {
   questions: ClarificationQuestion[];
   aiFallback: boolean;
   fallbackReason?: string;
+}
+
+// ── Import Deduplication (DST-041) ──
+
+export type DeduplicationStatus = 'new' | 'duplicate' | 'conflict' | 'duplicate_in_file';
+
+export type ConflictResolution = 'skip' | 'overwrite' | 'merge';
+
+export interface FieldDiff {
+  field: string;
+  existingValue: string | null;
+  incomingValue: string | null;
+}
+
+export interface DeduplicationInfo {
+  dedupStatus: DeduplicationStatus;
+  existingId?: string;
+  diffs?: FieldDiff[];
+  resolution?: ConflictResolution;
+  duplicateOfRow?: number;
 }
 
 // ── Config ──
