@@ -20,6 +20,11 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: functions/package-lock.json
+      - name: Build @dst/contracts
+        working-directory: packages/contracts
+        run: npm ci && npm run build
+      - name: Bundle contracts for functions
+        run: mkdir -p .contracts/dist && cp ../packages/contracts/package.json .contracts/ && cp -r ../packages/contracts/dist/* .contracts/dist/
       - run: npm ci
       - run: npm test
         env:
@@ -34,6 +39,9 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Build @dst/contracts
+        working-directory: packages/contracts
+        run: npm ci && npm run build
       - run: npm ci
       - run: npm test
         env:
