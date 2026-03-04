@@ -189,19 +189,32 @@ router.get('/unmapped', async (req, res) => {
       .get();
     const mappedVersions = new Set(activeMappings.docs.map(d => d.data().coreVersion as string));
 
+    const friendlyVersionSet = new Set<string>();
+    for (const doc of activeMappings.docs) {
+      const fv = doc.data().friendlyVersion as string;
+      if (fv) friendlyVersionSet.add(fv.toLowerCase().replace(/\s+/g, ' ').trim());
+    }
+
+    interface UnmappedEntry {
+      deviceIds: Set<string>;
+      partnerKeys: Set<string>;
+      firstSeen: string | null;
+      sources: Set<string>;
+    }
+
+    const unmappedMap = new Map<string, UnmappedEntry>();
+
     const telSnap = await db.collection('telemetrySnapshots').get();
-
-    const unmappedMap = new Map<string, { deviceIds: Set<string>; partnerKeys: Set<string>; firstSeen: string | null }>();
-
     for (const doc of telSnap.docs) {
       const data = doc.data();
       const cv = data.coreVersion as string;
       if (!cv || mappedVersions.has(cv)) continue;
 
       if (!unmappedMap.has(cv)) {
-        unmappedMap.set(cv, { deviceIds: new Set(), partnerKeys: new Set(), firstSeen: null });
+        unmappedMap.set(cv, { deviceIds: new Set(), partnerKeys: new Set(), firstSeen: null, sources: new Set() });
       }
       const entry = unmappedMap.get(cv)!;
+      entry.sources.add('Telemetry');
       if (data.deviceId) entry.deviceIds.add(data.deviceId);
       if (data.partnerKey) entry.partnerKeys.add(data.partnerKey);
       const snapDate = data.snapshotDate as string | undefined;
@@ -210,12 +223,32 @@ router.get('/unmapped', async (req, res) => {
       }
     }
 
+    const devSnap = await db.collection('devices').get();
+    for (const doc of devSnap.docs) {
+      const data = doc.data();
+      const lav = data.liveAdkVersion as string | null;
+      if (!lav) continue;
+
+      const normalized = lav.toLowerCase().replace(/\s+/g, ' ').trim();
+      if (friendlyVersionSet.has(normalized)) continue;
+
+      if (mappedVersions.has(lav)) continue;
+
+      if (!unmappedMap.has(lav)) {
+        unmappedMap.set(lav, { deviceIds: new Set(), partnerKeys: new Set(), firstSeen: null, sources: new Set() });
+      }
+      const entry = unmappedMap.get(lav)!;
+      entry.sources.add('Questionnaire');
+      entry.deviceIds.add(data.deviceId ?? doc.id);
+    }
+
     const unmapped = Array.from(unmappedMap.entries()).map(([cv, info]) => ({
       coreVersion: cv,
       platform: detectPlatform(cv),
       deviceCount: info.deviceIds.size,
       partnerCount: info.partnerKeys.size,
       firstSeen: info.firstSeen,
+      sources: Array.from(info.sources).sort(),
     }));
 
     unmapped.sort((a, b) => b.deviceCount - a.deviceCount);

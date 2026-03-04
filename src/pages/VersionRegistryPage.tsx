@@ -516,7 +516,7 @@ export default function VersionRegistryPage() {
             {unmappedLoading ? (
               <LoadingSpinner />
             ) : unmapped.length === 0 ? (
-              <p className="text-sm text-gray-500">All core versions in telemetry have active mappings.</p>
+              <p className="text-sm text-gray-500">All versions in telemetry and device records have active mappings.</p>
             ) : (
               <div className="overflow-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -524,6 +524,7 @@ export default function VersionRegistryPage() {
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">Core Version</th>
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">Platform</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">Source</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-gray-500">Devices</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-gray-500">Partners</th>
                       <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">First Seen</th>
@@ -536,6 +537,13 @@ export default function VersionRegistryPage() {
                         <td className="whitespace-nowrap px-4 py-2 font-mono text-sm text-gray-900">{u.coreVersion}</td>
                         <td className="px-4 py-2">
                           <Badge variant={PLATFORM_BADGE[u.platform]}>{u.platform}</Badge>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {(u.sources ?? []).map(s => (
+                              <Badge key={s} variant={s === 'Telemetry' ? 'info' : s === 'Questionnaire' ? 'success' : 'default'}>{s}</Badge>
+                            ))}
+                          </div>
                         </td>
                         <td className="px-4 py-2 text-right text-sm text-gray-700">{u.deviceCount}</td>
                         <td className="px-4 py-2 text-right text-sm text-gray-700">{u.partnerCount}</td>

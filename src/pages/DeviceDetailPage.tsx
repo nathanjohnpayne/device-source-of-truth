@@ -31,6 +31,7 @@ import DataTable, { type Column } from '../components/shared/DataTable';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
+import VersionInput from '../components/shared/VersionInput';
 import type {
   DeviceDetail,
   DeviceDeployment,
@@ -230,6 +231,11 @@ export default function DeviceDetailPage() {
     deploymentStatus: 'Active' as DeploymentStatus,
     deployedAdkVersion: '',
   });
+
+  const [knownFriendlyVersions, setKnownFriendlyVersions] = useState<string[]>([]);
+  useEffect(() => {
+    api.versionMappings.friendlyVersions().then(res => setKnownFriendlyVersions(res.data)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -432,7 +438,20 @@ export default function DeviceDetailPage() {
           <div>
             <dt className="text-xs font-medium text-gray-500">ADK Version</dt>
             <dd className="mt-0.5 text-sm text-gray-900">
-              {device.liveAdkVersion ?? '—'}
+              {device.liveAdkVersion ? (
+                <span className="flex items-center gap-2">
+                  {device.liveAdkVersion}
+                  {knownFriendlyVersions.length > 0 &&
+                    !knownFriendlyVersions.some(fv => fv.toLowerCase().replace(/\s+/g, ' ').trim() === device.liveAdkVersion!.toLowerCase().replace(/\s+/g, ' ').trim()) && (
+                    <Link to="/admin/version-registry">
+                      <Badge variant="warning">
+                        <AlertTriangle className="mr-0.5 h-3 w-3" />
+                        Unmapped
+                      </Badge>
+                    </Link>
+                  )}
+                </span>
+              ) : '—'}
             </dd>
           </div>
           <div>
@@ -716,15 +735,11 @@ export default function DeviceDetailPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">ADK Version</label>
-            <input
-              type="text"
-              value={editForm.liveAdkVersion}
-              onChange={(e) => setEditForm((p) => ({ ...p, liveAdkVersion: e.target.value }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            />
-          </div>
+          <VersionInput
+            value={editForm.liveAdkVersion}
+            onChange={(v) => setEditForm((p) => ({ ...p, liveAdkVersion: v }))}
+            label="ADK Version"
+          />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Certification Status

@@ -593,12 +593,15 @@ export interface CoreVersionMapping {
   updatedBy: string;
 }
 
+export type UnmappedVersionSource = 'Telemetry' | 'Import' | 'Questionnaire';
+
 export interface UnmappedVersion {
   coreVersion: string;
   platform: VersionPlatform;
   deviceCount: number;
   partnerCount: number;
   firstSeen: Timestamp | null;
+  sources: UnmappedVersionSource[];
 }
 
 // ── Hardware Tiers ──

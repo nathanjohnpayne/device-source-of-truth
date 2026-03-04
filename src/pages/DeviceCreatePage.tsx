@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import VersionInput from '../components/shared/VersionInput';
 import type { PartnerKey, DeviceType, Region } from '../lib/types';
 
 const DEVICE_TYPES: DeviceType[] = ['STB', 'Smart TV', 'Stick', 'Console', 'OTT Box', 'Other'];
@@ -204,16 +205,10 @@ export default function DeviceCreatePage() {
           />
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Live ADK Version</label>
-          <input
-            type="text"
-            value={form.liveAdkVersion}
-            onChange={set('liveAdkVersion')}
-            placeholder="e.g. 7.3.1"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-          />
-        </div>
+        <VersionInput
+          value={form.liveAdkVersion}
+          onChange={(v) => setForm((prev) => ({ ...prev, liveAdkVersion: v }))}
+        />
 
         <div className="flex justify-end gap-3 border-t border-gray-100 pt-5">
           <button
