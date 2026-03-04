@@ -12,6 +12,7 @@ dist
 dist-ssr
 functions/dist
 functions/node_modules
+functions/.contracts
 *.local
 
 # Firebase secrets
