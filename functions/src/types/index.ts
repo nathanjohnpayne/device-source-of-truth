@@ -1,49 +1,77 @@
-// ── Enums & Literals ──
+// Re-export shared contracts (audited types moved to @dst/contracts)
+export {
+  SPEC_CATEGORIES,
+  CreateDeviceRequestSchema,
+  UpdateDeviceRequestSchema,
+  SaveDeviceSpecRequestSchema,
+} from '@dst/contracts';
+
+export type {
+  Timestamp,
+  CertificationStatus,
+  DeviceType,
+  DeviceStatus,
+  Region,
+  PartnerKeyRegion,
+  AuditEntityType,
+  AlertStatus,
+  AlertDismissReason,
+  DeploymentStatus,
+  Partner,
+  PartnerKey,
+  Device,
+  QuestionnaireGeneral,
+  QuestionnaireHardware,
+  QuestionnaireFirmware,
+  QuestionnaireMediaCodec,
+  QuestionnaireFrameRates,
+  QuestionnaireContentProtection,
+  QuestionnaireNative,
+  QuestionnaireVideoPlayback,
+  QuestionnaireUhdHdr,
+  QuestionnaireAVOutput,
+  QuestionnaireOther,
+  QuestionnaireAppRuntime,
+  QuestionnaireAudio,
+  QuestionnaireAccessibility,
+  QuestionnairePlatform,
+  QuestionnaireBenchmarks,
+  DeviceSpec,
+  SpecCategory,
+  DeviceDeployment,
+  TelemetrySnapshot,
+  HardwareTier,
+  AuditLogEntry,
+  UploadHistory,
+  PaginatedResponse,
+  DeviceWithRelations,
+  DeviceDetail,
+  PartnerWithStats,
+  PartnerKeyListItem,
+  TelemetryHistoryItem,
+  CreateDeviceRequest,
+  UpdateDeviceRequest,
+  SaveDeviceSpecRequest,
+  DashboardReportResponse,
+  PartnerReportResponse,
+  SpecCoverageReportResponse,
+} from '@dst/contracts';
+
+// ── Backend-only types below ──
 
 export type UserRole = 'viewer' | 'editor' | 'admin';
-
-export type CertificationStatus =
-  | 'Certified'
-  | 'Pending'
-  | 'In Review'
-  | 'Not Submitted'
-  | 'Deprecated';
-
-export type DeviceType = 'STB' | 'Smart TV' | 'Stick' | 'Console' | 'OTT Box' | 'Other';
-
-export type DeviceStatus = 'active' | 'deprecated' | 'device_id_missing';
-
-export type DeploymentStatus = 'Active' | 'Deprecated';
 
 export type SocVendor = 'Broadcom' | 'Novatek' | 'MediaTek' | 'Amlogic' | 'Realtek' | 'Other';
 
 export type AlertType = 'unregistered_device' | 'new_partner_key' | 'inactive_key';
 
-export type AlertStatus = 'open' | 'dismissed';
-
-export type AlertDismissReason = 'Test Device' | 'Duplicate Key' | 'Will Register' | 'Internal / Deprecated';
-
 export type TierAssignmentTrigger = 'spec_update' | 'tier_definition_update' | 'manual';
 
-export type Region = 'NA' | 'EMEA' | 'LATAM' | 'APAC';
+export type PartnerKeySource = 'csv_import' | 'manual';
 
-export type AuditEntityType =
-  | 'partner'
-  | 'partnerKey'
-  | 'device'
-  | 'deviceSpec'
-  | 'deployment'
-  | 'hardwareTier'
-  | 'alert'
-  | 'user'
-  | 'fieldOption'
-  | 'intakeRequest'
-  | 'partnerAlias'
-  | 'system';
+export type MatchConfidence = 'exact' | 'alias_direct' | 'alias_contextual' | 'fuzzy' | 'unmatched';
 
-// ── Firestore Timestamp (serialized as ISO string in API responses) ──
-
-export type Timestamp = string;
+import type { PartnerKeyRegion, Timestamp } from '@dst/contracts';
 
 // ── Users ──
 
@@ -53,43 +81,26 @@ export interface User {
   role: UserRole;
   displayName: string;
   photoUrl: string | null;
-  lastLogin: Timestamp;
+  lastLogin: string;
 }
 
-// ── Partners ──
+// ── Partner Key Import ──
 
-export interface Partner {
-  id: string;
-  displayName: string;
-  regions: Region[];
-  countriesIso2: string[];
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+export type DeduplicationStatus = 'new' | 'duplicate' | 'conflict' | 'duplicate_in_file';
+export type ConflictResolution = 'skip' | 'overwrite' | 'merge';
+
+export interface FieldDiff {
+  field: string;
+  existingValue: string | null;
+  incomingValue: string | null;
 }
 
-// ── Partner Keys ──
-
-export type PartnerKeySource = 'csv_import' | 'manual';
-
-export type PartnerKeyRegion = 'APAC' | 'EMEA' | 'LATAM' | 'DOMESTIC' | 'GLOBAL';
-
-export interface PartnerKey {
-  id: string;
-  key: string;
-  partnerId: string | null;
-  countries: string[];
-  regions: PartnerKeyRegion[];
-  chipset: string | null;
-  oem: string | null;
-  kernel: string | null;
-  os: string | null;
-  isActive: boolean;
-  source: PartnerKeySource;
-  importBatchId: string | null;
-  createdAt: Timestamp;
-  createdBy: string;
-  updatedAt: Timestamp;
-  updatedBy: string;
+export interface DeduplicationInfo {
+  dedupStatus: DeduplicationStatus;
+  existingId?: string;
+  diffs?: FieldDiff[];
+  resolution?: ConflictResolution;
+  duplicateOfRow?: number;
 }
 
 export interface PartnerKeyImportRow {
@@ -136,411 +147,7 @@ export interface PartnerKeyImportBatch {
   rollbackAvailable: boolean;
 }
 
-// ── Devices ──
-
-export interface Device {
-  id: string;
-  displayName: string;
-  deviceId: string;
-  partnerKeyId: string;
-  deviceType: DeviceType;
-  status: DeviceStatus;
-  liveAdkVersion: string | null;
-  certificationStatus: CertificationStatus;
-  certificationNotes: string | null;
-  lastCertifiedDate: Timestamp | null;
-  questionnaireUrl: string | null;
-  questionnaireFileUrl: string | null;
-  activeDeviceCount: number;
-  specCompleteness: number;
-  pendingPartnerKey: string | null;
-  tierId: string | null;
-  tierAssignedAt: Timestamp | null;
-  importBatchId?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
-// ── Device Specs (STB Questionnaire — 16 sections, ~170 fields) ──
-
-export interface QuestionnaireGeneral {
-  modelName: string | null;
-  modelNumber: string | null;
-  dateDeployed: string | null;
-  dateDeliveriesStopped: string | null;
-  activeDevicesMonthly: string | null;
-  totalInstalledBase: string | null;
-  forecastedGrowth: string | null;
-  countriesDeployed: string | null;
-  thirdPartyApps: string | null;
-  connectionType: string | null;
-  connectionTypeOther: string | null;
-}
-
-export interface QuestionnaireHardware {
-  socVendor: string | null;
-  socVendorOther: string | null;
-  socModelChipset: string | null;
-  softwareArchitecture: string | null;
-  softwareArchitectureOther: string | null;
-  socBaseRefVersion: string | null;
-  socCustomizations: string | null;
-  socCustomizationsDesc: string | null;
-  socSupportContract: string | null;
-  socSupportExpiration: string | null;
-  cpuClockRateGhz: number | null;
-  cpuDmips: string | null;
-  cpuCores: string | null;
-  cpuCoresOther: string | null;
-  stbManufacturer: string | null;
-  operatingSystem: string | null;
-  operatingSystemOther: string | null;
-  osVersion: string | null;
-  osCustomization: string | null;
-  osCustomizationDesc: string | null;
-  middlewareProvider: string | null;
-  middlewareProviderOther: string | null;
-  middlewareVersion: string | null;
-  middlewareContract: string | null;
-  middlewareContractExpiration: string | null;
-  middlewareIntegrationCompany: string | null;
-  videoDelivery: string | null;
-  videoDeliveryOther: string | null;
-  memoryTotalGb: number | null;
-  memoryType: string | null;
-  memoryTypeOther: string | null;
-  ramAvailableGb: number | null;
-  linuxMemoryAvailableMb: number | null;
-  gpuMemoryAvailableMb: number | null;
-  gpuTextureMemoryMb: number | null;
-  gpuMemorySharing: string | null;
-  gpuMemorySharingOther: string | null;
-  gpuMemoryReservedMb: number | null;
-  storageTotalGb: number | null;
-  storageType: string | null;
-  storageTypeOther: string | null;
-  storageAvailableMb: number | null;
-  nonPersistentStorageMb: number | null;
-  maxAppBinarySizeMb: number | null;
-  filesystemType: string | null;
-  filesystemTypeOther: string | null;
-  storageLimitations: string | null;
-  storageLimitationsDesc: string | null;
-  gpuAvailability: string | null;
-  gpuAvailableForApp: string | null;
-  gpuGraphicsLibrary: string | null;
-  gpuGraphicsLibraryOther: string | null;
-  openglEs2Apps: string | null;
-  openglEs2AppsNames: string | null;
-  streamingInterface: string | null;
-  streamingInterfaceOther: string | null;
-  ethernetPort: string | null;
-  wifiStandards: string | null;
-  wifiBands: string | null;
-  mocaPresent: string | null;
-  maxStreamingThroughputMbps: number | null;
-  hdmiCapabilitiesRetrieval: string | null;
-  hdmiVersion: string | null;
-  hdmiVersionOther: string | null;
-  digitalVideoOutputModes: string | null;
-  analogVideoOutputModes: string | null;
-  uiNativeResolution: string | null;
-  uiNativeResolutionOther: string | null;
-  ottAppRestrictions: string | null;
-}
-
-export interface QuestionnaireFirmware {
-  firmwareSupported: string | null;
-  firmwareFrequency: string | null;
-  firmwareFrequencyOther: string | null;
-  internalLeadTime: string | null;
-  rolloutDuration: string | null;
-  emergencyUpdate: string | null;
-  emergencyUpdateTime: string | null;
-  codeSigning: string | null;
-  codeSigningDesc: string | null;
-}
-
-export interface QuestionnaireMediaCodec {
-  avcH264: string | null;
-  hevcH265: string | null;
-  eac3DolbyDigitalPlus: string | null;
-  eac3Atmos: string | null;
-  hdr10: string | null;
-  hdr10Plus: string | null;
-  av1: string | null;
-  dolbyVisionSupported: string | null;
-  dolbyVisionVersion: string | null;
-}
-
-export interface QuestionnaireFrameRates {
-  outputRefreshRates: string | null;
-  userRefreshRateSettings: string | null;
-  frameRateAdjust: string | null;
-  frameRateAdjustOther: string | null;
-  frameRateConvert: string | null;
-  frameRateConvertFixed: string | null;
-  appDetermineRefreshRate: string | null;
-  appSetRefreshRate: string | null;
-}
-
-export interface QuestionnaireContentProtection {
-  drmSystem: string | null;
-  encryptionScheme: string | null;
-  playreadySupported: string | null;
-  playreadyVersion: string | null;
-  playreadySecurityLevel: string | null;
-  playreadyEncryption: string | null;
-  widevineSupported: string | null;
-  widevineSecurityLevel: string | null;
-  widevineVersion: string | null;
-  widevineEncryption: string | null;
-  drmHwLevel: string | null;
-  cbcsSupport: string | null;
-  multiKeyCtr: string | null;
-  multiKeyCtrMax: number | null;
-  digitalVideoOutput: string | null;
-  hdcpVersion: string | null;
-  hdcpType: string | null;
-  otherDrms: string | null;
-  broadcomSage: string | null;
-  secureFirmwareDownload: string | null;
-  signedFirmwareSecureBoot: string | null;
-  hardwareRootOfTrust: string | null;
-  tamperResistantCode: string | null;
-  tee: string | null;
-  secureVideoPath: string | null;
-  rootedDeviceProtection: string | null;
-  appCodeSigning: string | null;
-  sideloadingRestricted: string | null;
-  digitalOutputProtection: string | null;
-  encryptedAudio: string | null;
-  secureBootJtag: string | null;
-}
-
-export interface QuestionnaireNative {
-  adkPortPossible: string | null;
-  ursrModification: string | null;
-  ursrModificationOther: string | null;
-  nexusVideoApis: string | null;
-  sageApiAccess: string | null;
-  audioDetectionApi: string | null;
-  drmBroadcomRefApi: string | null;
-}
-
-export interface QuestionnaireVideoPlayback {
-  avcBitrateLimitations: string | null;
-  avcFrameRateLimitations: string | null;
-  hevcBitrateLimitations: string | null;
-  hevcFrameRateLimitations: string | null;
-  eac3BitrateLimitations: string | null;
-  playbackEncryption: string | null;
-  playbackEncryptionOther: string | null;
-  eac3MseCmaf: string | null;
-  eac3DecodeMode: string | null;
-  atmosSupported: string | null;
-  dolbyVisionProfiles: string | null;
-  dolbyVisionIdkSdkVersion: string | null;
-  playreadyCdmVersion: string | null;
-  playreadyCbcsConfirmed: string | null;
-  widevineCdmVersion: string | null;
-  widevineCdmCategory: string | null;
-  widevineCbcsConfirmed: string | null;
-  securitySecureBoot: string | null;
-  securityHwRootOfTrust: string | null;
-  securitySecureKeyStorage: string | null;
-  securitySecureDecryption: string | null;
-  securitySecureVideoPath: string | null;
-  securityHdcp: string | null;
-  html5CapabilityDetection: string | null;
-}
-
-export interface QuestionnaireUhdHdr {
-  hdrTechnologies: string | null;
-  uhdSubscriberPercent: number | null;
-  hdrNativeUi: string | null;
-  displayRangeApi: string | null;
-  displayRangeApiDesc: string | null;
-  hdrTransform: string | null;
-  hdrTransformOther: string | null;
-  hdrModeSwitch: string | null;
-  hdrModeSwitchOther: string | null;
-  videoRangeRender: string | null;
-  videoRangeRenderOther: string | null;
-  hdrHelpResources: string | null;
-  hdrUserSettings: string | null;
-  colorSpace: string | null;
-  colorSpaceOther: string | null;
-  existingHdrApps: string | null;
-  existingHdrAppsNames: string | null;
-  publicHdrResources: string | null;
-  hdrCompositing: string | null;
-  graphicsPlaneResolution: string | null;
-  graphicsPlaneResolutionOther: string | null;
-}
-
-export interface QuestionnaireAVOutput {
-  displayOutputSettings: string | null;
-  videoDecodeSettings: string | null;
-  audioDecodeSettings: string | null;
-  aspectRatioSettings: string | null;
-  uiResolutionSettings: string | null;
-  alternateAudioPath: string | null;
-  audioSyncSettings: string | null;
-  audioSyncRange: string | null;
-}
-
-export interface QuestionnaireOther {
-  voltageRange: string | null;
-  voltageRangeOther: string | null;
-  rcuType: string | null;
-  bluetoothPresent: string | null;
-  bluetoothVersion: string | null;
-  bluetoothVersionOther: string | null;
-  bluetoothProfiles: string | null;
-  bluetoothUsedFor: string | null;
-  otherVideoOutputs: string | null;
-  otherAudioOutputs: string | null;
-  otherVideoOutputProtection: string | null;
-  otherVideoOutputDisney: string | null;
-}
-
-export interface QuestionnaireAppRuntime {
-  webEngine: string | null;
-  webEngineVersion: string | null;
-  adkVersion: string | null;
-  mseSupport: string | null;
-  mseLimitations: string | null;
-  emeSupport: string | null;
-  emeLimitations: string | null;
-  jsEngine: string | null;
-  jsEngineVersion: string | null;
-  jsEngineLimitations: string | null;
-  wasmSupport: string | null;
-  webglSupport: string | null;
-  webCryptoSupport: string | null;
-}
-
-export interface QuestionnaireAudio {
-  pcmChannels: string | null;
-  pcmChannelsOther: string | null;
-  audioSampleRates: string | null;
-  audioBitDepths: string | null;
-  dolbyAudio: string | null;
-  dolbyAudioOther: string | null;
-  dtsAudio: string | null;
-  dtsAudioOther: string | null;
-  btAudio: string | null;
-  btAudioOther: string | null;
-  audioBackgroundBehavior: string | null;
-  audioBackgroundOther: string | null;
-}
-
-export interface QuestionnaireAccessibility {
-  ttsApi: string | null;
-  ttsApiDesc: string | null;
-  captionFormats: string | null;
-  captionRendering: string | null;
-  adTrackSupport: string | null;
-  focusManagementApi: string | null;
-}
-
-export interface QuestionnairePlatform {
-  deepLinkSupport: string | null;
-  deepLinkDesc: string | null;
-  voiceAssistant: string | null;
-  homeScreenIntegration: string | null;
-  homeScreenDesc: string | null;
-  continueWatching: string | null;
-  continueWatchingDesc: string | null;
-  universalSearch: string | null;
-  universalSearchDesc: string | null;
-  recommendationsTiles: string | null;
-  appAutostart: string | null;
-}
-
-export interface QuestionnaireBenchmarks {
-  coldStartTime: string | null;
-  warmStartTime: string | null;
-  ttff: string | null;
-  uiFrameRate: string | null;
-  uiFrameRateOther: string | null;
-  concurrentStreams: string | null;
-  concurrentStreamsDesc: string | null;
-  memoryBackground: string | null;
-  benchmarkAvailable: string | null;
-}
-
-export interface DeviceSpec {
-  id: string;
-  deviceId: string;
-  general: QuestionnaireGeneral;
-  hardware: QuestionnaireHardware;
-  firmwareUpdates: QuestionnaireFirmware;
-  mediaCodec: QuestionnaireMediaCodec;
-  frameRates: QuestionnaireFrameRates;
-  contentProtection: QuestionnaireContentProtection;
-  native: QuestionnaireNative;
-  videoPlayback: QuestionnaireVideoPlayback;
-  uhdHdr: QuestionnaireUhdHdr;
-  audioVideoOutput: QuestionnaireAVOutput;
-  other: QuestionnaireOther;
-  appRuntime: QuestionnaireAppRuntime;
-  audioCapabilities: QuestionnaireAudio;
-  accessibility: QuestionnaireAccessibility;
-  platformIntegration: QuestionnairePlatform;
-  performanceBenchmarks: QuestionnaireBenchmarks;
-  updatedAt: Timestamp;
-}
-
-export const SPEC_CATEGORIES = [
-  'general',
-  'hardware',
-  'firmwareUpdates',
-  'mediaCodec',
-  'frameRates',
-  'contentProtection',
-  'native',
-  'videoPlayback',
-  'uhdHdr',
-  'audioVideoOutput',
-  'other',
-  'appRuntime',
-  'audioCapabilities',
-  'accessibility',
-  'platformIntegration',
-  'performanceBenchmarks',
-] as const;
-
-export type SpecCategory = (typeof SPEC_CATEGORIES)[number];
-
-// ── Device Deployments ──
-
-export interface DeviceDeployment {
-  id: string;
-  deviceId: string;
-  partnerKeyId: string;
-  countryIso2: string;
-  deploymentStatus: DeploymentStatus;
-  deployedAdkVersion: string | null;
-}
-
-// ── Telemetry Snapshots ──
-
-export interface TelemetrySnapshot {
-  id: string;
-  partnerKey: string;
-  deviceId: string;
-  coreVersion: string;
-  friendlyVersion: string | null;
-  uniqueDevices: number;
-  eventCount: number;
-  snapshotDate: Timestamp;
-  countUpdatedAt: Timestamp | null;
-  versionUpdatedAt: Timestamp | null;
-  uploadedAt: Timestamp | null;
-  uploadBatchId: string | null;
-}
+// ── Telemetry Preview ──
 
 export type TelemetryRowStatus = 'new' | 'update' | 'no_change' | 'stale';
 
@@ -588,23 +195,6 @@ export interface UnmappedVersion {
   sources: UnmappedVersionSource[];
 }
 
-// ── Hardware Tiers ──
-
-export interface HardwareTier {
-  id: string;
-  tierName: string;
-  tierRank: number;
-  ramMin: number | null;
-  gpuMin: number | null;
-  cpuSpeedMin: number | null;
-  cpuCoresMin: number | null;
-  requiredCodecs: string[];
-  require64Bit: boolean;
-  version: number;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-}
-
 // ── Device Tier Assignments ──
 
 export interface DeviceTierAssignment {
@@ -615,21 +205,7 @@ export interface DeviceTierAssignment {
   trigger: TierAssignmentTrigger;
 }
 
-// ── Audit Log ──
-
-export interface AuditLogEntry {
-  id: string;
-  entityType: AuditEntityType;
-  entityId: string;
-  field: string;
-  oldValue: string | null;
-  newValue: string | null;
-  userId: string;
-  userEmail: string;
-  timestamp: Timestamp;
-}
-
-// ── Alerts ──
+// ── Alerts (extended type with AlertType) ──
 
 export interface Alert {
   id: string;
@@ -639,16 +215,36 @@ export interface Alert {
   firstSeen: Timestamp;
   lastSeen: Timestamp;
   uniqueDeviceCount: number;
-  status: AlertStatus;
+  status: import('@dst/contracts').AlertStatus;
   dismissedBy: string | null;
-  dismissReason: AlertDismissReason | null;
+  dismissReason: import('@dst/contracts').AlertDismissReason | null;
   dismissedAt: Timestamp | null;
   consecutiveMisses: number;
 }
 
-// ── Upload History ──
+// ── Compatibility aliases ──
 
-export interface UploadHistory {
+export interface PartnerKeyWithDisplay {
+  id: string;
+  key: string;
+  partnerId: string | null;
+  countries: string[];
+  regions: PartnerKeyRegion[];
+  chipset: string | null;
+  oem: string | null;
+  kernel: string | null;
+  os: string | null;
+  isActive: boolean;
+  source: PartnerKeySource;
+  importBatchId: string | null;
+  createdAt: Timestamp;
+  createdBy: string;
+  updatedAt: Timestamp;
+  updatedBy: string;
+  partnerDisplayName: string | null;
+}
+
+export interface UploadHistoryWithRollback {
   id: string;
   uploadedBy: string;
   uploadedByEmail: string;
@@ -664,45 +260,6 @@ export interface UploadHistory {
   noChangeCount?: number;
   staleOverwrittenCount?: number;
   uploadBatchId?: string;
-}
-
-// ── API Response Types ──
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-export interface DeviceWithRelations extends Device {
-  partnerName?: string;
-  partnerKeyName?: string;
-  tierName?: string;
-}
-
-export interface DeviceDetail extends Device {
-  partner: Partner | null;
-  partnerKey: PartnerKey | null;
-  spec: DeviceSpec | null;
-  tier: HardwareTier | null;
-  deployments: DeviceDeployment[];
-  telemetrySnapshots: TelemetrySnapshot[];
-  auditHistory: AuditLogEntry[];
-}
-
-export interface PartnerWithStats extends Partner {
-  partnerKeyCount: number;
-  deviceCount: number;
-  activeDeviceCount: number;
-}
-
-export interface PartnerKeyWithDisplay extends PartnerKey {
-  partnerDisplayName: string | null;
-}
-
-export interface UploadHistoryWithRollback extends UploadHistory {
   rollbackAvailable: boolean;
 }
 
@@ -733,8 +290,6 @@ export interface FieldOptionKeyInfo {
 // ── Intake Requests (DST-037) ──
 
 export type IntakeRegion = 'APAC' | 'DOMESTIC' | 'EMEA' | 'GLOBAL' | 'LATAM';
-
-export type MatchConfidence = 'exact' | 'alias_direct' | 'alias_contextual' | 'fuzzy' | 'unmatched';
 
 export interface IntakeRequest {
   id: string;
@@ -899,26 +454,6 @@ export interface MigrationBatch {
   duplicates: number;
   errored: number;
   rollbackAvailable: boolean;
-}
-
-// ── Import Deduplication (DST-041) ──
-
-export type DeduplicationStatus = 'new' | 'duplicate' | 'conflict' | 'duplicate_in_file';
-
-export type ConflictResolution = 'skip' | 'overwrite' | 'merge';
-
-export interface FieldDiff {
-  field: string;
-  existingValue: string | null;
-  incomingValue: string | null;
-}
-
-export interface DeduplicationInfo {
-  dedupStatus: DeduplicationStatus;
-  existingId?: string;
-  diffs?: FieldDiff[];
-  resolution?: ConflictResolution;
-  duplicateOfRow?: number;
 }
 
 // ── Partner Aliases (DST-046) ──

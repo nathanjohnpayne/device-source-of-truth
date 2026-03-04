@@ -4,7 +4,7 @@ import { mockDb } from '../helpers/setup.js';
 import { createTestApp } from '../helpers/testApp.js';
 import { seedAll } from '../helpers/fixtures.js';
 import {
-  paginatedResponse,
+  paginatedResponseSchema,
   DeviceWithRelationsSchema,
   DeviceDetailSchema,
   DeviceSchema,
@@ -20,7 +20,7 @@ beforeEach(() => {
 describe('GET /api/devices', () => {
   it('returns a PaginatedResponse<DeviceWithRelations>', async () => {
     const res = await request(app).get('/api/devices').expect(200);
-    const schema = paginatedResponse(DeviceWithRelationsSchema);
+    const schema = paginatedResponseSchema(DeviceWithRelationsSchema);
     const parsed = schema.safeParse(res.body);
     if (!parsed.success) {
       expect.fail(
@@ -105,6 +105,14 @@ describe('GET /api/devices/:id', () => {
     expect(Array.isArray(res.body.auditHistory)).toBe(true);
   });
 
+  it('detail coerces telemetry counts to numbers', async () => {
+    const res = await request(app).get('/api/devices/d1').expect(200);
+    for (const snap of res.body.telemetrySnapshots) {
+      expect(typeof snap.uniqueDevices).toBe('number');
+      expect(typeof snap.eventCount).toBe('number');
+    }
+  });
+
   it('returns 404 for missing device', async () => {
     const res = await request(app).get('/api/devices/nonexistent').expect(404);
     expect(res.body.error).toBeDefined();
@@ -143,10 +151,43 @@ describe('POST /api/devices', () => {
     expect(typeof res.body.activeDeviceCount).toBe('number');
   });
 
+  it('persists liveAdkVersion on create', async () => {
+    const res = await request(app)
+      .post('/api/devices')
+      .send({
+        displayName: 'ADK Test',
+        deviceId: 'adk-test-001',
+        partnerKeyId: 'pk1',
+        liveAdkVersion: '8.0.0',
+      })
+      .expect(201);
+
+    expect(res.body.liveAdkVersion).toBe('8.0.0');
+  });
+
+  it('rejects missing partnerKeyId', async () => {
+    await request(app)
+      .post('/api/devices')
+      .send({ displayName: 'No Key', deviceId: 'no-key-001' })
+      .expect(400);
+  });
+
   it('rejects missing required fields', async () => {
     await request(app)
       .post('/api/devices')
       .send({ displayName: 'No ID' })
+      .expect(400);
+  });
+
+  it('rejects region, countriesIso2, and computed fields', async () => {
+    await request(app)
+      .post('/api/devices')
+      .send({
+        displayName: 'Bad Device',
+        deviceId: 'bad-001',
+        partnerKeyId: 'pk1',
+        region: 'NA',
+      })
       .expect(400);
   });
 });
@@ -165,6 +206,23 @@ describe('PUT /api/devices/:id', () => {
         `PUT response does not match Device shape:\n${JSON.stringify(parsed.error.issues, null, 2)}`,
       );
     }
+  });
+
+  it('rejects activeDeviceCount, specCompleteness, createdAt, and id', async () => {
+    await request(app)
+      .put('/api/devices/d1')
+      .send({ activeDeviceCount: 999 })
+      .expect(400);
+
+    await request(app)
+      .put('/api/devices/d1')
+      .send({ specCompleteness: 100 })
+      .expect(400);
+
+    await request(app)
+      .put('/api/devices/d1')
+      .send({ createdAt: '2020-01-01' })
+      .expect(400);
   });
 
   it('returns 404 for missing device', async () => {

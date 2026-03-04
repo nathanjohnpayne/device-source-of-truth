@@ -18,7 +18,8 @@ import {
 } from '../components/specs/SpecFormFields';
 import { QUESTIONNAIRE_SECTIONS, buildEmptySpec } from '../lib/questionnaireFields';
 import type { QuestionnaireFieldDef, QuestionnaireSectionDef } from '../lib/questionnaireFields';
-import type { DeviceSpec, SpecCategory } from '../lib/types';
+import type { SaveDeviceSpecRequest } from '@dst/contracts';
+import type { SpecCategory } from '../lib/types';
 
 function countFilledFields(obj: Record<string, unknown>): number {
   return Object.values(obj).filter((v) => v !== null && v !== undefined && v !== '').length;
@@ -367,7 +368,7 @@ function SpecEditForm() {
     setError(null);
 
     try {
-      await api.deviceSpecs.save(deviceId, formData as Partial<DeviceSpec>);
+      await api.deviceSpecs.save(deviceId, formData as SaveDeviceSpecRequest);
 
       if (questionnaireUrl || questionnaireFile) {
         await api.devices.update(deviceId, { questionnaireUrl: questionnaireUrl || null });

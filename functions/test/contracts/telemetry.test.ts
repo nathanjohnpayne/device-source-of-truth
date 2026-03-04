@@ -3,7 +3,6 @@ import request from 'supertest';
 import { mockDb } from '../helpers/setup.js';
 import { createTestApp } from '../helpers/testApp.js';
 import { seedAll } from '../helpers/fixtures.js';
-import { paginatedResponse, UploadHistorySchema } from './schemas.js';
 
 const app = createTestApp();
 
@@ -13,7 +12,7 @@ beforeEach(() => {
 });
 
 describe('POST /api/telemetry/upload', () => {
-  it('returns upload result matching UploadHistory shape', async () => {
+  it('returns upload result with numeric fields', async () => {
     const csvData = 'partner,device,core_version,count_unique_device_id,count\nacme-stb-na,acme-4k-001,7.3.1,100,5000';
 
     const res = await request(app)
@@ -21,18 +20,11 @@ describe('POST /api/telemetry/upload', () => {
       .send({ csvData, snapshotDate: '2026-02-25', fileName: 'test.csv' })
       .expect(200);
 
-    // Frontend expects UploadHistory shape
-    // Current API returns { success, rowCount, successCount, errorCount, errors, devicesUpdated }
-    // which differs from UploadHistory { id, uploadedBy, uploadedByEmail, uploadedAt, fileName, ... }
-    const parsed = UploadHistorySchema.safeParse(res.body);
-    if (!parsed.success) {
-      // Document the contract mismatch: API returns a summary, not an UploadHistory doc
-      expect(res.body.success).toBeDefined();
-      expect(typeof res.body.rowCount).toBe('number');
-      expect(typeof res.body.successCount).toBe('number');
-      expect(typeof res.body.errorCount).toBe('number');
-      expect(Array.isArray(res.body.errors)).toBe(true);
-    }
+    expect(res.body.success).toBeDefined();
+    expect(typeof res.body.rowCount).toBe('number');
+    expect(typeof res.body.successCount).toBe('number');
+    expect(typeof res.body.errorCount).toBe('number');
+    expect(Array.isArray(res.body.errors)).toBe(true);
   });
 
   it('rejects missing csvData', async () => {
@@ -67,5 +59,12 @@ describe('GET /api/telemetry/history', () => {
     expect(res.body).toHaveProperty('page');
     expect(res.body).toHaveProperty('pageSize');
     expect(res.body).toHaveProperty('totalPages');
+  });
+
+  it('history items have rollbackAvailable as boolean', async () => {
+    const res = await request(app).get('/api/telemetry/history').expect(200);
+    for (const item of res.body.data) {
+      expect(typeof item.rollbackAvailable).toBe('boolean');
+    }
   });
 });

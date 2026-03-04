@@ -4,7 +4,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "cd ../packages/contracts && npm run build && cd ../../functions && tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -13,6 +13,7 @@
     "node": "22"
   },
   "dependencies": {
+    "@dst/contracts": "file:../packages/contracts",
     "@anthropic-ai/sdk": "^0.78.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",

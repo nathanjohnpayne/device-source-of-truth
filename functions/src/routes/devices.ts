@@ -3,7 +3,8 @@ import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
-import { safeNumber } from '../services/safeNumber.js';
+import { coerceDeviceDoc, coerceTelemetrySnapshotDoc } from '../services/coercion.js';
+import { CreateDeviceRequestSchema, UpdateDeviceRequestSchema } from '../types/index.js';
 import type { Device, DeviceWithRelations } from '../types/index.js';
 
 const router = Router();
@@ -35,15 +36,7 @@ router.get('/', async (req, res) => {
     if (tierId) query = query.where('tierId', '==', tierId);
 
     const snap = await query.get();
-    let devices = snap.docs.map((d) => {
-      const data = d.data();
-      return {
-        ...data,
-        id: d.id,
-        activeDeviceCount: safeNumber(data.activeDeviceCount),
-        specCompleteness: safeNumber(data.specCompleteness),
-      } as Device;
-    });
+    let devices = snap.docs.map((d) => coerceDeviceDoc({ ...d.data(), id: d.id }) as Device);
     req.log?.debug('Firestore device query returned', { rawCount: devices.length });
 
     if (partnerId) {
@@ -151,13 +144,7 @@ router.get('/:id', async (req, res) => {
       req.log?.debug('Resolved device via deviceId fallback', { firestoreId: doc.id, deviceId: idParam });
     }
 
-    const rawData = doc.data()!;
-    const device = {
-      ...rawData,
-      id: doc.id,
-      activeDeviceCount: safeNumber(rawData.activeDeviceCount),
-      specCompleteness: safeNumber(rawData.specCompleteness),
-    } as Device;
+    const device = coerceDeviceDoc({ ...doc.data()!, id: doc.id }) as Device;
     req.log?.debug('Fetching device relations', { deviceId: device.deviceId, partnerKeyId: device.partnerKeyId, tierId: device.tierId });
 
     const [pkResult, specResult, tierResult, deployResult, telResult, auditResult] = await Promise.allSettled([
@@ -207,10 +194,9 @@ router.get('/:id', async (req, res) => {
       spec: specSnap && !specSnap.empty ? { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } : null,
       tier: tierSnap && tierSnap.exists ? { id: tierSnap.id, ...tierSnap.data() } : null,
       deployments: deploySnap ? deploySnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
-      telemetrySnapshots: telSnap ? telSnap.docs.map((d) => {
-        const td = d.data();
-        return { id: d.id, ...td, uniqueDevices: safeNumber(td.uniqueDevices), eventCount: safeNumber(td.eventCount) };
-      }) : [],
+      telemetrySnapshots: telSnap ? telSnap.docs.map((d) =>
+        coerceTelemetrySnapshotDoc({ id: d.id, ...d.data() }),
+      ) : [],
       auditHistory: auditSnap ? auditSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
     });
   } catch (err) {
@@ -221,14 +207,15 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', requireRole('editor', 'admin'), async (req, res) => {
   try {
-    const db = admin.firestore();
-    const { displayName, deviceId, partnerKeyId, deviceType, certificationStatus } = req.body;
-
-    if (!displayName || !deviceId || !partnerKeyId) {
-      req.log?.warn('Device creation failed: missing required fields', { hasDisplayName: !!displayName, hasDeviceId: !!deviceId, hasPartnerKeyId: !!partnerKeyId });
-      res.status(400).json({ error: 'displayName, deviceId, and partnerKeyId are required' });
+    const parsed = CreateDeviceRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      req.log?.warn('Device creation failed: invalid payload', { issues: parsed.error.issues });
+      res.status(400).json({ error: 'Invalid request payload', detail: parsed.error.issues });
       return;
     }
+
+    const db = admin.firestore();
+    const { displayName, deviceId, partnerKeyId, deviceType, liveAdkVersion, certificationStatus } = parsed.data;
 
     req.log?.info('Creating device', { displayName, deviceId, partnerKeyId, userId: req.user!.uid });
 
@@ -246,7 +233,7 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
       partnerKeyId,
       deviceType: deviceType ?? 'Other',
       status: 'active',
-      liveAdkVersion: req.body.liveAdkVersion ?? null,
+      liveAdkVersion: liveAdkVersion ?? null,
       certificationStatus: certificationStatus ?? 'Not Submitted',
       certificationNotes: null,
       lastCertifiedDate: null,
@@ -281,6 +268,13 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
 
 router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
   try {
+    const parsed = UpdateDeviceRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      req.log?.warn('Device update failed: invalid payload', { issues: parsed.error.issues });
+      res.status(400).json({ error: 'Invalid request payload', detail: parsed.error.issues });
+      return;
+    }
+
     const db = admin.firestore();
     const deviceDocId = req.params.id as string;
     req.log?.info('Updating device', { deviceDocId, userId: req.user!.uid });
@@ -294,25 +288,16 @@ router.put('/:id', requireRole('editor', 'admin'), async (req, res) => {
     }
 
     const oldData = existing.data()!;
-    const MUTABLE_FIELDS = [
-      'displayName', 'deviceId', 'partnerKeyId', 'deviceType', 'status',
-      'liveAdkVersion', 'certificationStatus', 'certificationNotes',
-      'lastCertifiedDate', 'questionnaireUrl', 'questionnaireFileUrl',
-      'pendingPartnerKey', 'tierId', 'tierAssignedAt',
-      'activeDeviceCount', 'specCompleteness',
-    ];
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    for (const key of MUTABLE_FIELDS) {
-      if (key in req.body) {
-        updates[key] = req.body[key];
-      }
+    for (const [key, value] of Object.entries(parsed.data)) {
+      updates[key] = value;
     }
 
     await docRef.update(updates);
     await diffAndLog('device', deviceDocId, oldData, updates, req.user!.uid, req.user!.email);
 
     const updated = await docRef.get();
-    req.log?.info('Device updated', { deviceDocId, updatedFields: Object.keys(req.body) });
+    req.log?.info('Device updated', { deviceDocId, updatedFields: Object.keys(parsed.data) });
     res.json({ id: docRef.id, ...updated.data() });
   } catch (err) {
     req.log?.error('Failed to update device', formatError(err));

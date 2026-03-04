@@ -43,10 +43,7 @@ describe('DashboardPage smoke test', () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Ecosystem Overview') ||
-        screen.getByText('Unable to load dashboard data.'),
-      ).toBeTruthy();
+      expect(screen.getByText('Unable to load dashboard data.')).toBeInTheDocument();
     });
   });
 

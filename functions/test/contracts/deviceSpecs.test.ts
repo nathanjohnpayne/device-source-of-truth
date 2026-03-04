@@ -4,6 +4,7 @@ import { mockDb } from '../helpers/setup.js';
 import { createTestApp } from '../helpers/testApp.js';
 import { seedAll } from '../helpers/fixtures.js';
 import { DeviceSpecSchema } from './schemas.js';
+import { SPEC_CATEGORIES } from '@dst/contracts';
 
 const app = createTestApp();
 
@@ -13,7 +14,7 @@ beforeEach(() => {
 });
 
 describe('GET /api/device-specs/:deviceId', () => {
-  it('returns a DeviceSpec with nested category objects', async () => {
+  it('returns a DeviceSpec matching the 16-section schema', async () => {
     const res = await request(app).get('/api/device-specs/d1').expect(200);
     const parsed = DeviceSpecSchema.safeParse(res.body);
     if (!parsed.success) {
@@ -26,11 +27,7 @@ describe('GET /api/device-specs/:deviceId', () => {
 
   it('spec categories are objects (not flat fields)', async () => {
     const res = await request(app).get('/api/device-specs/d1').expect(200);
-    const categories = [
-      'identity', 'soc', 'os', 'memory', 'gpu', 'streaming',
-      'videoOutput', 'firmware', 'codecs', 'frameRate', 'drm', 'security',
-    ];
-    for (const cat of categories) {
+    for (const cat of SPEC_CATEGORIES) {
       expect(typeof res.body[cat]).toBe('object');
       expect(res.body[cat]).not.toBeNull();
     }
@@ -39,15 +36,15 @@ describe('GET /api/device-specs/:deviceId', () => {
   it('numeric spec fields are numbers (not strings)', async () => {
     const res = await request(app).get('/api/device-specs/d1').expect(200);
     const numericFields = [
-      ['memory', 'totalRamMb'],
-      ['memory', 'appAvailableRamMb'],
-      ['gpu', 'gpuMemoryMb'],
-      ['soc', 'cpuCores'],
-      ['soc', 'cpuSpeedMhz'],
+      ['hardware', 'cpuClockRateGhz'],
+      ['hardware', 'memoryTotalGb'],
+      ['hardware', 'ramAvailableGb'],
+      ['hardware', 'gpuMemoryAvailableMb'],
+      ['hardware', 'storageTotalGb'],
     ];
     for (const [cat, field] of numericFields) {
       const val = res.body[cat]?.[field];
-      if (val !== null) {
+      if (val !== null && val !== undefined) {
         expect(typeof val).toBe('number');
       }
     }
@@ -64,18 +61,8 @@ describe('PUT /api/device-specs/:deviceId', () => {
     const res = await request(app)
       .put('/api/device-specs/d1')
       .send({
-        identity: { deviceModel: 'Updated Model', manufacturer: 'Acme', brandName: 'Acme', modelYear: 2026, deviceCategory: 'STB' },
-        soc: { socVendor: 'Broadcom', socModel: 'BCM7218', cpuArchitecture: 'ARM', cpuCores: 4, cpuSpeedMhz: 1800, cpuBenchmarkDmips: 12000, is64Bit: true },
-        os: {},
-        memory: { totalRamMb: 2048, appAvailableRamMb: 1536, totalStorageGb: 8, appAvailableStorageMb: 4096, swapMemoryMb: 512 },
-        gpu: { gpuModel: 'Mali-G52', gpuVendor: 'ARM', gpuMemoryMb: 512, openGlVersion: '3.2', openGlEsVersion: '3.2', vulkanSupport: false, gpuBenchmark: 3200 },
-        streaming: {},
-        videoOutput: {},
-        firmware: {},
-        codecs: { avcSupport: true, hevcSupport: true },
-        frameRate: {},
-        drm: {},
-        security: {},
+        general: { modelName: 'Updated Model' },
+        hardware: { socVendor: 'Broadcom', socModelChipset: 'BCM7218', cpuClockRateGhz: 1.8 },
       })
       .expect(200);
 
@@ -84,10 +71,39 @@ describe('PUT /api/device-specs/:deviceId', () => {
     expect(typeof res.body.deviceId).toBe('string');
   });
 
+  it('accepts the 16-section request DTO', async () => {
+    const payload: Record<string, Record<string, unknown>> = {};
+    for (const cat of SPEC_CATEGORIES) {
+      payload[cat] = {};
+    }
+    payload.general = { modelName: 'Test' };
+
+    const res = await request(app)
+      .put('/api/device-specs/d1')
+      .send(payload)
+      .expect(200);
+
+    expect(res.body.id).toBeDefined();
+  });
+
   it('returns 404 if device does not exist', async () => {
     await request(app)
       .put('/api/device-specs/nonexistent')
-      .send({ identity: {} })
+      .send({ general: {} })
       .expect(404);
+  });
+
+  it('returns 400 for unknown top-level section', async () => {
+    await request(app)
+      .put('/api/device-specs/d1')
+      .send({ unknownSection: { foo: 'bar' } })
+      .expect(400);
+  });
+
+  it('returns 400 for unknown field within a known section', async () => {
+    await request(app)
+      .put('/api/device-specs/d1')
+      .send({ general: { modelName: 'Test', unknownField: 'bad' } })
+      .expect(400);
   });
 });

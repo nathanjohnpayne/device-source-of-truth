@@ -3,7 +3,7 @@ import request from 'supertest';
 import { mockDb } from '../helpers/setup.js';
 import { createTestApp } from '../helpers/testApp.js';
 import { seedAll } from '../helpers/fixtures.js';
-import { paginatedResponse, AlertSchema } from './schemas.js';
+import { paginatedResponseSchema, AlertSchema } from './schemas.js';
 
 const app = createTestApp();
 
@@ -15,7 +15,7 @@ beforeEach(() => {
 describe('GET /api/alerts', () => {
   it('returns PaginatedResponse<Alert>', async () => {
     const res = await request(app).get('/api/alerts').expect(200);
-    const schema = paginatedResponse(AlertSchema);
+    const schema = paginatedResponseSchema(AlertSchema);
     const parsed = schema.safeParse(res.body);
     if (!parsed.success) {
       expect.fail(

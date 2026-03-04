@@ -3,7 +3,6 @@ import request from 'supertest';
 import { mockDb } from '../helpers/setup.js';
 import { createTestApp } from '../helpers/testApp.js';
 import { seedAll } from '../helpers/fixtures.js';
-import { paginatedResponse, PartnerKeyWithDisplaySchema } from './schemas.js';
 
 const app = createTestApp();
 
@@ -35,6 +34,13 @@ describe('GET /api/partner-keys', () => {
     const res = await request(app).get('/api/partner-keys').expect(200);
     for (const key of res.body.data) {
       expect('partnerDisplayName' in key).toBe(true);
+    }
+  });
+
+  it('regions is an array', async () => {
+    const res = await request(app).get('/api/partner-keys').expect(200);
+    for (const key of res.body.data) {
+      expect(Array.isArray(key.regions)).toBe(true);
     }
   });
 });

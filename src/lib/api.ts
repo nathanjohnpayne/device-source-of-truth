@@ -1,5 +1,13 @@
 import { auth } from './firebase';
 import type {
+  CreateDeviceRequest,
+  UpdateDeviceRequest,
+  SaveDeviceSpecRequest,
+  DashboardReportResponse,
+  PartnerReportResponse,
+  SpecCoverageReportResponse,
+} from '@dst/contracts';
+import type {
   Partner,
   PartnerKeyWithDisplay,
   PartnerKeyImportPreview,
@@ -157,12 +165,18 @@ export const api = {
       }),
   },
   devices: {
-    ...crudEndpoints<DeviceWithRelations>('/devices'),
+    list: (params?: QueryParams) => apiFetch<PaginatedResponse<DeviceWithRelations>>(`/devices${qs(params)}`),
     get: (id: string) => apiFetch<DeviceDetail>(`/devices/${id}`),
+    create: (data: CreateDeviceRequest) =>
+      apiFetch<DeviceWithRelations>('/devices', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: UpdateDeviceRequest) =>
+      apiFetch<DeviceWithRelations>(`/devices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      apiFetch<void>(`/devices/${id}`, { method: 'DELETE' }),
   },
   deviceSpecs: {
     get: (deviceId: string) => apiFetch<DeviceSpec>(`/device-specs/${deviceId}`),
-    save: (deviceId: string, data: Partial<DeviceSpec>) =>
+    save: (deviceId: string, data: SaveDeviceSpecRequest) =>
       apiFetch<DeviceSpec>(`/device-specs/${deviceId}`, {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -244,32 +258,10 @@ export const api = {
     ),
 
   reports: {
-    dashboard: () => apiFetch<{
-      totalDevices: number;
-      totalActiveDevices: number;
-      specCoverageWeighted: number;
-      certifiedCount: number;
-      pendingCount: number;
-      uncertifiedCount: number;
-      openAlertCount: number;
-      top20Devices: { id: string; displayName: string; partnerName: string; activeDeviceCount: number; tierName: string | null }[];
-      adkVersions: { version: string; count: number }[];
-      regionBreakdown: { region: string; activeDevices: number; deviceCount: number }[];
-    }>('/reports/dashboard'),
-    partner: (id: string) => apiFetch<{
-      partner: Partner;
-      deviceCount: number;
-      totalActiveDevices: number;
-      specCoverage: number;
-      tierDistribution: Record<string, number>;
-      certificationCounts: Record<string, number>;
-      devices: { id: string; displayName: string; deviceId: string; activeDeviceCount: number; specCompleteness: number; certificationStatus: string; tierId: string | null }[];
-    }>(`/reports/partner/${id}`),
+    dashboard: () => apiFetch<DashboardReportResponse>('/reports/dashboard'),
+    partner: (id: string) => apiFetch<PartnerReportResponse>(`/reports/partner/${id}`),
     specCoverage: (params?: QueryParams) =>
-      apiFetch<{
-        summary: { totalDevices: number; fullSpecs: number; partialSpecs: number; noSpecs: number; weightedCoverage: number };
-        devices: { id: string; displayName: string; partnerName: string; activeDeviceCount: number; specCompleteness: number; questionnaireStatus: 'linked' | 'received' | 'none'; region: string }[];
-      }>(`/reports/spec-coverage${qs(params)}`),
+      apiFetch<SpecCoverageReportResponse>(`/reports/spec-coverage${qs(params)}`),
   },
 
   fieldOptions: {

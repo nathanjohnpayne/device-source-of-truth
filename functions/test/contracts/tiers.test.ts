@@ -4,7 +4,7 @@ import { mockDb } from '../helpers/setup.js';
 import { createTestApp } from '../helpers/testApp.js';
 import { seedAll, fixtures } from '../helpers/fixtures.js';
 import {
-  paginatedResponse,
+  paginatedResponseSchema,
   HardwareTierSchema,
   TierPreviewSchema,
   SimulateResultSchema,

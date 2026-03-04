@@ -5,7 +5,8 @@ import { diffAndLog } from '../services/audit.js';
 import { calculateSpecCompleteness } from '../services/specCompleteness.js';
 import { assignTierToDevice } from '../services/tierEngine.js';
 import { formatError } from '../services/logger.js';
-import { SPEC_CATEGORIES } from '../types/index.js';
+import { coerceDeviceSpecDoc } from '../services/coercion.js';
+import { SPEC_CATEGORIES, SaveDeviceSpecRequestSchema } from '../types/index.js';
 
 const router = Router();
 
@@ -28,8 +29,9 @@ router.get('/:deviceId', async (req, res) => {
     }
 
     const doc = snap.docs[0];
+    const specData = coerceDeviceSpecDoc({ id: doc.id, ...doc.data() });
     req.log?.info('Device specs fetched', { deviceId, specDocId: doc.id });
-    res.json({ id: doc.id, ...doc.data() });
+    res.json(specData);
   } catch (err) {
     req.log?.error('Failed to get device specs', formatError(err));
     res.status(500).json({ error: 'Failed to get device specs', detail: String(err) });
@@ -49,12 +51,10 @@ router.put('/:deviceId', requireRole('editor', 'admin'), async (req, res) => {
       return;
     }
 
-    const unknownKeys = Object.keys(req.body).filter(
-      k => k !== 'deviceId' && k !== 'updatedAt' && k !== 'id' && !(SPEC_CATEGORIES as readonly string[]).includes(k),
-    );
-    if (unknownKeys.length > 0) {
-      req.log?.warn('Unknown spec keys rejected', { unknownKeys });
-      res.status(400).json({ error: 'Unknown spec sections', detail: unknownKeys });
+    const parsed = SaveDeviceSpecRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      req.log?.warn('Device spec validation failed', { issues: parsed.error.issues });
+      res.status(400).json({ error: 'Invalid request payload', detail: parsed.error.issues });
       return;
     }
 
@@ -64,12 +64,7 @@ router.put('/:deviceId', requireRole('editor', 'admin'), async (req, res) => {
     };
 
     for (const key of SPEC_CATEGORIES) {
-      const section = req.body[key];
-      if (section !== undefined && (typeof section !== 'object' || section === null || Array.isArray(section))) {
-        res.status(400).json({ error: `Spec section "${key}" must be an object` });
-        return;
-      }
-      specData[key] = section ?? {};
+      specData[key] = parsed.data[key as keyof typeof parsed.data] ?? {};
     }
 
     const existingSnap = await db

@@ -3,7 +3,7 @@ import request from 'supertest';
 import { mockDb } from '../helpers/setup.js';
 import { createTestApp } from '../helpers/testApp.js';
 import { seedAll } from '../helpers/fixtures.js';
-import { DashboardSchema, SpecCoverageSchema } from './schemas.js';
+import { DashboardReportResponseSchema, SpecCoverageReportResponseSchema } from './schemas.js';
 
 const app = createTestApp();
 
@@ -15,7 +15,7 @@ beforeEach(() => {
 describe('GET /api/reports/dashboard', () => {
   it('returns all required dashboard fields with correct types', async () => {
     const res = await request(app).get('/api/reports/dashboard').expect(200);
-    const parsed = DashboardSchema.safeParse(res.body);
+    const parsed = DashboardReportResponseSchema.safeParse(res.body);
     if (!parsed.success) {
       expect.fail(
         `Dashboard response missing required fields:\n` +
@@ -50,7 +50,7 @@ describe('GET /api/reports/dashboard', () => {
     }
   });
 
-  it('regionBreakdown items have region and numeric counts', async () => {
+  it('regionBreakdown items use regions[] model', async () => {
     const res = await request(app).get('/api/reports/dashboard').expect(200);
     for (const r of res.body.regionBreakdown) {
       expect(typeof r.region).toBe('string');
@@ -70,6 +70,14 @@ describe('GET /api/reports/partner/:id', () => {
     expect(Array.isArray(res.body.devices)).toBe(true);
   });
 
+  it('partner report device list numeric fields are numbers', async () => {
+    const res = await request(app).get('/api/reports/partner/p1').expect(200);
+    for (const d of res.body.devices) {
+      expect(typeof d.activeDeviceCount).toBe('number');
+      expect(typeof d.specCompleteness).toBe('number');
+    }
+  });
+
   it('returns 404 for missing partner', async () => {
     await request(app).get('/api/reports/partner/nonexistent').expect(404);
   });
@@ -78,7 +86,7 @@ describe('GET /api/reports/partner/:id', () => {
 describe('GET /api/reports/spec-coverage', () => {
   it('returns summary + devices array', async () => {
     const res = await request(app).get('/api/reports/spec-coverage').expect(200);
-    const parsed = SpecCoverageSchema.safeParse(res.body);
+    const parsed = SpecCoverageReportResponseSchema.safeParse(res.body);
     if (!parsed.success) {
       expect.fail(
         `Spec coverage response shape mismatch:\n` +
@@ -87,7 +95,7 @@ describe('GET /api/reports/spec-coverage', () => {
     }
   });
 
-  it('summary fields are numbers', async () => {
+  it('summary numeric fields are numbers', async () => {
     const res = await request(app).get('/api/reports/spec-coverage').expect(200);
     const s = res.body.summary;
     expect(typeof s.totalDevices).toBe('number');
@@ -95,5 +103,12 @@ describe('GET /api/reports/spec-coverage', () => {
     expect(typeof s.partialSpecs).toBe('number');
     expect(typeof s.noSpecs).toBe('number');
     expect(typeof s.weightedCoverage).toBe('number');
+  });
+
+  it('spec coverage row region is derived from array-based partner key model', async () => {
+    const res = await request(app).get('/api/reports/spec-coverage').expect(200);
+    for (const d of res.body.devices) {
+      expect(typeof d.region).toBe('string');
+    }
   });
 });

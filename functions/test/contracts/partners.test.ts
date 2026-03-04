@@ -3,7 +3,7 @@ import request from 'supertest';
 import { mockDb } from '../helpers/setup.js';
 import { createTestApp } from '../helpers/testApp.js';
 import { seedAll } from '../helpers/fixtures.js';
-import { paginatedResponse, PartnerWithStatsSchema, PartnerSchema } from './schemas.js';
+import { paginatedResponseSchema, PartnerWithStatsSchema, PartnerSchema } from './schemas.js';
 
 const app = createTestApp();
 
@@ -15,7 +15,7 @@ beforeEach(() => {
 describe('GET /api/partners', () => {
   it('returns PaginatedResponse<PartnerWithStats>', async () => {
     const res = await request(app).get('/api/partners').expect(200);
-    const schema = paginatedResponse(PartnerWithStatsSchema);
+    const schema = paginatedResponseSchema(PartnerWithStatsSchema);
     const parsed = schema.safeParse(res.body);
     if (!parsed.success) {
       expect.fail(
