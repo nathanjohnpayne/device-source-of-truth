@@ -241,6 +241,7 @@ function RegistryTab() {
 type ImportStep = 'upload' | 'preview' | 'done';
 
 function ImportTab() {
+  const prereqs = useImportPrerequisites();
   const [step, setStep] = useState<ImportStep>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -386,6 +387,9 @@ function ImportTab() {
       const res = await api.partnerKeys.importConfirm(importable as PartnerKeyImportPreview['rows'], file.name);
       setResult(res);
       setStep('done');
+      if (res.partnersCreated && res.partnersCreated > 0) {
+        prereqs.refresh();
+      }
       trackEvent('partner_key_import_complete', { imported: res.imported });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');

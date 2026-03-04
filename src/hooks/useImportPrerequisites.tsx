@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from './useAuth';
 
@@ -23,6 +24,7 @@ const ImportPrerequisiteContext = createContext<ImportPrerequisiteStatus | null>
 
 export function ImportPrerequisiteProvider({ children }: { children: ReactNode }) {
   const { isAdmin } = useAuth();
+  const { pathname } = useLocation();
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState({
     fieldOptions: 0,
@@ -69,7 +71,7 @@ export function ImportPrerequisiteProvider({ children }: { children: ReactNode }
 
   useEffect(() => {
     fetchStatus();
-  }, [fetchStatus]);
+  }, [fetchStatus, pathname]);
 
   const value: ImportPrerequisiteStatus = {
     fieldOptionsSeeded: counts.fieldOptions > 0,
