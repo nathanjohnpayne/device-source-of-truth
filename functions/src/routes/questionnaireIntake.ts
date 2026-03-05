@@ -245,8 +245,10 @@ router.get('/:id', async (req, res) => {
       for (const doc of devicesSnap2.docs) {
         const dData = doc.data();
         if (dData.extractionStatus === 'processing') {
-          const startedAt = new Date(job.aiExtractionStartedAt as string).getTime();
-          if (Date.now() - startedAt > staleThresholdMs) {
+          const processingAt = dData.extractionProcessingAt
+            ? new Date(dData.extractionProcessingAt as string).getTime()
+            : new Date(job.aiExtractionStartedAt as string).getTime();
+          if (Date.now() - processingAt > staleThresholdMs) {
             await doc.ref.update({
               extractionStatus: 'failed' as ExtractionStatus,
               extractionError: 'Task timed out or was interrupted',
@@ -394,6 +396,15 @@ router.post('/:id/trigger-extraction', requireRole('editor', 'admin'), async (re
       })
       .map(d => d.id);
 
+    if (deviceIds.length === 0) {
+      await jobRef.update({
+        status: 'pending_review',
+        updatedAt: new Date().toISOString(),
+      });
+      res.json({ status: 'pending_review', message: 'All devices already extracted' });
+      return;
+    }
+
     const results = await enqueueExtractionTasks((req.params.id as string), deviceIds, db);
     const allEnqueued = results.every(r => r.success);
     const noneEnqueued = results.length > 0 && results.every(r => !r.success);
@@ -452,15 +463,6 @@ router.post('/:id/retry-device/:deviceId', requireRole('editor', 'admin'), async
       extractionError: null,
     });
 
-    // Set job back to extracting
-    await jobRef.update({
-      status: 'extracting',
-      extractionStep: 2,
-      extractionCurrentDevice: deviceData.rawHeaderLabel,
-      notificationSentAt: null,
-      updatedAt: new Date().toISOString(),
-    });
-
     const results = await enqueueExtractionTasks(
       (req.params.id as string),
       [(req.params.deviceId as string)],
@@ -468,8 +470,20 @@ router.post('/:id/retry-device/:deviceId', requireRole('editor', 'admin'), async
     );
 
     if (results[0]?.success) {
+      await jobRef.update({
+        status: 'extracting',
+        extractionStep: 2,
+        extractionCurrentDevice: deviceData.rawHeaderLabel,
+        notificationSentAt: null,
+        updatedAt: new Date().toISOString(),
+      });
       res.json({ status: 'retrying', message: `Retrying extraction for ${deviceData.rawHeaderLabel}` });
     } else {
+      // Enqueue failed — revert device to failed so it doesn't block finalization
+      await deviceRef.update({
+        extractionStatus: 'failed' as ExtractionStatus,
+        extractionError: `Enqueue failed: ${results[0]?.error}`,
+      });
       res.status(500).json({ error: 'Failed to enqueue retry task', detail: results[0]?.error });
     }
   } catch (err) {

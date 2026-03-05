@@ -548,7 +548,10 @@ export async function processDeviceExtraction(payload: ExtractionTaskPayload): P
     if (!snap.exists) return false;
     const status = snap.data()?.extractionStatus as ExtractionStatus | undefined;
     if (status === 'complete' || status === 'failed') return false;
-    tx.update(deviceRef, { extractionStatus: 'processing' as ExtractionStatus });
+    tx.update(deviceRef, {
+      extractionStatus: 'processing' as ExtractionStatus,
+      extractionProcessingAt: new Date().toISOString(),
+    });
     return true;
   });
 

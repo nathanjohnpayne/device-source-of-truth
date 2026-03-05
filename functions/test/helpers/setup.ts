@@ -49,8 +49,15 @@ vi.mock('../../src/services/questionnaireParser.js', () => ({
 }));
 
 vi.mock('../../src/services/questionnaireExtractor.js', () => ({
-  runExtractionJob: vi.fn().mockResolvedValue(undefined),
-  retryDeviceExtraction: vi.fn().mockResolvedValue(undefined),
+  enqueueExtractionTasks: vi.fn().mockResolvedValue([{ deviceId: 'mock-device', success: true }]),
+}));
+
+vi.mock('firebase-admin/functions', () => ({
+  getFunctions: vi.fn().mockReturnValue({
+    taskQueue: vi.fn().mockReturnValue({
+      enqueue: vi.fn().mockResolvedValue(undefined),
+    }),
+  }),
 }));
 
 vi.mock('../../src/services/storage.js', () => ({
