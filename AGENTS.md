@@ -22,7 +22,7 @@ Firebase Hosting (static SPA)
 
 - Frontend: React 19 + TypeScript + Tailwind CSS 4, built with Vite 7
 - Backend: Express 5 app exported as a Firebase Cloud Function named `api`, plus a Cloud Tasks function `extractDeviceTask` for async AI extraction
-- Database: Firestore (23 collections)
+- Database: Firestore (25 collections)
 - AI: Anthropic Claude API (claude-sonnet-4-6) for import disambiguation and questionnaire field extraction
 - Auth: Firebase Auth with Google OAuth, domain-restricted to `@disney.com` and `@disneystreaming.com`
 
@@ -34,7 +34,7 @@ Firebase Hosting (static SPA)
 │   ├── App.tsx                   ← Router, auth guards, lazy-loaded routes
 │   ├── main.tsx                  ← Entry point
 │   ├── index.css                 ← Tailwind imports + global styles
-│   ├── pages/                    ← 25 route-level page components
+│   ├── pages/                    ← 27 route-level page components
 │   ├── components/
 │   │   ├── layout/               ← AppShell (sidebar + topbar), GlobalSearch
 │   │   ├── shared/               ← DataTable, Badge, Modal, FilterPanel, Logo, etc.
@@ -42,30 +42,40 @@ Firebase Hosting (static SPA)
 │   │   └── onboarding/           ← WelcomeModal (first-login wizard)
 │   ├── hooks/
 │   │   ├── useAuth.tsx           ← AuthProvider + useAuth() hook
-│   │   └── useAppUpdate.ts      ← Dual-path update detection (SW + version polling)
+│   │   ├── useAppUpdate.ts      ← Dual-path update detection (SW + version polling)
+│   │   ├── useAIPassStatus.ts   ← AI pass status reducer for import disambiguation (DST-051)
+│   │   ├── useFieldOptions.tsx  ← Field options context provider for spec dropdowns
+│   │   └── useImportPrerequisites.tsx ← Shared context for prerequisite checks (partners/keys exist)
 │   └── lib/
 │       ├── firebase.ts           ← Firebase client SDK init (Auth, Firestore, Analytics)
 │       ├── api.ts                ← Typed fetch wrapper for /api/* endpoints
 │       ├── analytics.ts          ← Typed GA4 event tracking (no-op in dev)
+│       ├── analyticsParams.ts   ← GA4 event parameter definitions
+│       ├── analyticsRoutes.ts   ← Route path → analytics page title mapping
 │       ├── export.ts             ← CSV/PDF export utilities
 │       ├── format.ts             ← Shared date/time formatting helpers (formatDate, formatDateTime)
-│       └── types.ts              ← ALL shared TypeScript interfaces (791 lines)
+│       ├── questionnaireFields.ts ← Questionnaire field key → DST spec field mappings
+│       └── types.ts              ← Frontend-layer TypeScript interfaces (re-exports from @dst/contracts + frontend-only types)
 │
 ├── functions/                    ← Firebase Cloud Functions (backend)
 │   ├── src/
 │   │   ├── index.ts              ← Express app + extractDeviceTask Cloud Tasks function
 │   │   ├── middleware/auth.ts    ← Token verification, domain check, role guard
-│   │   ├── routes/               ← 15 Express routers (partners, devices, disambiguate, questionnaireIntake, etc.)
+│   │   ├── routes/               ← 17 Express routers (partners, devices, disambiguate, questionnaireIntake, versionMappings, partnerAliases, etc.)
 │   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, aiImportFramework, seedFieldOptions, questionnaireParser, questionnaireExtractor, partnerResolver, partnerAliasResolver, coercion, safeNumber, storage, logger)
 │   │   └── types/index.ts        ← Backend type definitions (mirrors src/lib/types.ts)
 │   ├── package.json              ← Separate deps (firebase-admin, express, xlsx, etc.)
 │   └── tsconfig.json
 │
+├── packages/
+│   └── contracts/
+│       └── src/index.ts          ← Canonical shared types & Zod schemas (~1250 lines)
+│
 ├── public/
 │   └── favicon.svg               ← SVG favicon (device-cloud icon, indigo fill)
 ├── specs/                        ← Product specs and feature stories
 ├── firebase.json                 ← Hosting rewrites + functions + firestore config
-├── firestore.rules               ← Firestore security rules (23 collections)
+├── firestore.rules               ← Firestore security rules (24 collections)
 ├── storage.rules                 ← Firebase Storage security rules (questionnaire files)
 ├── firestore.indexes.json        ← Composite index definitions (currently empty)
 ├── .env / .env.example           ← Firebase API keys (3 vars, all VITE_ prefixed)
@@ -75,7 +85,7 @@ Firebase Hosting (static SPA)
 
 ## Key Files to Read First
 
-1. **`src/lib/types.ts`** — The single source of truth for all data types. Every Firestore collection, every API response, every form shape is defined here. Read this first.
+1. **`packages/contracts/src/index.ts`** — The canonical source of truth for all shared data types and Zod schemas. Every Firestore entity, every API request/response shape, every spec category is defined here. `src/lib/types.ts` and `functions/src/types/index.ts` re-export from this package. Read this first.
 2. **`functions/src/index.ts`** — Express app structure and all route mounts.
 3. **`functions/src/middleware/auth.ts`** — How authentication and role-based access control works.
 4. **`src/App.tsx`** — All client-side routes and their auth guards (ProtectedRoute, EditorRoute, AdminRoute).
@@ -88,7 +98,7 @@ Firebase Hosting (static SPA)
 | `partners` | Canonical partner brands | displayName, regions[], countriesIso2[] |
 | `partnerKeys` | Datadog slugs → partner mapping | key (unique), partnerId, chipset, oem |
 | `devices` | One row per hardware model | deviceId (unique, Datadog join key), partnerKeyId, certificationStatus, activeDeviceCount, specCompleteness, tierId |
-| `deviceSpecs` | 90 typed hardware spec fields | deviceId (1:1), 12 category sub-objects (identity, soc, os, memory, gpu, streaming, videoOutput, firmware, codecs, frameRate, drm, security) |
+| `deviceSpecs` | ~260 typed hardware spec fields | deviceId (1:1), 16 category sub-objects (general, hardware, firmwareUpdates, mediaCodec, frameRates, contentProtection, native, videoPlayback, uhdHdr, audioVideoOutput, other, appRuntime, audioCapabilities, accessibility, platformIntegration, performanceBenchmarks) |
 | `deviceDeployments` | Many-to-many: device × partner × country | deviceId, partnerKeyId, countryIso2, deploymentStatus |
 | `telemetrySnapshots` | Periodic Datadog field counts | partnerKey, deviceId, coreVersion, uniqueDevices, snapshotDate |
 | `hardwareTiers` | Tier definitions (Tier 1/2/3) | tierName, tierRank, ramMin, gpuMin, requiredCodecs[] |
@@ -98,7 +108,7 @@ Firebase Hosting (static SPA)
 | `uploadHistory` | Telemetry upload log | uploadedBy, fileName, rowCount, successCount |
 | `users` | Role assignments | email, role (viewer/editor/admin) |
 | `config` | App-level settings | retentionDailyDays, retentionWeeklyYears |
-| `fieldOptions` | Controlled vocabulary options | category, options[] |
+| `fieldOptions` | Controlled vocabulary dropdown options | dropdownKey, displayLabel, displayValue, sortOrder, isActive |
 | `partnerKeyImportBatches` | Partner key CSV import history | importedBy, fileName, keyCount, status |
 | `intakeRequests` | Airtable intake request records | requestType, partnerName, region, tamOwner, batchId |
 | `intakeRequestPartners` | Intake request → partner links | intakeRequestId, partnerId, matchType |
@@ -108,6 +118,8 @@ Firebase Hosting (static SPA)
 | `questionnaireStagedFields` | Individual Q/A pairs extracted per device | stagedDeviceId, dstFieldKey, rawQuestionText, extractedValue, conflictStatus, resolution |
 | `deviceQuestionnaireSources` | Links devices to the questionnaire jobs that populated their specs | deviceId, intakeJobId, fieldsImported, fieldsOverridden |
 | `notifications` | In-app notifications for admins | recipientRole, title, body, link, read |
+| `coreVersionMappings` | Core version → friendly version lookup | coreVersion, friendlyVersion, platform, isActive |
+| `partnerAliases` | Alternative partner names → canonical partner | alias, partnerId, resolutionType, contextRules, isActive |
 
 ## API Routes
 
@@ -182,6 +194,27 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | GET | /questionnaire-intake/notifications/list | any | List in-app notifications |
 | PATCH | /questionnaire-intake/notifications/:id/read | any | Mark notification as read |
 | GET | /questionnaire-intake/device-sources/:deviceId | any | Get questionnaire sources for a device |
+| GET | /field-options | any | List dropdown key summaries |
+| GET | /field-options/all | any | Bulk fetch all field options grouped by key |
+| GET | /field-options/key/:dropdownKey | any | Get options for a specific dropdown |
+| POST | /field-options | admin | Create a field option |
+| PUT | /field-options/:id | admin | Update a field option |
+| PUT | /field-options/reorder/:dropdownKey | admin | Reorder options within a dropdown |
+| DELETE | /field-options/:id | admin | Soft-delete a field option |
+| GET | /field-options/:id/usage | admin | Count device specs using this option |
+| POST | /field-options/seed | admin | Seed default field options |
+| GET | /version-mappings | any | List core version → friendly version mappings |
+| POST | /version-mappings | admin | Create a version mapping |
+| PUT | /version-mappings/:id | admin | Update a version mapping |
+| GET | /version-mappings/unmapped | any | List core versions with no friendly mapping |
+| GET | /version-mappings/friendly-versions | any | Distinct active friendly versions |
+| GET | /version-mappings/usage/:id | any | Count telemetry rows using a mapping |
+| POST | /version-mappings/seed | admin | Seed default version mappings |
+| GET | /partner-aliases | any | List partner aliases |
+| POST | /partner-aliases | admin | Create a partner alias |
+| PUT | /partner-aliases/:id | admin | Update a partner alias |
+| PUT | /partner-aliases/:id/deactivate | admin | Deactivate a partner alias |
+| POST | /partner-aliases/seed | admin | Seed default partner aliases |
 
 ## Role System
 
@@ -204,7 +237,7 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 - **Styling:** Tailwind CSS utility classes only. No CSS modules, no styled-components. `src/index.css` contains a critical un-layered `appearance: none` reset for `<button>` elements — see item 13 in "Things to Watch Out For".
 - **Icons:** `lucide-react` exclusively.
 - **Charts:** `recharts` for all data visualizations.
-- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel`, `Logo`, `AIPassStatusPanel`, `ExtractionStatusPanel` in `src/components/shared/`. `LoadingSpinner` accepts an `inline` prop for use inside buttons without the default `p-12` wrapper. `Logo` renders the device-cloud SVG inline with `fill="currentColor"` for flexible coloring. `AIPassStatusPanel` shows import AI pass progress (DST-051). `ExtractionStatusPanel` shows questionnaire AI extraction progress with per-device retry (DST-052).
+- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel`, `Logo`, `AIPassStatusPanel`, `ExtractionStatusPanel`, `PrerequisiteBanner`, `VersionInput` in `src/components/shared/`. `LoadingSpinner` accepts an `inline` prop for use inside buttons without the default `p-12` wrapper. `Logo` renders the device-cloud SVG inline with `fill="currentColor"` for flexible coloring. `AIPassStatusPanel` shows import AI pass progress (DST-051). `ExtractionStatusPanel` shows questionnaire AI extraction progress with per-device retry (DST-052). `PrerequisiteBanner` warns when required data (partners/keys) is missing before import flows. `VersionInput` renders a core-version text input with friendly-version resolution.
 - **Responsive shell:** `AppShell` is mobile-responsive. Below `lg:` the sidebar collapses off-screen and a hamburger menu in the topbar opens it as a slide-over overlay. Above `lg:` the sidebar is always visible.
 - **Update banner:** `UpdateBanner` in `src/components/UpdateBanner.tsx` detects new versions via service worker (Workbox/PWA) and version polling. It renders inside `AppShell`'s fixed header wrapper (above the topbar) so it reserves vertical space instead of overlapping navigation.
 - **Date formatting:** Use `formatDate()` and `formatDateTime()` from `src/lib/format.ts` for all date/time display. Do not use inline `toLocaleString()` or page-local formatters.
@@ -226,8 +259,8 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 ## Common Tasks
 
 ### Adding a new Firestore collection
-1. Add the TypeScript interface to `src/lib/types.ts`
-2. Mirror it in `functions/src/types/index.ts`
+1. Add the TypeScript interface to `packages/contracts/src/index.ts`
+2. Re-export the type in both `src/lib/types.ts` and `functions/src/types/index.ts`
 3. Add Firestore rules for the collection in `firestore.rules`
 4. Create the route file in `functions/src/routes/`
 5. Mount the router in `functions/src/index.ts`
@@ -291,7 +324,7 @@ Secret management flow:
 1. **Two separate `package.json` files.** Root is for the frontend, `functions/package.json` is for the backend. Install deps in the right one.
 2. **Two separate `tsconfig` setups.** Frontend uses `tsconfig.app.json` (erasableSyntaxOnly, no class property syntax in constructors). Backend uses `functions/tsconfig.json` (standard ESNext).
 3. **Types are defined in three places.** `packages/contracts/src/index.ts` is the canonical source for shared types. `src/lib/types.ts` and `functions/src/types/index.ts` re-export from `@dst/contracts` and add their own layer-specific types. Keep re-exports in sync when adding new contract types.
-4. **Device specs have 90 fields** across 12 categories. The `DeviceSpec` interface nests sub-interfaces (e.g., `DeviceSpecSoc`, `DeviceSpecMemory`). These are NOT flat — they're grouped objects.
+4. **Device specs have ~260 fields** across 16 categories. The `DeviceSpec` interface nests sub-interfaces (e.g., `QuestionnaireHardware`, `QuestionnaireContentProtection`). These are NOT flat — they're grouped objects. Category names follow the `Questionnaire*` naming convention from the partner questionnaire format.
 5. **The tier engine auto-runs** on spec save and tier definition save. Don't forget this side effect when modifying those flows.
 6. **Firestore has no joins.** The backend manually fetches related collections. Watch for N+1 query patterns.
 7. **Two Cloud Functions are exported.** `api` handles all Express routes under `/api/*`. `extractDeviceTask` is a Cloud Tasks handler (`onTaskDispatched`) for per-device AI extraction. Both are in `functions/src/index.ts`.
