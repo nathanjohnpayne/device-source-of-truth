@@ -13,11 +13,13 @@ import {
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
 import Badge from '../components/shared/Badge';
+import FreshnessBadge from '../components/shared/FreshnessBadge';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 
 interface DashboardData {
   totalActiveDevices: number;
   totalDevices: number;
+  lastTelemetryAt: string | null;
   specCoverageWeighted: number;
   certifiedCount: number;
   pendingCount: number;
@@ -51,12 +53,14 @@ function KpiCard({
   value,
   sub,
   badge,
+  children,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
   sub?: string;
   badge?: { text: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'default' };
+  children?: React.ReactNode;
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5">
@@ -70,6 +74,7 @@ function KpiCard({
         </p>
         <p className="mt-0.5 text-sm text-gray-500">{label}</p>
         {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
+        {children}
       </div>
     </div>
   );
@@ -94,6 +99,7 @@ export default function DashboardPage() {
         setData({
           totalActiveDevices: res.totalActiveDevices ?? 0,
           totalDevices: res.totalDevices ?? 0,
+          lastTelemetryAt: res.lastTelemetryAt ?? null,
           specCoverageWeighted: res.specCoverageWeighted ?? 0,
           certifiedCount: res.certifiedCount ?? 0,
           pendingCount: res.pendingCount ?? 0,
@@ -140,7 +146,9 @@ export default function DashboardPage() {
           icon={<Monitor className="h-5 w-5" />}
           label="Total Active Devices"
           value={data.totalActiveDevices ?? 0}
-        />
+        >
+          <FreshnessBadge lastTelemetryAt={data.lastTelemetryAt} />
+        </KpiCard>
         <KpiCard
           icon={<Cpu className="h-5 w-5" />}
           label="Total Devices in Registry"
@@ -303,6 +311,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-400">
                       {(r.deviceCount ?? 0).toLocaleString()} devices registered
                     </p>
+                    <FreshnessBadge lastTelemetryAt={data.lastTelemetryAt} />
                   </div>
                 </div>
               );

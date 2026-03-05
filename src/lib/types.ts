@@ -67,7 +67,7 @@ export type {
   AppNotification,
 } from '@dst/contracts';
 
-export { SPEC_CATEGORIES } from '@dst/contracts';
+export { SPEC_CATEGORIES, ACTIVE_DEVICES_WINDOW_DAYS } from '@dst/contracts';
 
 // ── Frontend-only types below ──
 

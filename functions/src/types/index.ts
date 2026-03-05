@@ -1,6 +1,7 @@
 // Re-export shared contracts (audited types moved to @dst/contracts)
 export {
   SPEC_CATEGORIES,
+  ACTIVE_DEVICES_WINDOW_DAYS,
   CreateDeviceRequestSchema,
   UpdateDeviceRequestSchema,
   SaveDeviceSpecRequestSchema,

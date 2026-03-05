@@ -57,6 +57,12 @@ router.get('/dashboard', async (req, res) => {
     const totalDevices = devices.length;
     const totalActiveDevices = devices.reduce((sum, d) => sum + d.activeDeviceCount, 0);
 
+    let latestTelemetryAt: string | null = null;
+    for (const d of devices) {
+      const t = (d as unknown as { lastTelemetryAt?: string | null }).lastTelemetryAt;
+      if (t && (!latestTelemetryAt || t > latestTelemetryAt)) latestTelemetryAt = t;
+    }
+
     let weightedSpecSum = 0;
     let totalWeight = 0;
     for (const d of devices) {
@@ -125,6 +131,7 @@ router.get('/dashboard', async (req, res) => {
     res.json({
       totalDevices,
       totalActiveDevices,
+      lastTelemetryAt: latestTelemetryAt,
       specCoverageWeighted,
       certifiedCount,
       pendingCount,

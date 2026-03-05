@@ -32,6 +32,7 @@ import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
 import VersionInput from '../components/shared/VersionInput';
+import FreshnessBadge from '../components/shared/FreshnessBadge';
 import type {
   DeviceDetail,
   DeviceDeployment,
@@ -361,6 +362,7 @@ export default function DeviceDetailPage() {
             {(device.activeDeviceCount ?? 0).toLocaleString()}
           </p>
           <p className="text-xs text-gray-500">Active Devices</p>
+          <FreshnessBadge lastTelemetryAt={(device as DeviceDetail & { lastTelemetryAt?: string | null }).lastTelemetryAt} />
           {isEditor && (
             <div className="mt-2 flex gap-2">
               <button

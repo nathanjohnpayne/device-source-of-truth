@@ -383,7 +383,10 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
     for (const [deviceId, count] of Object.entries(deviceCounts)) {
       const devSnap = await db.collection('devices').where('deviceId', '==', deviceId).limit(1).get();
       if (!devSnap.empty) {
-        await devSnap.docs[0].ref.update({ activeDeviceCount: count });
+        await devSnap.docs[0].ref.update({
+          activeDeviceCount: count,
+          lastTelemetryAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
       }
     }
     req.log?.info('Device active counts updated', { devicesUpdated: Object.keys(deviceCounts).length });
