@@ -260,6 +260,7 @@ export interface UploadHistoryWithRollback {
   successCount: number;
   errorCount: number;
   snapshotDate: Timestamp;
+  importTimeRange?: string;
   errors: string[];
   newCount?: number;
   updatedCount?: number;

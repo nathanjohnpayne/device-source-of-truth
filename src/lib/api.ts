@@ -229,7 +229,7 @@ export const api = {
         body: JSON.stringify({ csvData, snapshotDate }),
       });
     },
-    upload: async (file: File, snapshotDate: string, staleOverrides?: number[]) => {
+    upload: async (file: File, snapshotDate: string, staleOverrides?: number[], importTimeRange?: string) => {
       const csvData = await file.text();
       return apiFetch<{
         success: boolean;
@@ -245,7 +245,7 @@ export const api = {
         devicesUpdated: number;
       }>('/telemetry/upload', {
         method: 'POST',
-        body: JSON.stringify({ csvData, snapshotDate, fileName: file.name, staleOverrides }),
+        body: JSON.stringify({ csvData, snapshotDate, fileName: file.name, staleOverrides, importTimeRange }),
       });
     },
     history: (params?: QueryParams) =>

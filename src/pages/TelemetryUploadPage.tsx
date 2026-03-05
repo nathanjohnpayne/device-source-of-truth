@@ -20,6 +20,7 @@ import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
 import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
+import TimeRangeDropdown from '../components/shared/TimeRangeDropdown';
 import type { UploadHistoryWithRollback, TelemetryPreviewRow } from '../lib/types';
 import { formatDateTime } from '../lib/format';
 
@@ -138,6 +139,7 @@ export default function TelemetryUploadPage() {
   const [snapshotDate, setSnapshotDate] = useState(
     new Date().toISOString().split('T')[0],
   );
+  const [importTimeRange, setImportTimeRange] = useState<string | null>(null);
   const [dateParsedFromFile, setDateParsedFromFile] = useState(false);
   const [dateReadOnly, setDateReadOnly] = useState(false);
   const [dateWarning, setDateWarning] = useState<string | null>(null);
@@ -230,12 +232,12 @@ export default function TelemetryUploadPage() {
   }, [previewRows, staleOverrides]);
 
   const handleUpload = useCallback(async () => {
-    if (!file) return;
+    if (!file || !importTimeRange) return;
     setLoading(true);
     setParseError(null);
 
     try {
-      const result = await api.telemetry.upload(file, snapshotDate, Array.from(staleOverrides));
+      const result = await api.telemetry.upload(file, snapshotDate, Array.from(staleOverrides), importTimeRange);
       setUploadResult(result);
       trackEvent('telemetry_upload', { file_name: file.name, row_count: result.rowCount });
       setStep('result');
@@ -245,7 +247,7 @@ export default function TelemetryUploadPage() {
     } finally {
       setLoading(false);
     }
-  }, [file, snapshotDate, staleOverrides, loadHistory]);
+  }, [file, snapshotDate, staleOverrides, importTimeRange, loadHistory]);
 
   const handleRollback = useCallback(async (batch: UploadHistoryWithRollback) => {
     if (!batch.uploadBatchId) return;
@@ -271,6 +273,7 @@ export default function TelemetryUploadPage() {
     setPreviewSummary(null);
     setStaleOverrides(new Set());
     setUploadResult(null);
+    setImportTimeRange(null);
     setSnapshotDate(new Date().toISOString().split('T')[0]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -284,7 +287,7 @@ export default function TelemetryUploadPage() {
             Upload observability CSV exports to update device telemetry data
           </p>
           <a
-            href="https://disney.my.sentry.io/organizations/disney/explore/discover/results/?field=partner&field=device&field=core_version&field=count_unique%28device_id%29&field=count%28%29&name=ADK%20Partner%20-%20Device%20Combinations&project=23&query=%21partner%3Arefapp%20%21partner%3Abroadcom%20%21partner%3Avpe%20title%3Alaunch%20%21partner%3Adss%20%21partner%3Atwdc_microsoft%20%21partner%3Atwdc_amazon&sort=-count_unique_device_id&statsPeriod=24h&yAxis=count_unique%28device_id%29&yAxis=count%28%29"
+            href={`https://disney.my.sentry.io/organizations/disney/explore/discover/results/?field=partner&field=device&field=core_version&field=count_unique%28device_id%29&field=count%28%29&name=ADK%20Partner%20-%20Device%20Combinations&project=23&query=%21partner%3Arefapp%20%21partner%3Abroadcom%20%21partner%3Avpe%20title%3Alaunch%20%21partner%3Adss%20%21partner%3Atwdc_microsoft%20%21partner%3Atwdc_amazon&sort=-count_unique_device_id&statsPeriod=${importTimeRange ?? '24h'}&yAxis=count_unique%28device_id%29&yAxis=count%28%29`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-1 inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800"
@@ -387,17 +390,25 @@ export default function TelemetryUploadPage() {
             )}
           </div>
 
-          <div className="mt-4">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              <Clock className="mr-1 inline h-3.5 w-3.5" />
-              Snapshot Date
-            </label>
-            <input
-              type="date"
-              value={snapshotDate}
-              onChange={(e) => setSnapshotDate(e.target.value)}
-              className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-            />
+          <div className="mt-4 flex flex-wrap gap-6">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                <Clock className="mr-1 inline h-3.5 w-3.5" />
+                Snapshot Date
+              </label>
+              <input
+                type="date"
+                value={snapshotDate}
+                onChange={(e) => setSnapshotDate(e.target.value)}
+                className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Import Time Range {importTimeRange == null && <span className="text-red-500">*</span>}
+              </label>
+              <TimeRangeDropdown value={importTimeRange} onChange={setImportTimeRange} />
+            </div>
           </div>
 
           <div className="mt-4 rounded-md bg-gray-50 p-3">
@@ -439,7 +450,8 @@ export default function TelemetryUploadPage() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <TimeRangeDropdown value={importTimeRange} onChange={setImportTimeRange} />
                 {dateReadOnly ? (
                   <button
                     onClick={() => setDateReadOnly(false)}
@@ -593,9 +605,12 @@ export default function TelemetryUploadPage() {
           )}
 
           <div className="flex items-center justify-end gap-3">
+            {!importTimeRange && (
+              <p className="text-sm text-amber-600">Select an Import Time Range before uploading.</p>
+            )}
             <button
               onClick={handleUpload}
-              disabled={loading || (previewSummary?.total ?? 0) === 0}
+              disabled={loading || (previewSummary?.total ?? 0) === 0 || !importTimeRange}
               className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? <LoadingSpinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
@@ -662,7 +677,9 @@ export default function TelemetryUploadPage() {
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium text-gray-900">{batch.fileName}</p>
                       <p className="text-xs text-gray-500">
-                        Snapshot: {formatSnapshotDate(batch.snapshotDate)} &middot; Uploaded {formatDateTime(batch.uploadedAt)} by {batch.uploadedByEmail}
+                        Snapshot: {formatSnapshotDate(batch.snapshotDate)}
+                        {batch.importTimeRange && <> &middot; Range: {batch.importTimeRange.toUpperCase()}</>}
+                        {' '}&middot; Uploaded {formatDateTime(batch.uploadedAt)} by {batch.uploadedByEmail}
                       </p>
                       <p className="text-xs text-gray-500">
                         {batch.rowCount} rows

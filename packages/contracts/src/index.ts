@@ -696,6 +696,7 @@ export interface UploadHistory {
   successCount: number;
   errorCount: number;
   snapshotDate: Timestamp;
+  importTimeRange?: string;
   errors: string[];
   newCount?: number;
   updatedCount?: number;
@@ -1094,6 +1095,7 @@ export const UploadHistorySchema = z.object({
   successCount: z.number(),
   errorCount: z.number(),
   snapshotDate: timestamp,
+  importTimeRange: z.string().optional(),
   errors: z.array(z.string()),
 });
 

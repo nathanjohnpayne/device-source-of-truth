@@ -214,11 +214,11 @@ router.post('/preview', requireRole('admin'), async (req, res) => {
 router.post('/upload', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const { csvData, snapshotDate, fileName, staleOverrides } = req.body;
+    const { csvData, snapshotDate, fileName, staleOverrides, importTimeRange } = req.body;
 
-    if (!csvData || !snapshotDate) {
-      req.log?.warn('Telemetry upload failed: missing required fields', { hasCsvData: !!csvData, hasSnapshotDate: !!snapshotDate });
-      res.status(400).json({ error: 'csvData and snapshotDate are required' });
+    if (!csvData || !snapshotDate || !importTimeRange) {
+      req.log?.warn('Telemetry upload failed: missing required fields', { hasCsvData: !!csvData, hasSnapshotDate: !!snapshotDate, hasImportTimeRange: !!importTimeRange });
+      res.status(400).json({ error: 'csvData, snapshotDate, and importTimeRange are required' });
       return;
     }
 
@@ -226,6 +226,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
 
     req.log?.info('Starting telemetry upload', {
       snapshotDate,
+      importTimeRange,
       fileName: fileName ?? 'telemetry.csv',
       csvLength: csvData.length,
       userId: req.user!.uid,
@@ -469,6 +470,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
       successCount,
       errorCount: errors.length,
       snapshotDate,
+      importTimeRange,
       errors,
       uploadBatchId,
       newCount,

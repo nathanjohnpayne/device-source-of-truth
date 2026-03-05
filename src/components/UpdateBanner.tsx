@@ -1,15 +1,9 @@
-import { useState } from 'react';
 import { useAppUpdate } from '../hooks/useAppUpdate';
 
-const DISMISS_KEY = 'dst_update_dismissed';
-
 export default function UpdateBanner() {
-  const { updateAvailable, applyUpdate } = useAppUpdate();
-  const [dismissed, setDismissed] = useState(() => {
-    try { return sessionStorage.getItem(DISMISS_KEY) === '1'; } catch { return false; }
-  });
+  const { updateAvailable, applyUpdate, dismiss } = useAppUpdate();
 
-  if (!updateAvailable || dismissed) return null;
+  if (!updateAvailable) return null;
 
   return (
     <div
@@ -30,10 +24,7 @@ export default function UpdateBanner() {
         </button>
 
         <button
-          onClick={() => {
-            setDismissed(true);
-            try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch { /* noop */ }
-          }}
+          onClick={dismiss}
           aria-label="Dismiss update notification"
           className="rounded p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
         >
