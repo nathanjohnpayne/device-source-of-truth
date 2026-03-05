@@ -119,7 +119,9 @@ function getTargetSheet(workbook: XLSX.WorkBook, format: QuestionnaireFormat): X
       const name = workbook.SheetNames.find(
         n => n.toLowerCase() === 'stb tech questionnaire',
       );
-      return name ? workbook.Sheets[name] : null;
+      return name
+        ? workbook.Sheets[name]
+        : (workbook.Sheets[workbook.SheetNames[0]] ?? null);
     }
     case 'android_atv':
       return workbook.Sheets[workbook.SheetNames[0]] ?? null;
@@ -134,6 +136,8 @@ function getHeaderRowIndex(format: QuestionnaireFormat): number {
 
 // ── Device Column Detection ──
 
+const STRUCTURAL_HEADERS = ['no.', 'category', 'description'];
+
 export function findDeviceColumns(
   sheet: XLSX.WorkSheet,
   format: QuestionnaireFormat,
@@ -144,16 +148,26 @@ export function findDeviceColumns(
   if (descCol < 0) return [];
 
   const devices: ParsedDevice[] = [];
+  const labelCounts = new Map<string, number>();
+
   for (let c = descCol + 1; c <= range.e.c; c++) {
     const header = cellValue(sheet, headerRow, c);
     if (!header) continue;
     const headerStr = String(header).trim();
     if (!headerStr) continue;
     if (SAMPLE_HEADERS.includes(headerStr.toLowerCase())) continue;
+    if (STRUCTURAL_HEADERS.includes(headerStr.toLowerCase())) continue;
+
+    const labelKey = headerStr.toLowerCase();
+    const count = labelCounts.get(labelKey) ?? 0;
+    labelCounts.set(labelKey, count + 1);
+
+    const suffix = count > 0 ? String.fromCharCode(96 + count) : '';
+    const displayLabel = suffix ? `${headerStr} (${suffix})` : headerStr;
 
     devices.push({
       columnIndex: c,
-      rawHeaderLabel: headerStr,
+      rawHeaderLabel: displayLabel,
       platformType: 'unknown',
       isOutOfScope: false,
     });

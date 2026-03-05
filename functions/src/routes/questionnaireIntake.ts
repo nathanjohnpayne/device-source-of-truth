@@ -745,7 +745,7 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
           }
         }
 
-        batch.update(specRef, flatUpdates);
+        batch.set(specRef, flatUpdates, { merge: true });
       }
 
       // Create source link

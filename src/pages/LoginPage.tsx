@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldX } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import Logo from '../components/shared/Logo';
 
 const DOMAIN_DENIED_MESSAGE =
   'Your email domain is not authorized to access Device Source of Truth.';
@@ -27,8 +28,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
       <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-2xl">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-xl font-bold text-white shadow-lg">
-            D
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg">
+            <Logo className="h-8 w-8" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Device Source of Truth</h1>
           <p className="mt-1 text-sm text-gray-500">

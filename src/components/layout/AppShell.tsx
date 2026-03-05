@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { useImportPrerequisites } from '../../hooks/useImportPrerequisites';
 import Badge from '../shared/Badge';
+import Logo from '../shared/Logo';
 import GlobalSearch from './GlobalSearch';
 
 interface NavItem {
@@ -227,8 +228,8 @@ function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-slate-900">
       <div className="flex h-16 items-center gap-3 px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-          D
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
+          <Logo className="h-5 w-5" />
         </div>
         <div>
           <h1 className="text-sm font-semibold text-white">Device Source of Truth</h1>

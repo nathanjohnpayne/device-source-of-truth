@@ -78,7 +78,7 @@ One record per uploaded file. Persists regardless of extraction outcome.
 | `ai_extraction_mode` | `text` NULLABLE | `'auto'` or `'manual'`; null if not yet triggered |
 | `ai_extraction_started_at` | `timestamptz` NULLABLE | |
 | `ai_extraction_completed_at` | `timestamptz` NULLABLE | |
-| `extraction_error` | `text` NULLABLE | Error message if extraction failed |
+| `extraction_error` | `text` NULLABLE | Human-readable error summary if extraction failed (e.g., "All 3 device(s) failed AI extraction — likely due to API rate limits or timeouts. Try again in a few minutes.") |
 | `notes` | `text` NULLABLE | Admin free-text notes |
 | `created_at` | `timestamptz` NOT NULL | |
 | `updated_at` | `timestamptz` NOT NULL | |
@@ -120,6 +120,7 @@ One record per device column detected in the questionnaire. Represents a device 
 | `reviewed_by` | `uuid` FK `users` NULLABLE | |
 | `reviewed_at` | `timestamptz` NULLABLE | |
 | `rejection_reason` | `text` NULLABLE | |
+| `extraction_error` | `text` NULLABLE | Per-device error message if AI extraction failed for this device (e.g., "AI extraction returned no results after retries") |
 | `created_at` | `timestamptz` NOT NULL | |
 
 #### `questionnaire_staged_fields`
@@ -280,11 +281,15 @@ registerImportFlow({
 });
 ```
 
-### Call structure
+### Call structure and chunking
 
-Unlike the DST-042 disambiguation batches (which group identical field types across rows), questionnaire extraction sends one API call per device, covering all question-answer pairs for that device in a single call. This is necessary because the AI must reason over the entire question set holistically — some answers only make sense in the context of adjacent questions, and confidence for one field may depend on the answer to another.
+Each device's Q/A pairs are split into **chunks of 30** (`CHUNK_SIZE = 30`) and sent as sequential API calls. A real-world questionnaire commonly has 100–150 Q/A pairs; sending all of them in a single call produces a prompt large enough to exceed the API timeout before a response is returned. Chunking keeps each call small enough to complete reliably within the timeout budget.
 
-**Prompt structure (per-device call):**
+For a device with 143 Q/A pairs, this produces 5 sequential calls (pairs 1–30, 31–60, 61–90, 91–120, 121–143). Results from all chunks are merged into a single field list after all chunks complete. Where two chunks return a result for the same `dst_field_key`, the result with the higher confidence score wins.
+
+A **1,500 ms inter-chunk delay** (`INTER_CHUNK_DELAY_MS = 1500`) is inserted between chunks for the same device to keep combined output token volume below rate limits.
+
+**Prompt structure (per-chunk call):**
 
 ```
 System:
@@ -308,21 +313,77 @@ User:
 Partner: {partner_display_name or "Unknown"}
 Device column header: {raw_header_label}
 Platform type: {platform_type}
+Chunk: {chunk_index + 1} of {total_chunks}
 
 Question-answer pairs:
 1. Q: "Model name of device" | A: "MagentaTV One (2. Generation)"
 2. Q: "SoC Vendor" | A: "Amlogic"
 3. Q: "CPU Speed" | A: "24k DMIPS"
-[... all pairs for this device ...]
+[... up to 30 pairs ...]
 ```
 
 The schema injected into the system prompt is generated from the `device_specs` column definitions in DST-001, including field type, units, and accepted values for enum fields. It is a static string built once at server startup.
 
-### Parallelism
+### Device processing: sequential with retry and backoff
 
-All per-device API calls for a single intake job are dispatched in parallel (`Promise.all`), bounded by a concurrency limit of 5 simultaneous calls. For a questionnaire with 6 device columns, all 6 calls are dispatched at once (within the concurrency limit). Wall-clock time is bounded by the slowest single call, not the sum.
+Devices are processed **one at a time** (sequential loop), not with concurrent `Promise.all`. Concurrent multi-device dispatch multiplies output token volume and reliably triggers HTTP 429 rate-limit errors from the Anthropic API when a questionnaire contains several devices.
 
-Each call has a 15-second timeout (longer than the DST-042 5-second timeout due to the larger prompt). On timeout, that device's fields are left with `extraction_method = 'skipped'` and `ai_confidence = null`. The other devices are unaffected.
+For each chunk within a device, the call is retried up to **3 times** (`MAX_RETRIES = 3`) on HTTP 429 or timeout. Retry uses exponential backoff: **3 s → 6 s → 12 s** (`RETRY_BASE_DELAY_MS = 3000`, delay = `RETRY_BASE_DELAY_MS * 2^attempt`). If all retries are exhausted, the chunk is marked failed and extraction for that device stops.
+
+**API timeout per chunk call: 45 seconds** (`API_TIMEOUT_MS = 45000`). This is longer than a simple disambiguation call because the prompt includes the full schema plus up to 30 Q/A pairs.
+
+### Extraction constants
+
+| Constant | Value | Rationale |
+|---|---|---|
+| `CHUNK_SIZE` | 30 | Keeps prompt size within reliable timeout budget |
+| `INTER_CHUNK_DELAY_MS` | 1,500 | Rate-limit headroom between chunks for the same device |
+| `API_TIMEOUT_MS` | 45,000 | Accounts for schema + 30 Q/A pairs in prompt |
+| `MAX_RETRIES` | 3 | Handles transient 429s and single-call timeouts |
+| `RETRY_BASE_DELAY_MS` | 3,000 | Base for exponential backoff (3 s → 6 s → 12 s) |
+| Device concurrency | 1 (sequential) | Prevents combined output volume from exceeding rate limits |
+
+### Failure detection — explicit rules
+
+A device extraction is counted as **failed** if `extractDeviceFields()` returns an empty array **and** the device had at least one non-null Q/A pair. An empty result from a device with real data is never a success; it indicates a timeout or rate-limit failure that exhausted all retries.
+
+This must be enforced explicitly in the orchestrator. The following logic is **required**:
+
+```typescript
+const results = await extractDeviceFields(qaPairs, context, client);
+
+if (results.length === 0 && qaPairs.length > 0) {
+  // Extraction failed — do not count as complete
+  devicesFailed++;
+  await db.stagedDevices.update(deviceId, {
+    extractionError: "AI extraction returned no results after retries"
+  });
+} else {
+  // Write extracted fields to staged_fields
+  for (const result of results) { /* ... batch.update() ... */ }
+  devicesComplete++;
+}
+```
+
+Falling through to `devicesComplete++` after an empty result — without the guard above — produces a silent failure: the job reaches `pending_review` with 0 fields extracted and no error indicator, and the admin has no way to know extraction did not run.
+
+### Job-level failure status
+
+After all devices are processed, the job status is set as follows:
+
+| Outcome | Job status set to |
+|---|---|
+| All devices succeeded (≥ 1 field extracted) | `pending_review` |
+| Some devices succeeded, some failed | `pending_review` — failed devices show per-card error and inline retry |
+| All devices failed | `extraction_failed` |
+
+When `extraction_failed`, a human-readable summary is written to `questionnaire_intake_jobs.extraction_error`:
+
+```
+"All {N} device(s) failed AI extraction — likely due to API rate limits or timeouts. Try again in a few minutes."
+```
+
+The frontend must never display `pending_review` as "Complete" without first verifying that at least one device has `extracted_fields_count > 0`. A job that is `pending_review` with all devices showing 0 extracted fields is a failed extraction, not a completed one, and the UI must surface this distinctly.
 
 ### Post-extraction normalization
 
@@ -386,6 +447,10 @@ Returns the full intake job record plus:
 
 Manually triggers the AI extraction pass on an intake job with status `awaiting_extraction`. Sets `ai_extraction_mode = 'manual'` and `status = 'extracting'`. Returns 409 if extraction has already run or is in progress.
 
+**`POST /api/questionnaire-intake/:id/staged-devices/:deviceId/retry-extraction`**
+
+Re-runs AI extraction for a single failed device without re-processing devices that already have extracted fields. Only valid when the target `questionnaire_staged_devices` record has `extraction_error` set. Resets that device's `extraction_error` to null, re-runs the chunked extraction pass for that device only, and updates the job status (e.g., promoting from `extraction_failed` to `pending_review` if the retry succeeds and all other devices are already complete). Returns 409 if the device is not in a failed state.
+
 **`GET /api/questionnaire-intake/:id/staged-devices`**
 
 Returns all `questionnaire_staged_devices` for the job with their full `questionnaire_staged_fields` arrays.
@@ -436,6 +501,17 @@ This page is visible during and after extraction, before the admin begins the DS
 └──────────────────────────────────────────────────────────────┘
 ```
 
+**Extraction progress indicator**
+
+During active extraction, the status line shows a real-time step indicator for the device currently being processed:
+
+```
+Status:  ● Extracting…   EOSv1 — chunk 2 of 5
+         Reading spreadsheet ✓ → Extracting fields ● → Validating → Done
+```
+
+The four steps (Reading spreadsheet, Extracting fields, Validating, Done) advance as the job progresses. The current device name and chunk position are shown during the Extracting step.
+
 **Device cards (one per detected device column):**
 
 ```
@@ -444,7 +520,7 @@ This page is visible during and after extraction, before the admin begins the DS
 │  ─────────────────────────────────────────────────────────  │
 │  Matched to:  DCX960 / EOS-1008C  (exact model number)      │
 │  Fields extracted:  47 / 89   ·   3 conflicts detected      │
-│  ● Extracting…                                              │
+│  ● Extracting…  chunk 2 of 5                                │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
@@ -455,22 +531,43 @@ This page is visible during and after extraction, before the admin begins the DS
 │  ✓ Complete                                                  │
 └─────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────────────────┐  ← red border
 │  G7  ·  platform: android_tv  ·  ⚠ Out of scope (Phase 2)  │
 │  ─────────────────────────────────────────────────────────  │
-│  Matched to:  ⚠ No match — will create new record           │
-│  Fields extracted:  61 / 89   ·   0 conflicts               │
-│  ✓ Complete                                                  │
+│  ✗ Extraction failed                                        │
+│  AI extraction returned no results after retries            │
+│                                          [ Retry Device ]   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Action bar (enabled once all extractions complete):**
+Failed device cards render with a red border and display the `extraction_error` string from `questionnaire_staged_devices`. The inline "Retry Device" button calls `POST /api/questionnaire-intake/:id/staged-devices/:deviceId/retry-extraction`.
+
+**Global error banner (full failure — all devices failed):**
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ✗  Extraction failed for all devices. This is usually caused by API rate    │
+│     limits or timeouts. Wait a few minutes, then try again.                  │
+│                                                    [ Restart Extraction ]    │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Global warning banner (partial failure — some devices failed, some succeeded):**
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ⚠  Extraction failed for 1 of 3 devices. Use the Retry button on the        │
+│     failed device card, or begin review and retry from the review screen.    │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Action bar (enabled once all extractions complete or partially complete):**
 
 ```
                         [ Download Source File ]  [ Begin Review → ]
 ```
 
-"Begin Review" navigates to the DST-048 admin review workflow.
+"Begin Review" is available even when some devices failed extraction, so the admin can approve the successful devices without being blocked. Failed devices appear in the review with their error state and a retry option.
 
 If extraction has not yet been triggered (status = `awaiting_extraction`):
 
@@ -521,7 +618,7 @@ This ensures no data from a questionnaire is ever silently discarded.
 - Platform type is correctly identified as `ncp_linux` for all LG and Vodafone devices, `android_tv` for the G7 and Vodafone Android devices, and `is_out_of_scope` is set accordingly.
 - Partner auto-detection correctly identifies Liberty Global, GM / Deutsche Telekom, and Vodafone from the four reference files, or leaves `partner_id` null with `partner_detection_method = 'ai'` if confidence is below 0.85.
 - The "Use AI Extraction?" checkbox triggers the DST-042 cost disclosure modal on first check per page load. Unchecking it results in zero Anthropic API calls.
-- When AI extraction is enabled (auto or manual), one API call per device is dispatched in parallel (up to 5 concurrently). Each call has a 15-second timeout; a timeout on one device does not affect others.
+- When AI extraction is enabled (auto or manual), devices are processed sequentially (one at a time). Each device's Q/A pairs are chunked into groups of 30 and sent as sequential API calls, each with a 45-second timeout and up to 3 retries with exponential backoff on 429 or timeout errors. A 1,500 ms delay is applied between chunks for the same device.
 - After extraction, `questionnaire_staged_fields` records exist for every non-null question-answer pair, with `dst_field_key` populated (or null for unmappable questions), `extracted_value` normalized, and `ai_confidence` set.
 - Conflict detection correctly sets `conflict_status` to `conflicts_with_existing` for any field where the extracted value differs from the existing `device_specs` value after normalization.
 - The uploaded file is stored in Firebase Storage immediately on upload, before parsing begins. A download link is available on the intake job detail page regardless of extraction status.
@@ -529,3 +626,7 @@ This ensures no data from a questionnaire is ever silently discarded.
 - Out-of-scope devices (Android TV, AOSP) are extracted, staged, and presented for admin review; they are not discarded or hidden.
 - The Intake Queue displays all jobs with correct status badges and supports filtering by status and partner.
 - A `GET /api/questionnaire-intake/:id` response includes extraction progress counts during active extraction (polled by the UI).
+- A device whose extraction returns an empty result array despite having non-null Q/A pairs is counted as `devicesFailed`, not `devicesComplete`. Its `extraction_error` field is populated and the job status is set to `extraction_failed` if all devices fail.
+- The frontend never renders a job as "Complete" unless at least one device has `extracted_fields_count > 0`. A `pending_review` job with all devices at 0 extracted fields is surfaced as an extraction failure.
+- Failed device cards display a red border, the error message, and an inline "Retry Device" button. A full-failure global banner and a partial-failure global warning banner are shown as appropriate.
+- `POST /api/questionnaire-intake/:id/staged-devices/:deviceId/retry-extraction` re-runs extraction for a single failed device without affecting already-extracted devices.
