@@ -177,6 +177,7 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | PATCH | /questionnaire-intake/:id/staged-devices/:deviceId/resolve-all | admin | Bulk resolve all pending conflicts to use_new |
 | POST | /questionnaire-intake/:id/approve | admin | Commit approved devices to catalog (atomic transaction) |
 | POST | /questionnaire-intake/:id/reject | admin | Reject entire intake job |
+| POST | /questionnaire-intake/:id/retry-device/:deviceId | editor+ | Retry AI extraction for a single failed device (DST-052) |
 | GET | /questionnaire-intake/notifications/list | any | List in-app notifications |
 | PATCH | /questionnaire-intake/notifications/:id/read | any | Mark notification as read |
 | GET | /questionnaire-intake/device-sources/:deviceId | any | Get questionnaire sources for a device |
@@ -202,7 +203,7 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 - **Styling:** Tailwind CSS utility classes only. No CSS modules, no styled-components.
 - **Icons:** `lucide-react` exclusively.
 - **Charts:** `recharts` for all data visualizations.
-- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel`, `Logo` in `src/components/shared/`. `LoadingSpinner` accepts an `inline` prop for use inside buttons without the default `p-12` wrapper. `Logo` renders the device-cloud SVG inline with `fill="currentColor"` for flexible coloring.
+- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel`, `Logo`, `AIPassStatusPanel`, `ExtractionStatusPanel` in `src/components/shared/`. `LoadingSpinner` accepts an `inline` prop for use inside buttons without the default `p-12` wrapper. `Logo` renders the device-cloud SVG inline with `fill="currentColor"` for flexible coloring. `AIPassStatusPanel` shows import AI pass progress (DST-051). `ExtractionStatusPanel` shows questionnaire AI extraction progress with per-device retry (DST-052).
 - **Responsive shell:** `AppShell` is mobile-responsive. Below `lg:` the sidebar collapses off-screen and a hamburger menu in the topbar opens it as a slide-over overlay. Above `lg:` the sidebar is always visible.
 - **Update banner:** `UpdateBanner` in `src/components/UpdateBanner.tsx` detects new versions via service worker (Workbox/PWA) and version polling. It renders inside `AppShell`'s fixed header wrapper (above the topbar) so it reserves vertical space instead of overlapping navigation.
 - **Date formatting:** Use `formatDate()` and `formatDateTime()` from `src/lib/format.ts` for all date/time display. Do not use inline `toLocaleString()` or page-local formatters.
@@ -283,9 +284,9 @@ Backend (in `functions/.env`, gitignored):
 4. **Device specs have 90 fields** across 12 categories. The `DeviceSpec` interface nests sub-interfaces (e.g., `DeviceSpecSoc`, `DeviceSpecMemory`). These are NOT flat — they're grouped objects.
 5. **The tier engine auto-runs** on spec save and tier definition save. Don't forget this side effect when modifying those flows.
 6. **Firestore has no joins.** The backend manually fetches related collections. Watch for N+1 query patterns.
-7. **The `api` Cloud Function handles ALL routes.** There is only one function exported. All Express routes are under `/api/*`.
+7. **Two Cloud Functions are exported.** `api` handles all Express routes under `/api/*`. `extractDeviceTask` is a Cloud Tasks handler (`onTaskDispatched`) for per-device AI extraction. Both are in `functions/src/index.ts`.
 8. **AI disambiguation (DST-039) is pre-production/testing.** The Anthropic API key is stored in `functions/.env` (gitignored). If the key is missing or the API times out (5s), imports fall back to rule-based validation gracefully. The AI pass runs between CSV parsing and the validation preview.
 9. **Questionnaire intake (DST-047/048) uses Firebase Storage.** Uploaded questionnaire files are stored at `questionnaires/{jobId}/{filename}` via `admin.storage().bucket()`. The `storage.rules` file restricts reads to authenticated users; writes are admin-SDK only.
-10. **Questionnaire AI extraction is per-device.** Unlike DST-042's field-type batching, the questionnaire extractor sends one Anthropic call per device column (all Q/A pairs together) with a 15s timeout, bounded to 5 concurrent calls. Extraction runs asynchronously after upload.
+10. **Questionnaire AI extraction runs via Cloud Tasks, not fire-and-forget.** Each device gets its own `extractDeviceTask` Cloud Task (queue: `extractDeviceTask` in `us-central1`). Tasks are idempotent (CAS on `extractionStatus`), retry on rate limits/timeouts (3 attempts, 60-300s backoff, 300s function timeout, 1800s dispatch deadline), and finalize the job via Firestore transaction when all devices reach a terminal state. Notifications are deduped via `notificationSentAt`. The GET `/:id` endpoint has self-healing recovery for devices stuck in `processing` > 15 minutes (using per-device `extractionProcessingAt`). Never use fire-and-forget patterns for extraction — always enqueue via `enqueueExtractionTasks()`.
 11. **The questionnaire review wizard has 4 steps.** Assign Partner → Review Devices → Resolve Conflicts → Sign Off. Nothing is committed to the catalog until the admin completes Step 4. The `POST /:id/approve` endpoint runs an atomic Firestore batch that writes specs, creates device records, logs audit entries, and triggers tier/completeness recalculation.
 12. **Notifications are admin-only for now.** The `notifications` collection stores in-app notifications written by the backend when intake jobs reach `pending_review`. The `NotificationBell` component in `AppShell.tsx` polls every 30 seconds.
