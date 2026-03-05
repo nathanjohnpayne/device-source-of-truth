@@ -26,10 +26,10 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
-      <div className="w-full max-w-md rounded-2xl bg-white p-10 shadow-2xl">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg">
-            <Logo className="h-8 w-8" />
+      <div className="w-full max-w-md rounded-2xl bg-white px-8 py-8 shadow-2xl">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg">
+            <Logo className="h-12 w-12" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Device Source of Truth</h1>
           <p className="mt-1 text-sm text-gray-500">
