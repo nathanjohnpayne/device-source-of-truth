@@ -21,7 +21,7 @@ Firebase Hosting (static SPA)
 **No separate servers.** Everything runs inside one Firebase project (`device-source-of-truth`).
 
 - Frontend: React 19 + TypeScript + Tailwind CSS 4, built with Vite 7
-- Backend: Express 5 app exported as a single Firebase Cloud Function named `api`
+- Backend: Express 5 app exported as a Firebase Cloud Function named `api`, plus a Cloud Tasks function `extractDeviceTask` for async AI extraction
 - Database: Firestore (23 collections)
 - AI: Anthropic Claude API (claude-sonnet-4-6) for import disambiguation and questionnaire field extraction
 - Auth: Firebase Auth with Google OAuth, domain-restricted to `@disney.com` and `@disneystreaming.com`
@@ -37,7 +37,7 @@ Firebase Hosting (static SPA)
 │   ├── pages/                    ← 25 route-level page components
 │   ├── components/
 │   │   ├── layout/               ← AppShell (sidebar + topbar), GlobalSearch
-│   │   ├── shared/               ← DataTable, Badge, Modal, FilterPanel, etc.
+│   │   ├── shared/               ← DataTable, Badge, Modal, FilterPanel, Logo, etc.
 │   │   ├── specs/                ← SpecFormFields (reusable form inputs)
 │   │   └── onboarding/           ← WelcomeModal (first-login wizard)
 │   ├── hooks/
@@ -53,7 +53,7 @@ Firebase Hosting (static SPA)
 │
 ├── functions/                    ← Firebase Cloud Functions (backend)
 │   ├── src/
-│   │   ├── index.ts              ← Express app, route mounting, error handler
+│   │   ├── index.ts              ← Express app + extractDeviceTask Cloud Tasks function
 │   │   ├── middleware/auth.ts    ← Token verification, domain check, role guard
 │   │   ├── routes/               ← 15 Express routers (partners, devices, disambiguate, questionnaireIntake, etc.)
 │   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, seedFieldOptions, questionnaireParser, questionnaireExtractor, storage)
@@ -61,6 +61,8 @@ Firebase Hosting (static SPA)
 │   ├── package.json              ← Separate deps (firebase-admin, express, xlsx, etc.)
 │   └── tsconfig.json
 │
+├── public/
+│   └── favicon.svg               ← SVG favicon (device-cloud icon, indigo fill)
 ├── specs/                        ← Product specs and feature stories
 ├── firebase.json                 ← Hosting rewrites + functions + firestore config
 ├── firestore.rules               ← Firestore security rules (23 collections)
@@ -100,8 +102,8 @@ Firebase Hosting (static SPA)
 | `intakeRequests` | Airtable intake request records | requestType, partnerName, region, tamOwner, batchId |
 | `intakeRequestPartners` | Intake request → partner links | intakeRequestId, partnerId, matchType |
 | `intakeImportHistory` | Intake CSV import history | importedBy, fileName, rowCount, status |
-| `questionnaireIntakeJobs` | Questionnaire file upload/parse/extraction jobs | fileName, fileStoragePath, partnerId, questionnaireFormat, status, aiExtractionMode |
-| `questionnaireStagedDevices` | Devices detected from a questionnaire file | intakeJobId, rawHeaderLabel, platformType, matchedDeviceId, reviewStatus |
+| `questionnaireIntakeJobs` | Questionnaire file upload/parse/extraction jobs | fileName, fileStoragePath, partnerId, questionnaireFormat, status, aiExtractionMode, tasksEnqueued, notificationSentAt |
+| `questionnaireStagedDevices` | Devices detected from a questionnaire file | intakeJobId, rawHeaderLabel, platformType, matchedDeviceId, reviewStatus, extractionStatus (pending/processing/complete/failed), extractionProcessingAt |
 | `questionnaireStagedFields` | Individual Q/A pairs extracted per device | stagedDeviceId, dstFieldKey, rawQuestionText, extractedValue, conflictStatus, resolution |
 | `deviceQuestionnaireSources` | Links devices to the questionnaire jobs that populated their specs | deviceId, intakeJobId, fieldsImported, fieldsOverridden |
 | `notifications` | In-app notifications for admins | recipientRole, title, body, link, read |
@@ -200,7 +202,7 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 - **Styling:** Tailwind CSS utility classes only. No CSS modules, no styled-components.
 - **Icons:** `lucide-react` exclusively.
 - **Charts:** `recharts` for all data visualizations.
-- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel` in `src/components/shared/`. `LoadingSpinner` accepts an `inline` prop for use inside buttons without the default `p-12` wrapper.
+- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel`, `Logo` in `src/components/shared/`. `LoadingSpinner` accepts an `inline` prop for use inside buttons without the default `p-12` wrapper. `Logo` renders the device-cloud SVG inline with `fill="currentColor"` for flexible coloring.
 - **Responsive shell:** `AppShell` is mobile-responsive. Below `lg:` the sidebar collapses off-screen and a hamburger menu in the topbar opens it as a slide-over overlay. Above `lg:` the sidebar is always visible.
 - **Update banner:** `UpdateBanner` in `src/components/UpdateBanner.tsx` detects new versions via service worker (Workbox/PWA) and version polling. It renders inside `AppShell`'s fixed header wrapper (above the topbar) so it reserves vertical space instead of overlapping navigation.
 - **Date formatting:** Use `formatDate()` and `formatDateTime()` from `src/lib/format.ts` for all date/time display. Do not use inline `toLocaleString()` or page-local formatters.
