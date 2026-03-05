@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,12 +11,14 @@ import {
   XCircle,
   Cpu,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import Badge from '../components/shared/Badge';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Modal from '../components/shared/Modal';
+import ExtractionStatusPanel from '../components/shared/ExtractionStatusPanel';
 import type {
   QuestionnaireIntakeJobDetail,
   QuestionnaireIntakeJobStatus,
@@ -141,6 +143,9 @@ function DeviceCard({
   device,
   jobStatus,
   matchedDeviceName,
+  isActiveDevice,
+  onRetry,
+  isRetrying,
 }: {
   device: QuestionnaireStagedDevice & {
     fieldSummary: {
@@ -153,17 +158,27 @@ function DeviceCard({
   };
   jobStatus: QuestionnaireIntakeJobStatus;
   matchedDeviceName: string | null;
+  isActiveDevice: boolean;
+  onRetry?: () => void;
+  isRetrying?: boolean;
 }) {
   const { rawHeaderLabel, platformType, isOutOfScope, matchedDeviceId, fieldSummary } = device;
   const deviceError = device.extractionError;
-  const isExtracting = jobStatus === 'extracting' && fieldSummary.extractedFields === 0;
+  const isExtracting = jobStatus === 'extracting' && fieldSummary.extractedFields === 0 && !deviceError;
   const isComplete = fieldSummary.extractedFields > 0;
   const hasConflicts = fieldSummary.conflictCount > 0;
-  const isDeviceFailed = !isExtracting && !isComplete && (jobStatus === 'extraction_failed' || !!deviceError);
+  const isDeviceFailed = !!deviceError;
+
+  let borderClass = 'border-gray-200 bg-white';
+  if (isDeviceFailed) {
+    borderClass = 'border-red-200 bg-red-50/30';
+  } else if (isActiveDevice) {
+    borderClass = 'border-indigo-300 bg-indigo-50/30 ring-2 ring-indigo-200 ring-offset-1';
+  }
 
   return (
-    <div className={`rounded-lg border p-4 shadow-sm transition-shadow hover:shadow-md ${
-      isDeviceFailed ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-white'
+    <div className={`rounded-lg border p-4 shadow-sm transition-all ${borderClass} ${
+      isActiveDevice ? 'animate-pulse-subtle' : 'hover:shadow-md'
     }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -172,6 +187,15 @@ function DeviceCard({
             <Badge variant={platformBadgeVariant(platformType)}>
               {platformLabel(platformType)}
             </Badge>
+            {isActiveDevice && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-indigo-500" />
+                </span>
+                Extracting
+              </span>
+            )}
           </div>
 
           <div className="mt-2 space-y-1 text-sm text-gray-600">
@@ -212,22 +236,42 @@ function DeviceCard({
                 <span className="text-gray-400">No fields</span>
               )}
             </div>
-            {isDeviceFailed && deviceError && (
-              <div className="flex items-start gap-1 text-red-600">
-                <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span className="text-xs">{deviceError}</span>
+            {isDeviceFailed && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-start gap-1 text-red-600">
+                  <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="text-xs">
+                    {deviceError === 'AI extraction returned no results after retries'
+                      ? 'Extraction failed'
+                      : deviceError}
+                  </span>
+                </div>
+                {onRetry && (
+                  <button
+                    onClick={onRetry}
+                    disabled={isRetrying}
+                    className="flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 transition-colors hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isRetrying ? 'animate-spin' : ''}`} />
+                    Retry
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
 
         <div className="flex shrink-0 items-center">
-          {isExtracting ? (
+          {isRetrying ? (
+            <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+          ) : isActiveDevice ? (
             <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
           ) : isComplete ? (
             <CheckCircle className="h-5 w-5 text-emerald-500" />
           ) : isDeviceFailed ? (
             <XCircle className="h-5 w-5 text-red-500" />
+          ) : isExtracting ? (
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
           ) : (
             <Clock className="h-5 w-5 text-gray-400" />
           )}
@@ -252,6 +296,9 @@ export default function QuestionnaireDetailPage() {
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
   const [savingPartner, setSavingPartner] = useState(false);
   const [matchedDeviceNames, setMatchedDeviceNames] = useState<Record<string, string>>({});
+  const [retryingDeviceId, setRetryingDeviceId] = useState<string | null>(null);
+  const [statusPanelVisible, setStatusPanelVisible] = useState(true);
+  const prevStatusRef = useRef<string | null>(null);
 
   const fetchJob = useCallback(async () => {
     if (!id) return;
@@ -294,12 +341,39 @@ export default function QuestionnaireDetailPage() {
     fetchJob();
   }, [fetchJob]);
 
-  // Poll when extracting
+  // Poll when extracting or retrying a device
   useEffect(() => {
-    if (!id || !job || job.status !== 'extracting') return;
+    if (!id || !job) return;
+    const shouldPoll = job.status === 'extracting' || retryingDeviceId != null;
+    if (!shouldPoll) return;
     const interval = setInterval(fetchJob, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [id, job?.status, fetchJob]);
+  }, [id, job?.status, retryingDeviceId, fetchJob]);
+
+  // Auto-collapse status panel 2s after extraction completes successfully
+  useEffect(() => {
+    if (!job) return;
+    const wasExtracting = prevStatusRef.current === 'extracting';
+    const nowComplete = ['pending_review', 'approved', 'partially_approved'].includes(job.status);
+    if (wasExtracting && nowComplete && !job.extractionError) {
+      setStatusPanelVisible(true);
+      const timer = setTimeout(() => setStatusPanelVisible(false), 2000);
+      return () => clearTimeout(timer);
+    }
+    if (job.status === 'extracting' || job.status === 'extraction_failed') {
+      setStatusPanelVisible(true);
+    }
+    prevStatusRef.current = job.status;
+  }, [job?.status, job?.extractionError]);
+
+  // Clear retrying state when the device error is resolved
+  useEffect(() => {
+    if (!retryingDeviceId || !job) return;
+    const device = job.stagedDevices?.find(d => d.id === retryingDeviceId);
+    if (device && !device.extractionError && job.status !== 'extracting') {
+      setRetryingDeviceId(null);
+    }
+  }, [retryingDeviceId, job]);
 
   const runExtraction = async () => {
     if (!id) return;
@@ -311,6 +385,18 @@ export default function QuestionnaireDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to trigger extraction');
     } finally {
       setExtracting(false);
+    }
+  };
+
+  const handleRetryDevice = async (deviceId: string) => {
+    if (!id) return;
+    setRetryingDeviceId(deviceId);
+    try {
+      await api.questionnaireIntake.retryDevice(id, deviceId);
+      await fetchJob();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to retry device extraction');
+      setRetryingDeviceId(null);
     }
   };
 
@@ -469,7 +555,7 @@ export default function QuestionnaireDetailPage() {
           </div>
         </div>
 
-        {job.extractionError && (
+        {job.extractionError && !statusPanelVisible && (
           <div className={`mt-4 rounded-lg border p-4 text-sm ${
             job.status === 'extraction_failed'
               ? 'border-red-200 bg-red-50 text-red-700'
@@ -492,6 +578,22 @@ export default function QuestionnaireDetailPage() {
         )}
       </div>
 
+      {/* DST-052: Extraction Status Panel */}
+      {statusPanelVisible && (
+        <ExtractionStatusPanel
+          status={job.status}
+          progress={job.extractionProgress ?? null}
+          failedDevices={
+            (job.stagedDevices ?? [])
+              .filter(d => !!d.extractionError)
+              .map(d => ({ id: d.id, rawHeaderLabel: d.rawHeaderLabel }))
+          }
+          onRestart={handleTriggerExtraction}
+          onRetryDevice={handleRetryDevice}
+          retryingDeviceId={retryingDeviceId}
+        />
+      )}
+
       {/* Device cards */}
       <div>
         <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
@@ -506,6 +608,12 @@ export default function QuestionnaireDetailPage() {
                 device={device}
                 jobStatus={job.status}
                 matchedDeviceName={device.matchedDeviceId ? matchedDeviceNames[device.matchedDeviceId] ?? null : null}
+                isActiveDevice={
+                  job.status === 'extracting' &&
+                  job.extractionProgress?.currentDevice === device.rawHeaderLabel
+                }
+                onRetry={device.extractionError ? () => handleRetryDevice(device.id) : undefined}
+                isRetrying={retryingDeviceId === device.id}
               />
             ))}
           </div>

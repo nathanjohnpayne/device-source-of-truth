@@ -8,7 +8,7 @@ import { requireRole } from '../middleware/auth.js';
 import { logAuditEntry } from '../services/audit.js';
 import { formatError } from '../services/logger.js';
 import { parseQuestionnaire } from '../services/questionnaireParser.js';
-import { runExtractionJob } from '../services/questionnaireExtractor.js';
+import { runExtractionJob, retryDeviceExtraction } from '../services/questionnaireExtractor.js';
 import { uploadQuestionnaireFile, getSignedDownloadUrl } from '../services/storage.js';
 import { calculateSpecCompleteness } from '../services/specCompleteness.js';
 import { assignTierToDevice } from '../services/tierEngine.js';
@@ -259,18 +259,15 @@ router.get('/:id', async (req, res) => {
       if (partnerSnap.exists) partner = partnerSnap.data();
     }
 
-    // Extraction progress
+    // Extraction progress (DST-052: include step and current device)
     let extractionProgress = null;
-    if (job.status === 'extracting') {
-      const complete = stagedDevices.filter(d =>
-        (d as Record<string, unknown>).fieldSummary &&
-        ((d as Record<string, { extractedFields: number }>).fieldSummary.extractedFields > 0),
-      ).length;
-
+    if (job.status === 'extracting' || job.status === 'extraction_failed') {
       extractionProgress = {
         totalDevices: stagedDevices.length,
-        devicesComplete: complete,
-        devicesFailed: 0,
+        devicesComplete: (job.devicesComplete as number) || 0,
+        devicesFailed: (job.devicesFailed as number) || 0,
+        step: (job.extractionStep as 1 | 2 | 3 | 4) || null,
+        currentDevice: (job.extractionCurrentDevice as string) || null,
       };
     }
 
@@ -321,6 +318,47 @@ router.post('/:id/trigger-extraction', requireRole('editor', 'admin'), async (re
     res.json({ status: 'extracting', message: 'Extraction started' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to trigger extraction', detail: formatError(err) });
+  }
+});
+
+// ── DST-052: Retry extraction for a single failed device ──
+
+router.post('/:id/retry-device/:deviceId', requireRole('editor', 'admin'), async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const jobRef = db.collection('questionnaireIntakeJobs').doc((req.params.id as string));
+    const jobSnap = await jobRef.get();
+
+    if (!jobSnap.exists) {
+      res.status(404).json({ error: 'Intake job not found' });
+      return;
+    }
+
+    const deviceRef = db.collection('questionnaireStagedDevices').doc((req.params.deviceId as string));
+    const deviceSnap = await deviceRef.get();
+
+    if (!deviceSnap.exists) {
+      res.status(404).json({ error: 'Staged device not found' });
+      return;
+    }
+
+    const deviceData = deviceSnap.data()!;
+    if (!deviceData.extractionError) {
+      res.status(409).json({ error: 'Device does not have an extraction error' });
+      return;
+    }
+
+    retryDeviceExtraction((req.params.id as string), (req.params.deviceId as string)).catch(() => {
+      jobRef.update({
+        extractionStep: null,
+        extractionCurrentDevice: null,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    res.json({ status: 'retrying', message: `Retrying extraction for ${deviceData.rawHeaderLabel}` });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retry device extraction', detail: formatError(err) });
   }
 });
 

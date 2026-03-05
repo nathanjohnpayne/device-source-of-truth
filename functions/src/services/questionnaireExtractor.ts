@@ -475,6 +475,10 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
   await jobRef.update({
     status: 'extracting',
     aiExtractionStartedAt: new Date().toISOString(),
+    extractionStep: 1,
+    extractionCurrentDevice: null,
+    devicesComplete: 0,
+    devicesFailed: 0,
   });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -506,10 +510,18 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
     chunks.push(devices.slice(i, i + MAX_CONCURRENT_CALLS));
   }
 
+  let deviceIndex = 0;
+
   for (const chunk of chunks) {
     await Promise.all(
       chunk.map(async (deviceDoc) => {
         const deviceData = deviceDoc.data();
+        deviceIndex++;
+
+        await jobRef.update({
+          extractionStep: 2,
+          extractionCurrentDevice: deviceData.rawHeaderLabel as string,
+        });
 
         try {
           const fieldsSnap = await db
@@ -526,6 +538,7 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
 
           if (qaPairs.length === 0) {
             devicesComplete++;
+            await jobRef.update({ devicesComplete });
             return;
           }
 
@@ -541,6 +554,7 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
             log.warn('AI extraction returned no results for device', { device: deviceData.rawHeaderLabel, qaPairCount: qaPairs.length });
             await deviceDoc.ref.update({ extractionError: 'AI extraction returned no results after retries' });
             devicesFailed++;
+            await jobRef.update({ devicesFailed });
             return;
           }
 
@@ -630,6 +644,7 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
           }
 
           devicesComplete++;
+          await jobRef.update({ devicesComplete });
         } catch (err) {
           log.error('Device extraction failed', {
             device: deviceData.rawHeaderLabel,
@@ -637,10 +652,14 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
           });
           await deviceDoc.ref.update({ extractionError: typeof err === 'object' && err !== null && 'message' in err ? (err as Error).message : String(err) }).catch(() => {});
           devicesFailed++;
+          await jobRef.update({ devicesFailed });
         }
       }),
     );
   }
+
+  // Step 3: Validating values (normalization already happened inline, but mark the step)
+  await jobRef.update({ extractionStep: 3, extractionCurrentDevice: null });
 
   const allFailed = devicesComplete === 0;
   const someFailed = devicesFailed > 0 && devicesComplete > 0;
@@ -656,6 +675,8 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
     status: finalStatus,
     aiExtractionCompletedAt: new Date().toISOString(),
     extractionError: errorSummary,
+    extractionStep: allFailed ? null : 4,
+    extractionCurrentDevice: null,
     devicesComplete,
     devicesFailed,
   });
@@ -680,6 +701,176 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
       link: `/admin/questionnaires/${intakeJobId}`,
       read: false,
       createdAt: new Date().toISOString(),
+    });
+  }
+}
+
+// ── Single Device Retry ──
+
+export async function retryDeviceExtraction(
+  intakeJobId: string,
+  stagedDeviceId: string,
+): Promise<void> {
+  const db = admin.firestore();
+
+  const jobRef = db.collection('questionnaireIntakeJobs').doc(intakeJobId);
+  const jobSnap = await jobRef.get();
+  if (!jobSnap.exists) throw new Error(`Intake job ${intakeJobId} not found`);
+  const job = jobSnap.data()!;
+
+  const deviceDoc = await db.collection('questionnaireStagedDevices').doc(stagedDeviceId).get();
+  if (!deviceDoc.exists) throw new Error(`Staged device ${stagedDeviceId} not found`);
+  const deviceData = deviceDoc.data()!;
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+
+  const client = new Anthropic({ apiKey });
+
+  await deviceDoc.ref.update({ extractionError: null });
+  await jobRef.update({
+    status: 'extracting',
+    extractionStep: 2,
+    extractionCurrentDevice: deviceData.rawHeaderLabel as string,
+    extractionError: null,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const partnerName = job.partnerId
+    ? await getPartnerName(db, job.partnerId as string)
+    : 'Unknown';
+
+  try {
+    const fieldsSnap = await db
+      .collection('questionnaireStagedFields')
+      .where('stagedDeviceId', '==', stagedDeviceId)
+      .where('intakeJobId', '==', intakeJobId)
+      .get();
+
+    const qaPairs: RawQAPair[] = fieldsSnap.docs.map((f, i) => ({
+      rowIndex: i,
+      rawQuestionText: f.data().rawQuestionText as string,
+      rawAnswerText: f.data().rawAnswerText as string | null,
+    }));
+
+    const context: DeviceExtractionContext = {
+      partnerName,
+      rawHeaderLabel: deviceData.rawHeaderLabel as string,
+      platformType: deviceData.platformType as string,
+    };
+
+    const results = await extractDeviceFields(qaPairs, context, client);
+
+    if (results.length === 0) {
+      await deviceDoc.ref.update({ extractionError: 'AI extraction returned no results after retries' });
+      const prevFailed = (job.devicesFailed as number) || 0;
+      await jobRef.update({
+        status: prevFailed > 1 ? 'extraction_failed' : 'pending_review',
+        extractionStep: null,
+        extractionCurrentDevice: null,
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    let existingSpec: DeviceSpec | null = null;
+    if (deviceData.matchedDeviceId) {
+      const specSnap = await db
+        .collection('deviceSpecs')
+        .where('deviceId', '==', deviceData.matchedDeviceId)
+        .limit(1)
+        .get();
+      if (!specSnap.empty) {
+        existingSpec = { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } as DeviceSpec;
+      }
+    }
+
+    const batch = db.batch();
+    const fieldDocs = fieldsSnap.docs;
+
+    for (let i = 0; i < fieldDocs.length && i < results.length; i++) {
+      const result = results[i];
+      const fieldRef = fieldDocs[i].ref;
+
+      const normalizedValue = result.dstFieldKey
+        ? normalizeExtractedValue(result.dstFieldKey.split('.')[1] ?? '', result.extractedValue)
+        : result.extractedValue;
+
+      const { conflictStatus, existingValue } = result.dstFieldKey
+        ? detectConflicts(result.dstFieldKey, normalizedValue, existingSpec)
+        : { conflictStatus: 'new_field' as ConflictStatus, existingValue: null };
+
+      const section = result.dstFieldKey?.split('.')[0] ?? '';
+
+      batch.update(fieldRef, {
+        dstFieldKey: result.dstFieldKey ?? '__unmapped__',
+        dstFieldCategory: section,
+        extractedValue: normalizedValue,
+        extractionMethod: result.dstFieldKey ? 'ai' as ExtractionMethod : 'skipped' as ExtractionMethod,
+        aiConfidence: result.confidence,
+        aiReasoning: result.reasoning,
+        conflictStatus,
+        existingValue,
+      });
+    }
+
+    const identityUpdates: Record<string, unknown> = {};
+    for (const result of results) {
+      if (!result.dstFieldKey || !result.extractedValue) continue;
+      if (result.dstFieldKey === 'general.modelName') identityUpdates.detectedModelName = result.extractedValue;
+      else if (result.dstFieldKey === 'general.modelNumber') identityUpdates.detectedModelNumber = result.extractedValue;
+      else if (result.dstFieldKey === 'hardware.stbManufacturer') identityUpdates.detectedManufacturer = result.extractedValue;
+    }
+
+    batch.update(deviceDoc.ref, { ...identityUpdates, extractionError: null });
+    await batch.commit();
+
+    // Recalculate job-level counters
+    const allDevicesSnap = await db.collection('questionnaireStagedDevices')
+      .where('intakeJobId', '==', intakeJobId)
+      .get();
+
+    let devicesComplete = 0;
+    let devicesFailed = 0;
+    for (const d of allDevicesSnap.docs) {
+      const dd = d.data();
+      if (dd.extractionError) {
+        devicesFailed++;
+      } else {
+        const fSnap = await db.collection('questionnaireStagedFields')
+          .where('stagedDeviceId', '==', d.id)
+          .where('extractionMethod', '!=', 'skipped')
+          .limit(1)
+          .get();
+        if (!fSnap.empty || !dd.extractionError) devicesComplete++;
+      }
+    }
+
+    const allOk = devicesFailed === 0;
+    await jobRef.update({
+      status: 'pending_review',
+      extractionStep: allOk ? 4 : null,
+      extractionCurrentDevice: null,
+      devicesComplete,
+      devicesFailed,
+      extractionError: devicesFailed > 0
+        ? `${devicesFailed} of ${devicesFailed + devicesComplete} device(s) failed extraction. ${devicesComplete} succeeded.`
+        : null,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    log.error('Single device retry failed', {
+      device: deviceData.rawHeaderLabel,
+      error: formatError(err),
+    });
+    await deviceDoc.ref.update({
+      extractionError: typeof err === 'object' && err !== null && 'message' in err ? (err as Error).message : String(err),
+    }).catch(() => {});
+    await jobRef.update({
+      status: 'pending_review',
+      extractionStep: null,
+      extractionCurrentDevice: null,
+      updatedAt: new Date().toISOString(),
     });
   }
 }

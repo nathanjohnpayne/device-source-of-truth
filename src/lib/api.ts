@@ -435,6 +435,10 @@ export const api = {
       apiFetch<{ status: string; message: string }>(`/questionnaire-intake/${id}/trigger-extraction`, {
         method: 'POST',
       }),
+    retryDevice: (jobId: string, deviceId: string) =>
+      apiFetch<{ status: string; message: string }>(`/questionnaire-intake/${jobId}/retry-device/${deviceId}`, {
+        method: 'POST',
+      }),
     getStagedDevices: (id: string) =>
       apiFetch<(QuestionnaireStagedDevice & { fields: QuestionnaireStagedField[] })[]>(
         `/questionnaire-intake/${id}/staged-devices`,

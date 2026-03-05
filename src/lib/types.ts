@@ -58,6 +58,7 @@ export type {
   FieldResolution,
   StagedDeviceReviewStatus,
   DeviceMatchMethod,
+  ExtractionStep,
   QuestionnaireIntakeJob,
   QuestionnaireStagedDevice,
   QuestionnaireStagedField,

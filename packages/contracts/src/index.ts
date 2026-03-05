@@ -145,6 +145,8 @@ export type QuestionnaireIntakeJobStatus =
   | 'partially_approved'
   | 'rejected';
 
+export type ExtractionStep = 1 | 2 | 3 | 4;
+
 export type PlatformType = 'ncp_linux' | 'android_tv' | 'android_aosp' | 'unknown';
 
 export type PartnerDetectionMethod = 'filename' | 'content' | 'ai' | 'admin';
@@ -181,6 +183,10 @@ export interface QuestionnaireIntakeJob {
   aiExtractionStartedAt: Timestamp | null;
   aiExtractionCompletedAt: Timestamp | null;
   extractionError: string | null;
+  extractionStep: ExtractionStep | null;
+  extractionCurrentDevice: string | null;
+  devicesComplete: number;
+  devicesFailed: number;
   notes: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -207,6 +213,7 @@ export interface QuestionnaireStagedDevice {
   confirmedModelNumber: string | null;
   confirmedManufacturer: string | null;
   confirmedDeviceType: DeviceType | null;
+  extractionError: string | null;
   createdAt: Timestamp;
 }
 
@@ -256,6 +263,8 @@ export interface QuestionnaireIntakeJobDetail extends QuestionnaireIntakeJob {
     totalDevices: number;
     devicesComplete: number;
     devicesFailed: number;
+    step: ExtractionStep | null;
+    currentDevice: string | null;
   } | null;
 }
 
