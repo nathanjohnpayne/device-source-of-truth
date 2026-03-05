@@ -1,0 +1,85 @@
+---
+description: Firebase Cloud Functions log access for troubleshooting production issues in the DST app
+globs:
+alwaysApply: true
+---
+
+# Production Log Access
+
+The `api` Cloud Function (2nd gen, Cloud Run-backed) is the single backend entry point. All logs flow through Google Cloud Logging.
+
+## Quick Commands
+
+### Recent logs (human-readable, newest first)
+```
+firebase functions:log
+```
+
+### Errors only (last 24h)
+```
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="api" AND severity>=ERROR' --limit 20 --format=json --project=device-source-of-truth
+```
+
+### HTTP 4xx/5xx responses
+```
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="api" AND jsonPayload.statusCode>=400' --limit 20 --format=json --project=device-source-of-truth
+```
+
+### Logs for a specific API route (regex match)
+```
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="api" AND jsonPayload.path=~"/api/ROUTE_PREFIX"' --limit 20 --format=json --project=device-source-of-truth
+```
+
+### Logs for a specific request ID
+```
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="api" AND jsonPayload.requestId="REQUEST_ID"' --limit 50 --format=json --project=device-source-of-truth
+```
+
+### Logs within a time window
+```
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="api" AND timestamp>="2026-03-04T00:00:00Z" AND timestamp<="2026-03-04T23:59:59Z"' --limit 50 --format=json --project=device-source-of-truth
+```
+
+### Logs mentioning a specific user email
+```
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="api" AND jsonPayload.email="USER@disneystreaming.com"' --limit 20 --format=json --project=device-source-of-truth
+```
+
+### Slow requests (> 1000ms)
+```
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="api" AND jsonPayload.elapsedMs>1000' --limit 20 --format=json --project=device-source-of-truth
+```
+
+## Log Structure
+
+Every request is logged with structured JSON containing:
+- `requestId` — unique per request, trace across auth/handler/completion logs
+- `method` — HTTP method
+- `path` — full API path (e.g., `/api/devices`)
+- `statusCode` — HTTP response status (on completion log)
+- `elapsedMs` — request duration in ms (on completion log)
+- `email` — authenticated user email (on auth log)
+- `role` — user role: viewer/editor/admin (on auth log)
+- `service` — always "DST"
+- `error` — error object with `errorMessage`, `errorName`, `stack` (on error logs)
+
+## Firestore Data Inspection
+
+For direct Firestore queries during debugging, use the Firebase console or:
+```
+gcloud firestore documents list --collection=COLLECTION_NAME --project=device-source-of-truth --limit=5
+```
+
+## Firebase Hosting Logs
+
+For frontend hosting/CDN issues:
+```
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="device-source-of-truth"' --limit 10 --format=json --project=device-source-of-truth
+```
+
+## Tips
+
+- Use `--format=json` for full structured data; use `--format="table(timestamp,severity,jsonPayload.message,jsonPayload.path,jsonPayload.statusCode)"` for a compact table view.
+- Combine filters with `AND`. Use `=~` for regex matching on string fields.
+- The `firebase functions:log` command is simpler but less filterable than `gcloud logging read`.
+- For real-time tailing, use `gcloud logging tail` (requires beta component).
