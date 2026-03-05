@@ -385,7 +385,7 @@ router.post('/upload', requireRole('admin'), async (req, res) => {
       if (!devSnap.empty) {
         await devSnap.docs[0].ref.update({
           activeDeviceCount: count,
-          lastTelemetryAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastTelemetryAt: now,
         });
       }
     }

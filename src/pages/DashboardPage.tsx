@@ -37,6 +37,7 @@ interface DashboardData {
     region: string;
     activeDevices: number;
     deviceCount: number;
+    lastTelemetryAt: string | null;
   }[];
 }
 
@@ -311,7 +312,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-400">
                       {(r.deviceCount ?? 0).toLocaleString()} devices registered
                     </p>
-                    <FreshnessBadge lastTelemetryAt={data.lastTelemetryAt} />
+                    <FreshnessBadge lastTelemetryAt={r.lastTelemetryAt} />
                   </div>
                 </div>
               );

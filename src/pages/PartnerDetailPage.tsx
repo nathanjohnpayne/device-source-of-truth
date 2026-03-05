@@ -28,6 +28,17 @@ function countryFlag(iso2: string): string {
   return String.fromCodePoint(cp1, cp2);
 }
 
+type DeviceRow = DeviceWithRelations & { lastTelemetryAt?: string | null };
+
+function getFreshnessLabel(row: DeviceRow): string {
+  const t = row.lastTelemetryAt;
+  if (!t) return 'no data';
+  const diffMs = Date.now() - new Date(t).getTime();
+  if (diffMs < 48 * 3_600_000) return 'fresh';
+  if (diffMs < 7 * 86_400_000) return 'aging';
+  return 'stale';
+}
+
 const deviceColumns: Column<DeviceWithRelations>[] = [
   { header: 'Device Name', accessor: 'displayName', sortable: true },
   { header: 'Device ID', accessor: 'deviceId', sortable: true },
@@ -37,9 +48,12 @@ const deviceColumns: Column<DeviceWithRelations>[] = [
     header: 'Active Devices',
     accessor: 'activeDeviceCount',
     sortable: true,
+    cellProps: (row) => ({
+      'aria-label': `Active devices: ${(row.activeDeviceCount ?? 0).toLocaleString()}, ${getFreshnessLabel(row as DeviceRow)} data`,
+    }),
     render: (row) => (
       <FreshnessMicroPanel
-        lastTelemetryAt={(row as DeviceWithRelations & { lastTelemetryAt?: string | null }).lastTelemetryAt}
+        lastTelemetryAt={(row as DeviceRow).lastTelemetryAt}
         partnerName={row.partnerName}
         partnerKeyName={row.partnerKeyName}
       >
@@ -47,7 +61,7 @@ const deviceColumns: Column<DeviceWithRelations>[] = [
           {(row.activeDeviceCount ?? 0).toLocaleString()}
           <FreshnessBadge
             compact
-            lastTelemetryAt={(row as DeviceWithRelations & { lastTelemetryAt?: string | null }).lastTelemetryAt}
+            lastTelemetryAt={(row as DeviceRow).lastTelemetryAt}
           />
         </span>
       </FreshnessMicroPanel>

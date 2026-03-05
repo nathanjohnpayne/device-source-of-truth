@@ -106,13 +106,17 @@ router.get('/dashboard', async (req, res) => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    const regionAgg = new Map<string, { activeDevices: number; deviceCount: number }>();
+    const regionAgg = new Map<string, { activeDevices: number; deviceCount: number; lastTelemetryAt: string | null }>();
     for (const d of devices) {
       const regions = keyRegionsMap.get(d.partnerKeyId) ?? ['Unknown'];
+      const devTelemetry = (d as unknown as { lastTelemetryAt?: string | null }).lastTelemetryAt ?? null;
       for (const region of regions) {
-        const entry = regionAgg.get(region) ?? { activeDevices: 0, deviceCount: 0 };
+        const entry = regionAgg.get(region) ?? { activeDevices: 0, deviceCount: 0, lastTelemetryAt: null };
         entry.activeDevices += d.activeDeviceCount;
         entry.deviceCount += 1;
+        if (devTelemetry && (!entry.lastTelemetryAt || devTelemetry > entry.lastTelemetryAt)) {
+          entry.lastTelemetryAt = devTelemetry;
+        }
         regionAgg.set(region, entry);
       }
     }

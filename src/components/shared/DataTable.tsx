@@ -10,6 +10,7 @@ export interface Column<T> {
   accessor: keyof T | string;
   render?: (row: T) => ReactNode;
   sortable?: boolean;
+  cellProps?: (row: T) => Record<string, string> | undefined;
 }
 
 interface PaginationProps {
@@ -123,6 +124,7 @@ export default function DataTable<T extends { id?: string }>({
                   <td
                     key={String(col.accessor)}
                     className="whitespace-nowrap px-4 py-3 text-sm text-gray-700"
+                    {...(col.cellProps?.(row))}
                   >
                     {col.render
                       ? col.render(row)

@@ -1160,6 +1160,7 @@ export const DashboardReportResponseSchema = z.object({
       region: z.string(),
       activeDevices: z.number(),
       deviceCount: z.number(),
+      lastTelemetryAt: timestamp.nullable().optional(),
     }),
   ),
 });
