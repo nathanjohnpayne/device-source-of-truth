@@ -546,6 +546,7 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
     await jobRef.update({
       extractionStep: 2,
       extractionCurrentDevice: deviceData.rawHeaderLabel as string,
+      extractionHeartbeat: new Date().toISOString(),
     });
 
     try {
@@ -664,7 +665,7 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
       }
 
       devicesComplete++;
-      await jobRef.update({ devicesComplete });
+      await jobRef.update({ devicesComplete, extractionHeartbeat: new Date().toISOString() });
     } catch (err) {
       log.error('Device extraction failed', {
         device: deviceData.rawHeaderLabel,

@@ -141,8 +141,9 @@ export class MockCollectionRef {
     return c;
   }
 
-  doc(id: string): MockDocRef {
-    return new MockDocRef(this.store, this.name, id);
+  doc(id?: string): MockDocRef {
+    const docId = id ?? 'auto_' + Math.random().toString(36).slice(2, 10);
+    return new MockDocRef(this.store, this.name, docId);
   }
 
   async get(): Promise<MockQuerySnapshot> {
@@ -201,8 +202,8 @@ export class MockCollectionRef {
 export class MockBatch {
   private ops: Array<() => Promise<void>> = [];
 
-  set(ref: MockDocRef, data: DocData) {
-    this.ops.push(() => ref.set(data));
+  set(ref: MockDocRef, data: DocData, options?: { merge?: boolean }) {
+    this.ops.push(() => ref.set(data, options));
   }
 
   update(ref: MockDocRef, data: DocData) {
@@ -233,8 +234,8 @@ export class MockFirestoreDB {
 
   seed(collectionName: string, docs: Array<{ id: string; [k: string]: unknown }>) {
     const map = new Map<string, DocData>();
-    for (const { id, ...rest } of docs) {
-      map.set(id, rest);
+    for (const doc of docs) {
+      map.set(doc.id, { ...doc });
     }
     this.store.set(collectionName, map);
   }

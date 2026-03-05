@@ -200,8 +200,6 @@ export function detectPlatformTypes(
       platformType = 'android_tv';
     } else if (hasLinuxSignals) {
       platformType = 'ncp_linux';
-    } else if (hasAndroidSignals && hasLinuxSignals) {
-      platformType = 'ncp_linux';
     }
 
     if (format === 'android_atv') {

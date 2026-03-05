@@ -36,3 +36,29 @@ vi.mock('firebase-functions', () => ({
 vi.mock('firebase-functions/v2/https', () => ({
   onRequest: vi.fn(),
 }));
+
+vi.mock('../../src/services/questionnaireParser.js', () => ({
+  parseQuestionnaire: vi.fn().mockResolvedValue({
+    format: 'lg_stb_v1',
+    devices: [
+      { columnIndex: 3, rawHeaderLabel: 'STB Model A', platformType: 'ncp_linux', isOutOfScope: false },
+    ],
+    qaPairsByDevice: new Map([[3, [{ rowIndex: 2, rawQuestionText: 'SoC Vendor?', rawAnswerText: 'Broadcom' }]]]),
+    partnerDetection: { partnerId: null, confidence: 0, method: 'filename' },
+  }),
+}));
+
+vi.mock('../../src/services/questionnaireExtractor.js', () => ({
+  runExtractionJob: vi.fn().mockResolvedValue(undefined),
+  retryDeviceExtraction: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../src/services/storage.js', () => ({
+  uploadQuestionnaireFile: vi.fn().mockResolvedValue('questionnaires/test-job/file.xlsx'),
+  getSignedDownloadUrl: vi.fn().mockResolvedValue('https://storage.example.com/signed-url'),
+}));
+
+vi.mock('../../src/services/partnerAliasResolver.js', () => ({
+  loadActiveAliases: vi.fn().mockResolvedValue([]),
+  resolvePartnerAlias: vi.fn().mockReturnValue(null),
+}));

@@ -12,6 +12,7 @@ import auditRouter from '../../src/routes/audit.js';
 import searchRouter from '../../src/routes/search.js';
 import reportsRouter from '../../src/routes/reports.js';
 import uploadRouter from '../../src/routes/upload.js';
+import questionnaireIntakeRouter from '../../src/routes/questionnaireIntake.js';
 
 interface AuthUser {
   uid: string;
@@ -64,6 +65,7 @@ export function createTestApp(role: string = 'admin') {
   app.use('/api/search', searchRouter);
   app.use('/api/reports', reportsRouter);
   app.use('/api/upload', uploadRouter);
+  app.use('/api/questionnaire-intake', questionnaireIntakeRouter);
 
   return app;
 }
