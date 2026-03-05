@@ -14,13 +14,22 @@ const POLL_INTERVAL_MS = 60 * 1000;
 export function useAppUpdate() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const bootHashRef = useRef<string | null>(null);
+  const detectedRef = useRef(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function flagUpdate() {
+    if (detectedRef.current) return;
+    detectedRef.current = true;
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setUpdateAvailable(true);
+  }
 
   const {
     needRefresh: [swNeedsRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onNeedRefresh() {
-      setUpdateAvailable(true);
+      flagUpdate();
     },
     onOfflineReady() {},
   });
@@ -47,17 +56,18 @@ export function useAppUpdate() {
     }
 
     async function poll() {
+      if (detectedRef.current) return;
       const latest = await fetchHash();
       if (!cancelled && latest && bootHashRef.current && latest !== bootHashRef.current) {
-        setUpdateAvailable(true);
+        flagUpdate();
       }
     }
 
     init();
-    const id = setInterval(poll, POLL_INTERVAL_MS);
+    intervalRef.current = setInterval(poll, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 

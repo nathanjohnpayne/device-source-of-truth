@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useAppUpdate } from '../hooks/useAppUpdate';
 
-/**
- * Sticks to the top of the viewport when a new version is available.
- * Dismissible for the session (banner hides, update still applies on next reload).
- */
+const DISMISS_KEY = 'dst_update_dismissed';
+
 export default function UpdateBanner() {
   const { updateAvailable, applyUpdate } = useAppUpdate();
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    try { return sessionStorage.getItem(DISMISS_KEY) === '1'; } catch { return false; }
+  });
 
   if (!updateAvailable || dismissed) return null;
 
@@ -30,7 +30,10 @@ export default function UpdateBanner() {
         </button>
 
         <button
-          onClick={() => setDismissed(true)}
+          onClick={() => {
+            setDismissed(true);
+            try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch { /* noop */ }
+          }}
           aria-label="Dismiss update notification"
           className="rounded p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
         >
