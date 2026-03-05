@@ -20,8 +20,10 @@ import type { RawQAPair } from './questionnaireParser.js';
 
 const AI_MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 8000;
-const API_TIMEOUT_MS = 15_000;
-const MAX_CONCURRENT_CALLS = 5;
+const API_TIMEOUT_MS = 30_000;
+const MAX_CONCURRENT_CALLS = 3;
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 2_000;
 
 // ── Types ──
 
@@ -238,46 +240,60 @@ Platform type: ${context.platformType}
 Question-answer pairs:
 ${pairsText}`;
 
-  try {
-    const response = await withTimeout(
-      client.messages.create({
-        model: AI_MODEL,
-        max_tokens: MAX_TOKENS,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
-      API_TIMEOUT_MS,
-    );
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await withTimeout(
+        client.messages.create({
+          model: AI_MODEL,
+          max_tokens: MAX_TOKENS,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+        API_TIMEOUT_MS,
+      );
 
-    const textBlock = response.content.find(b => b.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') {
-      log.warn('AI extraction returned no text block');
+      const textBlock = response.content.find(b => b.type === 'text');
+      if (!textBlock || textBlock.type !== 'text') {
+        log.warn('AI extraction returned no text block');
+        return [];
+      }
+
+      const jsonMatch = textBlock.text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        log.warn('AI extraction returned no JSON array', { text: textBlock.text.slice(0, 200) });
+        return [];
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]) as Array<{
+        dst_field_key: string | null;
+        extracted_value: string | null;
+        confidence: number;
+        reasoning: string;
+      }>;
+
+      return parsed.map(r => ({
+        dstFieldKey: r.dst_field_key,
+        extractedValue: r.extracted_value != null ? String(r.extracted_value) : null,
+        confidence: r.confidence,
+        reasoning: r.reasoning,
+      }));
+    } catch (err) {
+      const isRateLimit = err instanceof Error && (err.message.includes('429') || err.message.includes('rate_limit'));
+      const isTimeout = err instanceof Error && err.message.includes('timeout');
+
+      if ((isRateLimit || isTimeout) && attempt < MAX_RETRIES) {
+        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+        log.warn('AI extraction retrying', { attempt: attempt + 1, delay, device: context.rawHeaderLabel, reason: isRateLimit ? 'rate_limit' : 'timeout' });
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+
+      log.error('AI extraction call failed', { error: formatError(err), device: context.rawHeaderLabel, attempts: attempt + 1 });
       return [];
     }
-
-    const jsonMatch = textBlock.text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      log.warn('AI extraction returned no JSON array', { text: textBlock.text.slice(0, 200) });
-      return [];
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as Array<{
-      dst_field_key: string | null;
-      extracted_value: string | null;
-      confidence: number;
-      reasoning: string;
-    }>;
-
-    return parsed.map(r => ({
-      dstFieldKey: r.dst_field_key,
-      extractedValue: r.extracted_value != null ? String(r.extracted_value) : null,
-      confidence: r.confidence,
-      reasoning: r.reasoning,
-    }));
-  } catch (err) {
-    log.error('AI extraction call failed', { error: formatError(err), device: context.rawHeaderLabel });
-    return [];
   }
+
+  return [];
 }
 
 // ── Post-Extraction Normalization ──
@@ -521,6 +537,13 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
 
           const results = await extractDeviceFields(qaPairs, context, client);
 
+          if (results.length === 0) {
+            log.warn('AI extraction returned no results for device', { device: deviceData.rawHeaderLabel, qaPairCount: qaPairs.length });
+            await deviceDoc.ref.update({ extractionError: 'AI extraction returned no results after retries' });
+            devicesFailed++;
+            return;
+          }
+
           let existingSpec: DeviceSpec | null = null;
           if (deviceData.matchedDeviceId) {
             const specSnap = await db
@@ -578,7 +601,9 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
           }
 
           if (Object.keys(identityUpdates).length > 0) {
-            batch.update(deviceDoc.ref, identityUpdates);
+            batch.update(deviceDoc.ref, { ...identityUpdates, extractionError: null });
+          } else {
+            batch.update(deviceDoc.ref, { extractionError: null });
           }
 
           await batch.commit();
@@ -610,20 +635,29 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
             device: deviceData.rawHeaderLabel,
             error: formatError(err),
           });
+          await deviceDoc.ref.update({ extractionError: typeof err === 'object' && err !== null && 'message' in err ? (err as Error).message : String(err) }).catch(() => {});
           devicesFailed++;
         }
       }),
     );
   }
 
-  const finalStatus = devicesFailed > 0 && devicesComplete === 0
-    ? 'extraction_failed'
-    : 'pending_review';
+  const allFailed = devicesComplete === 0;
+  const someFailed = devicesFailed > 0 && devicesComplete > 0;
+  const finalStatus = allFailed ? 'extraction_failed' : 'pending_review';
+
+  const errorSummary = allFailed
+    ? `All ${devicesFailed} device(s) failed AI extraction — likely due to API rate limits or timeouts. Try again in a few minutes.`
+    : someFailed
+      ? `${devicesFailed} of ${devicesFailed + devicesComplete} device(s) failed extraction. ${devicesComplete} succeeded.`
+      : null;
 
   await jobRef.update({
     status: finalStatus,
     aiExtractionCompletedAt: new Date().toISOString(),
-    extractionError: devicesFailed > 0 ? `${devicesFailed} device(s) failed extraction` : null,
+    extractionError: errorSummary,
+    devicesComplete,
+    devicesFailed,
   });
 
   log.info('Extraction job complete', {
@@ -634,12 +668,15 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
   });
 
   if (finalStatus === 'pending_review') {
+    const notifBody = someFailed
+      ? `${job.fileName} — ${devicesComplete} device(s) extracted (${devicesFailed} failed), ready for review`
+      : `${job.fileName} — ${devicesComplete} device(s) extracted, ready for admin review`;
     const notifId = db.collection('notifications').doc().id;
     await db.collection('notifications').doc(notifId).set({
       id: notifId,
       recipientRole: 'admin',
       title: 'Questionnaire ready for review',
-      body: `${job.fileName} — ${devicesComplete} device(s) extracted, ready for admin review`,
+      body: notifBody,
       link: `/admin/questionnaires/${intakeJobId}`,
       read: false,
       createdAt: new Date().toISOString(),

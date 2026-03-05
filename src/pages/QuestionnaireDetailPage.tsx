@@ -149,17 +149,22 @@ function DeviceCard({
       conflictCount: number;
       newFieldCount: number;
     };
+    extractionError?: string | null;
   };
   jobStatus: QuestionnaireIntakeJobStatus;
   matchedDeviceName: string | null;
 }) {
   const { rawHeaderLabel, platformType, isOutOfScope, matchedDeviceId, fieldSummary } = device;
+  const deviceError = (device as Record<string, unknown>).extractionError as string | null | undefined;
   const isExtracting = jobStatus === 'extracting' && fieldSummary.extractedFields === 0;
   const isComplete = fieldSummary.extractedFields > 0;
   const hasConflicts = fieldSummary.conflictCount > 0;
+  const isDeviceFailed = !isExtracting && !isComplete && (jobStatus === 'extraction_failed' || !!deviceError);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+    <div className={`rounded-lg border p-4 shadow-sm transition-shadow hover:shadow-md ${
+      isDeviceFailed ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-white'
+    }`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -207,6 +212,12 @@ function DeviceCard({
                 <span className="text-gray-400">No fields</span>
               )}
             </div>
+            {isDeviceFailed && deviceError && (
+              <div className="flex items-start gap-1 text-red-600">
+                <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span className="text-xs">{deviceError}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -215,7 +226,7 @@ function DeviceCard({
             <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
           ) : isComplete ? (
             <CheckCircle className="h-5 w-5 text-emerald-500" />
-          ) : jobStatus === 'extraction_failed' ? (
+          ) : isDeviceFailed ? (
             <XCircle className="h-5 w-5 text-red-500" />
           ) : (
             <Clock className="h-5 w-5 text-gray-400" />
@@ -458,13 +469,23 @@ export default function QuestionnaireDetailPage() {
           </div>
         </div>
 
-        {job.status === 'extraction_failed' && job.extractionError && (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {job.extractionError && (
+          <div className={`mt-4 rounded-lg border p-4 text-sm ${
+            job.status === 'extraction_failed'
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`}>
             <div className="flex items-start gap-2">
-              <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              {job.status === 'extraction_failed' ? (
+                <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+              ) : (
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              )}
               <div>
-                <span className="font-medium">Extraction failed</span>
-                <p className="mt-1">{job.extractionError}</p>
+                <span className="font-medium">
+                  {job.status === 'extraction_failed' ? 'Extraction failed' : 'Extraction completed with issues'}
+                </span>
+                <p className="mt-1">{typeof job.extractionError === 'string' ? job.extractionError : 'An unknown error occurred during extraction.'}</p>
               </div>
             </div>
           </div>
@@ -506,7 +527,7 @@ export default function QuestionnaireDetailPage() {
           {downloading ? 'Downloading…' : 'Download Source File'}
         </button>
 
-        {job.status === 'awaiting_extraction' && (
+        {(job.status === 'awaiting_extraction' || job.status === 'extraction_failed') && (
           <>
             <button
               onClick={handleTriggerExtraction}
@@ -514,7 +535,7 @@ export default function QuestionnaireDetailPage() {
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
             >
               <Cpu className="h-4 w-4" />
-              {extracting ? 'Starting…' : 'Run AI Extraction'}
+              {extracting ? 'Starting…' : job.status === 'extraction_failed' ? 'Retry AI Extraction' : 'Run AI Extraction'}
             </button>
             <button
               onClick={() => id && navigate(`/admin/questionnaires/${id}/review`)}
