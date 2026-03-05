@@ -17,7 +17,7 @@ describe('POST /api/telemetry/upload', () => {
 
     const res = await request(app)
       .post('/api/telemetry/upload')
-      .send({ csvData, snapshotDate: '2026-02-25', fileName: 'test.csv' })
+      .send({ csvData, snapshotDate: '2026-02-25', fileName: 'test.csv', importTimeRange: '30d' })
       .expect(200);
 
     expect(res.body.success).toBeDefined();
