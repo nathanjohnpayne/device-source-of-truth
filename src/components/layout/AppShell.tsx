@@ -228,8 +228,8 @@ function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-slate-900">
       <div className="flex h-16 items-center gap-3 px-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
-          <Logo className="h-6 w-6" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 p-1 text-white">
+          <Logo className="h-8 w-8" />
         </div>
         <div>
           <h1 className="text-sm font-semibold text-white">Device Source of Truth</h1>
