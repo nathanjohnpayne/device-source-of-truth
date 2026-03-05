@@ -24,12 +24,14 @@ export default function Modal({
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
 
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dismissable) onClose();
+      if (e.key === 'Escape' && dismissable) onCloseRef.current();
     };
     document.addEventListener('keydown', handleKey);
 
@@ -40,7 +42,7 @@ export default function Modal({
       document.removeEventListener('keydown', handleKey);
       prev?.focus();
     };
-  }, [open, onClose, dismissable]);
+  }, [open, dismissable]);
 
   if (!open) return null;
 
