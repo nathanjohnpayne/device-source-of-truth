@@ -8,14 +8,16 @@ import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import ClarificationPanel from '../components/shared/ClarificationPanel';
+import AIPassStatusPanel from '../components/shared/AIPassStatusPanel';
 import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
 import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
+import { useAIPassStatus } from '../hooks/useAIPassStatus';
 import type {
   IntakePreviewRow, IntakePreviewWarning,
   IntakePreviewPartnerMatch, IntakeImportBatch, IntakeRegion,
-  DisambiguationResponse, DisambiguationFieldResult, ClarificationAnswer,
+  DisambiguationFieldResult, ClarificationAnswer,
   ConflictResolution,
 } from '../lib/types';
 
@@ -143,8 +145,7 @@ export default function IntakeImportPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [rollbackModal, setRollbackModal] = useState<IntakeImportBatch | null>(null);
   const [rollbackLoading, setRollbackLoading] = useState(false);
-  const [disambiguation, setDisambiguation] = useState<DisambiguationResponse | null>(null);
-  const [disambiguating, setDisambiguating] = useState(false);
+  const { passState, disambiguation, setDisambiguation, runAIPass, restartAIPass, resetPass, collapsed: aiPanelCollapsed } = useAIPassStatus();
   const [resolving, setResolving] = useState(false);
   const [rawCsvRows, setRawCsvRows] = useState<Record<string, unknown>[]>([]);
   const [useAI, setUseAI] = useState(false);
@@ -272,28 +273,8 @@ export default function IntakeImportPage() {
         r.partnerMatches?.some((m: IntakePreviewPartnerMatch) => m.matchConfidence === 'unmatched'),
       );
       if (useAIRef.current && (hasWarnings || hasUnmatched)) {
-        setDisambiguating(true);
-        try {
-          const aiResult = await api.disambiguation.disambiguate(
-            'intake',
-            parsed.data as Record<string, unknown>[],
-          );
-          setDisambiguation(aiResult);
-          trackEvent('intake_ai_disambiguation', {
-            auto_resolved: aiResult.fields.filter(f => !f.needsHuman).length,
-            questions: aiResult.questions.length,
-            fallback: aiResult.aiFallback,
-          });
-        } catch {
-          setDisambiguation({
-            fields: [],
-            questions: [],
-            aiFallback: true,
-            fallbackReason: 'AI disambiguation request failed',
-          });
-        } finally {
-          setDisambiguating(false);
-        }
+        const INTAKE_FIELD_TYPE_COUNT = 4; // country, region, partner_name, date
+        await runAIPass('intake', parsed.data as Record<string, unknown>[], INTAKE_FIELD_TYPE_COUNT);
       }
     } catch (err) {
       setParseError(`Failed to process file: ${err instanceof Error ? err.message : String(err)}`);
@@ -450,7 +431,7 @@ export default function IntakeImportPage() {
     setParseError(null);
     setPreviewRows([]);
     setImportResult(null);
-    setDisambiguation(null);
+    resetPass();
     setRawCsvRows([]);
     setUseAI(false);
     useAIRef.current = false;
@@ -665,7 +646,7 @@ export default function IntakeImportPage() {
             )}
           </div>
 
-          {disambiguation?.fieldTypeFallbacks && disambiguation.fieldTypeFallbacks.length > 0 && (
+          {aiPanelCollapsed && disambiguation?.fieldTypeFallbacks && disambiguation.fieldTypeFallbacks.length > 0 && (
             <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
               <p className="text-sm text-amber-800">
@@ -696,14 +677,15 @@ export default function IntakeImportPage() {
           )}
 
           {/* AI Disambiguation Panel */}
-          {disambiguating && (
-            <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-              <Sparkles className="h-5 w-5 animate-pulse text-indigo-500" />
-              <p className="text-sm text-indigo-700">Running AI disambiguation on ambiguous fields…</p>
-            </div>
+          {passState.status !== 'idle' && (
+            <AIPassStatusPanel
+              passState={passState}
+              onRestart={restartAIPass}
+              collapsed={aiPanelCollapsed}
+            />
           )}
 
-          {disambiguation && !disambiguating && (
+          {disambiguation && passState.status !== 'running' && (
             <ClarificationPanel
               questions={disambiguation.questions}
               fields={disambiguation.fields}

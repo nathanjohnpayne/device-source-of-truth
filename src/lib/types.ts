@@ -445,6 +445,30 @@ export interface DisambiguationResponse {
   aiStats?: { totalResolved: number; cachedCount: number };
 }
 
+// ── AI Pass Status (DST-051) ──
+
+export type AIPassStep = 1 | 2 | 3 | 4 | 5;
+
+export type AIPassEvent =
+  | { type: 'ai_pass_start' }
+  | { type: 'ai_pass_step'; step: 1 | 2 | 3 | 4; batchCount?: number }
+  | { type: 'ai_pass_complete'; resolved: number; flagged: number }
+  | { type: 'ai_pass_failed'; reason: string }
+  | { type: 'ai_pass_partial_failure'; failedFieldTypes: string[] };
+
+export type AIPassStatus = 'idle' | 'running' | 'success' | 'failed' | 'partial_failure';
+
+export interface AIPassState {
+  status: AIPassStatus;
+  currentStep: AIPassStep | null;
+  batchCount: number | null;
+  completedSteps: Set<AIPassStep>;
+  resolved: number | null;
+  flagged: number | null;
+  failureReason: string | null;
+  failedFieldTypes: string[];
+}
+
 // ── Migration History ──
 
 export interface MigrationBatch {

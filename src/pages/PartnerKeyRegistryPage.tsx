@@ -23,18 +23,19 @@ import {
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
 import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
+import { useAIPassStatus } from '../hooks/useAIPassStatus';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
 import ClarificationPanel from '../components/shared/ClarificationPanel';
+import AIPassStatusPanel from '../components/shared/AIPassStatusPanel';
 import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import type {
   PartnerKeyWithDisplay,
   PartnerKeyImportRow,
   PartnerKeyImportPreview,
   PartnerKeyImportBatch,
-  DisambiguationResponse,
   DisambiguationFieldResult,
   ClarificationAnswer,
   ConflictResolution,
@@ -253,8 +254,7 @@ function ImportTab() {
   const [batches, setBatches] = useState<PartnerKeyImportBatch[]>([]);
   const [rollingBack, setRollingBack] = useState<string | null>(null);
   const [rollbackConfirm, setRollbackConfirm] = useState<string | null>(null);
-  const [disambiguation, setDisambiguation] = useState<DisambiguationResponse | null>(null);
-  const [disambiguating, setDisambiguating] = useState(false);
+  const { passState, disambiguation, setDisambiguation, runAIPass, restartAIPass, resetPass, collapsed: aiPanelCollapsed } = useAIPassStatus();
   const [resolving, setResolving] = useState(false);
   const [rawCsvRows, setRawCsvRows] = useState<Record<string, unknown>[]>([]);
   const [useAI, setUseAI] = useState(false);
@@ -295,7 +295,7 @@ function ImportTab() {
     if (!file) return;
     setParsing(true);
     setError(null);
-    setDisambiguation(null);
+    resetPass();
     try {
       const csvText = await file.text();
       const lines = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -317,25 +317,8 @@ function ImportTab() {
       trackEvent('partner_key_import_preview', { row_count: res.totalRows });
 
       if (useAI && res.errorCount > 0) {
-        setDisambiguating(true);
-        try {
-          const aiResult = await api.disambiguation.disambiguate('partner_key', csvRows);
-          setDisambiguation(aiResult);
-          trackEvent('partner_key_ai_disambiguation', {
-            auto_resolved: aiResult.fields.filter(f => !f.needsHuman).length,
-            questions: aiResult.questions.length,
-            fallback: aiResult.aiFallback,
-          });
-        } catch {
-          setDisambiguation({
-            fields: [],
-            questions: [],
-            aiFallback: true,
-            fallbackReason: 'AI disambiguation request failed',
-          });
-        } finally {
-          setDisambiguating(false);
-        }
+        const PARTNER_KEY_FIELD_TYPE_COUNT = 3; // country, region, enum
+        await runAIPass('partner_key', csvRows, PARTNER_KEY_FIELD_TYPE_COUNT);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Preview failed');
@@ -643,7 +626,7 @@ function ImportTab() {
             </div>
           )}
 
-          {disambiguation?.fieldTypeFallbacks && disambiguation.fieldTypeFallbacks.length > 0 && (
+          {aiPanelCollapsed && disambiguation?.fieldTypeFallbacks && disambiguation.fieldTypeFallbacks.length > 0 && (
             <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
               <p className="text-sm text-amber-800">
@@ -672,15 +655,16 @@ function ImportTab() {
             </div>
           )}
 
-          {/* AI Disambiguation Panel */}
-          {disambiguating && (
-            <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-              <Sparkles className="h-5 w-5 animate-pulse text-indigo-500" />
-              <p className="text-sm text-indigo-700">Running AI disambiguation on ambiguous fields…</p>
-            </div>
+          {/* AI Status Panel */}
+          {passState.status !== 'idle' && (
+            <AIPassStatusPanel
+              passState={passState}
+              onRestart={restartAIPass}
+              collapsed={aiPanelCollapsed}
+            />
           )}
 
-          {disambiguation && !disambiguating && (
+          {disambiguation && passState.status !== 'running' && (
             <ClarificationPanel
               questions={disambiguation.questions}
               fields={disambiguation.fields}
