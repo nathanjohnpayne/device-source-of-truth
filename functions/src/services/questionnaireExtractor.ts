@@ -19,11 +19,12 @@ import type { RawQAPair } from './questionnaireParser.js';
 // ── Constants ──
 
 const AI_MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS = 8000;
-const API_TIMEOUT_MS = 30_000;
-const MAX_CONCURRENT_CALLS = 3;
+const MAX_TOKENS = 4096;
+const API_TIMEOUT_MS = 45_000;
 const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 2_000;
+const RETRY_BASE_DELAY_MS = 3_000;
+const CHUNK_SIZE = 30;
+const INTER_CHUNK_DELAY_MS = 1_500;
 
 // ── Types ──
 
@@ -209,26 +210,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-export async function extractDeviceFields(
+async function extractChunk(
   qaPairs: RawQAPair[],
+  chunkIndex: number,
+  totalChunks: number,
   context: DeviceExtractionContext,
+  systemPrompt: string,
   client: Anthropic,
 ): Promise<AIExtractionResult[]> {
-  const schemaPrompt = buildSpecSchemaPrompt();
-
-  const systemPrompt = `You are a device specification extraction engine for Disney Streaming's internal device registry. Your task is to map each question-answer pair from a partner questionnaire to a normalized spec field.
-
-Return ONLY a JSON array. Each element must have:
-  - dst_field_key: the canonical field name from the schema below, in "section.fieldKey" format (e.g. "hardware.socVendor"). Set to null if the question does not map to any field.
-  - extracted_value: the normalized value (type-coerced per field type). For numbers, return just the numeric value. For booleans, return "true" or "false". For dates, return ISO YYYY-MM-DD format. For text, return the cleaned value. Set to null if the answer is blank, "n/a", or uninformative.
-  - confidence: float 0.0-1.0
-  - reasoning: one sentence explaining the extraction (max 120 chars)
-
-Target schema (section.fieldKey: "label" (type)):
-${schemaPrompt}
-
-Important: Many fields not listed above (like frame rates, UHD/HDR, audio/video output, accessibility, platform integration, benchmarks) should still be matched if they clearly correspond to a spec category. Use the section.key format for the full field path.`;
-
   const pairsText = qaPairs
     .map((p, i) => `${i + 1}. Q: "${p.rawQuestionText}" | A: ${p.rawAnswerText ? `"${p.rawAnswerText}"` : '(blank)'}`)
     .join('\n');
@@ -236,6 +225,7 @@ Important: Many fields not listed above (like frame rates, UHD/HDR, audio/video 
   const userPrompt = `Partner: ${context.partnerName}
 Device column header: ${context.rawHeaderLabel}
 Platform type: ${context.platformType}
+Batch ${chunkIndex + 1} of ${totalChunks}
 
 Question-answer pairs:
 ${pairsText}`;
@@ -254,13 +244,13 @@ ${pairsText}`;
 
       const textBlock = response.content.find(b => b.type === 'text');
       if (!textBlock || textBlock.type !== 'text') {
-        log.warn('AI extraction returned no text block');
+        log.warn('AI extraction chunk returned no text block', { device: context.rawHeaderLabel, chunk: chunkIndex + 1 });
         return [];
       }
 
       const jsonMatch = textBlock.text.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
-        log.warn('AI extraction returned no JSON array', { text: textBlock.text.slice(0, 200) });
+        log.warn('AI extraction chunk returned no JSON array', { device: context.rawHeaderLabel, chunk: chunkIndex + 1, text: textBlock.text.slice(0, 200) });
         return [];
       }
 
@@ -283,17 +273,60 @@ ${pairsText}`;
 
       if ((isRateLimit || isTimeout) && attempt < MAX_RETRIES) {
         const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
-        log.warn('AI extraction retrying', { attempt: attempt + 1, delay, device: context.rawHeaderLabel, reason: isRateLimit ? 'rate_limit' : 'timeout' });
+        log.warn('AI extraction chunk retrying', { attempt: attempt + 1, delay, device: context.rawHeaderLabel, chunk: chunkIndex + 1, reason: isRateLimit ? 'rate_limit' : 'timeout' });
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
 
-      log.error('AI extraction call failed', { error: formatError(err), device: context.rawHeaderLabel, attempts: attempt + 1 });
+      log.error('AI extraction chunk failed', { error: formatError(err), device: context.rawHeaderLabel, chunk: chunkIndex + 1, attempts: attempt + 1 });
       return [];
     }
   }
 
   return [];
+}
+
+export async function extractDeviceFields(
+  qaPairs: RawQAPair[],
+  context: DeviceExtractionContext,
+  client: Anthropic,
+): Promise<AIExtractionResult[]> {
+  const schemaPrompt = buildSpecSchemaPrompt();
+
+  const systemPrompt = `You are a device specification extraction engine for Disney Streaming's internal device registry. Your task is to map each question-answer pair from a partner questionnaire to a normalized spec field.
+
+Return ONLY a JSON array with one element per question-answer pair (in the same order). Each element must have:
+  - dst_field_key: the canonical field name from the schema below, in "section.fieldKey" format (e.g. "hardware.socVendor"). Set to null if the question does not map to any field.
+  - extracted_value: the normalized value (type-coerced per field type). For numbers, return just the numeric value. For booleans, return "true" or "false". For dates, return ISO YYYY-MM-DD format. For text, return the cleaned value. Set to null if the answer is blank, "n/a", or uninformative.
+  - confidence: float 0.0-1.0
+  - reasoning: one sentence explaining the extraction (max 120 chars)
+
+Target schema (section.fieldKey: "label" (type)):
+${schemaPrompt}
+
+Important: Many fields not listed above (like frame rates, UHD/HDR, audio/video output, accessibility, platform integration, benchmarks) should still be matched if they clearly correspond to a spec category. Use the section.key format for the full field path.`;
+
+  const chunks: RawQAPair[][] = [];
+  for (let i = 0; i < qaPairs.length; i += CHUNK_SIZE) {
+    chunks.push(qaPairs.slice(i, i + CHUNK_SIZE));
+  }
+
+  log.info('AI extraction starting', { device: context.rawHeaderLabel, totalPairs: qaPairs.length, chunks: chunks.length });
+
+  const allResults: AIExtractionResult[] = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkResults = await extractChunk(chunks[i], i, chunks.length, context, systemPrompt, client);
+    allResults.push(...chunkResults);
+
+    log.info('AI extraction chunk complete', { device: context.rawHeaderLabel, chunk: i + 1, totalChunks: chunks.length, resultsInChunk: chunkResults.length });
+
+    if (i < chunks.length - 1) {
+      await new Promise(r => setTimeout(r, INTER_CHUNK_DELAY_MS));
+    }
+  }
+
+  return allResults;
 }
 
 // ── Post-Extraction Normalization ──
@@ -505,104 +538,98 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
   let devicesComplete = 0;
   let devicesFailed = 0;
 
-  const chunks: FirebaseFirestore.QueryDocumentSnapshot[][] = [];
-  for (let i = 0; i < devices.length; i += MAX_CONCURRENT_CALLS) {
-    chunks.push(devices.slice(i, i + MAX_CONCURRENT_CALLS));
-  }
+  // Process devices sequentially to respect rate limits
+  for (let deviceIndex = 0; deviceIndex < devices.length; deviceIndex++) {
+    const deviceDoc = devices[deviceIndex];
+    const deviceData = deviceDoc.data();
 
-  let deviceIndex = 0;
+    await jobRef.update({
+      extractionStep: 2,
+      extractionCurrentDevice: deviceData.rawHeaderLabel as string,
+    });
 
-  for (const chunk of chunks) {
-    await Promise.all(
-      chunk.map(async (deviceDoc) => {
-        const deviceData = deviceDoc.data();
-        deviceIndex++;
+    try {
+      const fieldsSnap = await db
+        .collection('questionnaireStagedFields')
+        .where('stagedDeviceId', '==', deviceDoc.id)
+        .where('intakeJobId', '==', intakeJobId)
+        .get();
 
-        await jobRef.update({
-          extractionStep: 2,
-          extractionCurrentDevice: deviceData.rawHeaderLabel as string,
-        });
+      const qaPairs: RawQAPair[] = fieldsSnap.docs.map((f, i) => ({
+        rowIndex: i,
+        rawQuestionText: f.data().rawQuestionText as string,
+        rawAnswerText: f.data().rawAnswerText as string | null,
+      }));
 
-        try {
-          const fieldsSnap = await db
-            .collection('questionnaireStagedFields')
-            .where('stagedDeviceId', '==', deviceDoc.id)
-            .where('intakeJobId', '==', intakeJobId)
-            .get();
+      if (qaPairs.length === 0) {
+        devicesComplete++;
+        await jobRef.update({ devicesComplete });
+        continue;
+      }
 
-          const qaPairs: RawQAPair[] = fieldsSnap.docs.map((f, i) => ({
-            rowIndex: i,
-            rawQuestionText: f.data().rawQuestionText as string,
-            rawAnswerText: f.data().rawAnswerText as string | null,
-          }));
+      const context: DeviceExtractionContext = {
+        partnerName,
+        rawHeaderLabel: deviceData.rawHeaderLabel as string,
+        platformType: deviceData.platformType as string,
+      };
 
-          if (qaPairs.length === 0) {
-            devicesComplete++;
-            await jobRef.update({ devicesComplete });
-            return;
-          }
+      const results = await extractDeviceFields(qaPairs, context, client);
 
-          const context: DeviceExtractionContext = {
-            partnerName,
-            rawHeaderLabel: deviceData.rawHeaderLabel as string,
-            platformType: deviceData.platformType as string,
-          };
+      if (results.length === 0) {
+        log.warn('AI extraction returned no results for device', { device: deviceData.rawHeaderLabel, qaPairCount: qaPairs.length });
+        await deviceDoc.ref.update({ extractionError: 'AI extraction returned no results after retries' });
+        devicesFailed++;
+        await jobRef.update({ devicesFailed });
+        continue;
+      }
 
-          const results = await extractDeviceFields(qaPairs, context, client);
+      let existingSpec: DeviceSpec | null = null;
+      if (deviceData.matchedDeviceId) {
+        const specSnap = await db
+          .collection('deviceSpecs')
+          .where('deviceId', '==', deviceData.matchedDeviceId)
+          .limit(1)
+          .get();
+        if (!specSnap.empty) {
+          existingSpec = { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } as DeviceSpec;
+        }
+      }
 
-          if (results.length === 0) {
-            log.warn('AI extraction returned no results for device', { device: deviceData.rawHeaderLabel, qaPairCount: qaPairs.length });
-            await deviceDoc.ref.update({ extractionError: 'AI extraction returned no results after retries' });
-            devicesFailed++;
-            await jobRef.update({ devicesFailed });
-            return;
-          }
+      // Firestore batches have a 500-write limit; split if needed
+      const fieldDocs = fieldsSnap.docs;
+      const BATCH_LIMIT = 450;
+      for (let batchStart = 0; batchStart < fieldDocs.length && batchStart < results.length; batchStart += BATCH_LIMIT) {
+        const batch = db.batch();
+        const batchEnd = Math.min(batchStart + BATCH_LIMIT, fieldDocs.length, results.length);
 
-          let existingSpec: DeviceSpec | null = null;
-          if (deviceData.matchedDeviceId) {
-            const specSnap = await db
-              .collection('deviceSpecs')
-              .where('deviceId', '==', deviceData.matchedDeviceId)
-              .limit(1)
-              .get();
-            if (!specSnap.empty) {
-              existingSpec = { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } as DeviceSpec;
-            }
-          }
+        for (let i = batchStart; i < batchEnd; i++) {
+          const result = results[i];
+          const fieldRef = fieldDocs[i].ref;
 
-          const batch = db.batch();
-          const fieldDocs = fieldsSnap.docs;
+          const normalizedValue = result.dstFieldKey
+            ? normalizeExtractedValue(result.dstFieldKey.split('.')[1] ?? '', result.extractedValue)
+            : result.extractedValue;
 
-          for (let i = 0; i < fieldDocs.length && i < results.length; i++) {
-            const result = results[i];
-            const fieldRef = fieldDocs[i].ref;
+          const { conflictStatus, existingValue } = result.dstFieldKey
+            ? detectConflicts(result.dstFieldKey, normalizedValue, existingSpec)
+            : { conflictStatus: 'new_field' as ConflictStatus, existingValue: null };
 
-            const normalizedValue = result.dstFieldKey
-              ? normalizeExtractedValue(result.dstFieldKey.split('.')[1] ?? '', result.extractedValue)
-              : result.extractedValue;
+          const section = result.dstFieldKey?.split('.')[0] ?? '';
 
-            const { conflictStatus, existingValue } = result.dstFieldKey
-              ? detectConflicts(result.dstFieldKey, normalizedValue, existingSpec)
-              : { conflictStatus: 'new_field' as ConflictStatus, existingValue: null };
+          batch.update(fieldRef, {
+            dstFieldKey: result.dstFieldKey ?? '__unmapped__',
+            dstFieldCategory: section,
+            extractedValue: normalizedValue,
+            extractionMethod: result.dstFieldKey ? 'ai' as ExtractionMethod : 'skipped' as ExtractionMethod,
+            aiConfidence: result.confidence,
+            aiReasoning: result.reasoning,
+            conflictStatus,
+            existingValue,
+          });
+        }
 
-            const section = result.dstFieldKey?.split('.')[0] ?? '';
-
-            const updateData: Record<string, unknown> = {
-              dstFieldKey: result.dstFieldKey ?? '__unmapped__',
-              dstFieldCategory: section,
-              extractedValue: normalizedValue,
-              extractionMethod: result.dstFieldKey ? 'ai' as ExtractionMethod : 'skipped' as ExtractionMethod,
-              aiConfidence: result.confidence,
-              aiReasoning: result.reasoning,
-              conflictStatus,
-              existingValue,
-            };
-
-            batch.update(fieldRef, updateData);
-          }
-
-          // Extract identity fields for the staged device
-          const identityUpdates: Record<string, unknown> = {};
+        if (batchStart === 0) {
+          const identityUpdates: Record<string, unknown> = { extractionError: null };
           for (const result of results) {
             if (!result.dstFieldKey || !result.extractedValue) continue;
             if (result.dstFieldKey === 'general.modelName') {
@@ -613,49 +640,40 @@ export async function runExtractionJob(intakeJobId: string): Promise<void> {
               identityUpdates.detectedManufacturer = result.extractedValue;
             }
           }
-
-          if (Object.keys(identityUpdates).length > 0) {
-            batch.update(deviceDoc.ref, { ...identityUpdates, extractionError: null });
-          } else {
-            batch.update(deviceDoc.ref, { extractionError: null });
-          }
-
-          await batch.commit();
-
-          // Device registry matching (after extraction so we have identity fields)
-          const modelName = (identityUpdates.detectedModelName as string) ?? deviceData.detectedModelName;
-          const modelNumber = (identityUpdates.detectedModelNumber as string) ?? deviceData.detectedModelNumber;
-          const manufacturer = (identityUpdates.detectedManufacturer as string) ?? deviceData.detectedManufacturer;
-
-          if (!deviceData.matchedDeviceId) {
-            const matchResult = await matchDeviceToRegistry(
-              modelName as string | null,
-              modelNumber as string | null,
-              manufacturer as string | null,
-              db,
-            );
-            if (matchResult.matchedDeviceId) {
-              await deviceDoc.ref.update({
-                matchedDeviceId: matchResult.matchedDeviceId,
-                matchConfidence: matchResult.matchConfidence,
-                matchMethod: matchResult.matchMethod,
-              });
-            }
-          }
-
-          devicesComplete++;
-          await jobRef.update({ devicesComplete });
-        } catch (err) {
-          log.error('Device extraction failed', {
-            device: deviceData.rawHeaderLabel,
-            error: formatError(err),
-          });
-          await deviceDoc.ref.update({ extractionError: typeof err === 'object' && err !== null && 'message' in err ? (err as Error).message : String(err) }).catch(() => {});
-          devicesFailed++;
-          await jobRef.update({ devicesFailed });
+          batch.update(deviceDoc.ref, identityUpdates);
         }
-      }),
-    );
+
+        await batch.commit();
+      }
+
+      // Device registry matching (after extraction so we have identity fields)
+      const freshDeviceData = (await deviceDoc.ref.get()).data() ?? deviceData;
+      const modelName = freshDeviceData.detectedModelName as string | null;
+      const modelNumber = freshDeviceData.detectedModelNumber as string | null;
+      const manufacturer = freshDeviceData.detectedManufacturer as string | null;
+
+      if (!deviceData.matchedDeviceId) {
+        const matchResult = await matchDeviceToRegistry(modelName, modelNumber, manufacturer, db);
+        if (matchResult.matchedDeviceId) {
+          await deviceDoc.ref.update({
+            matchedDeviceId: matchResult.matchedDeviceId,
+            matchConfidence: matchResult.matchConfidence,
+            matchMethod: matchResult.matchMethod,
+          });
+        }
+      }
+
+      devicesComplete++;
+      await jobRef.update({ devicesComplete });
+    } catch (err) {
+      log.error('Device extraction failed', {
+        device: deviceData.rawHeaderLabel,
+        error: formatError(err),
+      });
+      await deviceDoc.ref.update({ extractionError: typeof err === 'object' && err !== null && 'message' in err ? (err as Error).message : String(err) }).catch(() => {});
+      devicesFailed++;
+      await jobRef.update({ devicesFailed });
+    }
   }
 
   // Step 3: Validating values (normalization already happened inline, but mark the step)
