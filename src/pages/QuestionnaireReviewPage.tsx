@@ -1551,12 +1551,7 @@ export default function QuestionnaireReviewPage() {
           ? 'resolve_conflicts'
           : 'sign_off';
 
-  const skippedSteps = [
-    ...(partnerAssigned && step !== 1 ? ['assign_partner'] : []),
-    ...(!hasConflicts && step > 3 ? ['resolve_conflicts'] : []),
-  ];
-
-  const explicitCompletedSteps = [
+  const visuallyBypassedSteps = [
     ...(partnerAssigned && step !== 1 ? ['assign_partner'] : []),
     ...(!hasConflicts && step > 3 ? ['resolve_conflicts'] : []),
   ];
@@ -1615,8 +1610,8 @@ export default function QuestionnaireReviewPage() {
         <WorkflowStepper
           mode="wizard4"
           currentStep={currentStepKey}
-          completedSteps={explicitCompletedSteps}
-          skippedSteps={skippedSteps}
+          completedSteps={visuallyBypassedSteps}
+          skippedSteps={visuallyBypassedSteps}
           steps={[
             { key: 'assign_partner', label: 'Assign Partner' },
             { key: 'review_devices', label: 'Review Devices' },
