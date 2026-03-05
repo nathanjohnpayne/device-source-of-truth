@@ -475,7 +475,7 @@ export default function QuestionnaireDetailPage() {
 
   if (error && !job) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 p-6">
+      <div className="mx-auto max-w-4xl space-y-4">
         <Link
           to="/admin/questionnaires"
           className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
@@ -497,7 +497,7 @@ export default function QuestionnaireDetailPage() {
   if (!job) return null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <Link
         to="/admin/questionnaires"
         className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
@@ -640,7 +640,7 @@ export default function QuestionnaireDetailPage() {
             <button
               onClick={handleTriggerExtraction}
               disabled={extracting}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
             >
               <Cpu className="h-4 w-4" />
               {extracting ? 'Starting…' : job.status === 'extraction_failed' ? 'Retry AI Extraction' : 'Run AI Extraction'}
@@ -658,7 +658,7 @@ export default function QuestionnaireDetailPage() {
         {extractionComplete && (
           <button
             onClick={handleBeginReview}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
           >
             <ChevronRight className="h-4 w-4" />
             Begin Review
@@ -706,7 +706,7 @@ export default function QuestionnaireDetailPage() {
             <button
               onClick={handleSavePartner}
               disabled={savingPartner}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {savingPartner ? 'Saving…' : 'Save'}
             </button>

@@ -12,6 +12,7 @@ import {
 import { api } from '../lib/api';
 import Badge from '../components/shared/Badge';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import EmptyState from '../components/shared/EmptyState';
 import Modal from '../components/shared/Modal';
 import type { CoreVersionMapping, UnmappedVersion, VersionPlatform } from '../lib/types';
 
@@ -399,21 +400,22 @@ export default function VersionRegistryPage() {
         {loading ? (
           <div className="flex justify-center py-12"><LoadingSpinner /></div>
         ) : mappings.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-500">
-            No version mappings found. Click "Seed Defaults" to populate the initial 17 mappings.
-          </div>
+          <EmptyState
+            title="No version mappings found"
+            description='Click "Seed Defaults" to populate the initial 17 mappings.'
+          />
         ) : (
           <div className="overflow-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Platform</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Core Version</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Friendly Version</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Notes</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Active</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Updated</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Platform</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Core Version</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Friendly Version</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Notes</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Active</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Updated</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -523,13 +525,13 @@ export default function VersionRegistryPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">Core Version</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">Platform</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">Source</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-gray-500">Devices</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-gray-500">Partners</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-gray-500">First Seen</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase text-gray-500"></th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Core Version</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Platform</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Source</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Devices</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Partners</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">First Seen</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">

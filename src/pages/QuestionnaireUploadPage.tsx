@@ -12,6 +12,7 @@ import { trackEvent } from '../lib/analytics';
 import { useAuth } from '../hooks/useAuth';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import Tooltip from '../components/shared/Tooltip';
 import type { PartnerWithStats } from '../lib/types';
 import { ApiError } from '../lib/api';
 
@@ -236,15 +237,9 @@ export default function QuestionnaireUploadPage() {
           <label htmlFor="questionnaire-use-ai" className="text-sm text-gray-700">
             Use AI Extraction?
           </label>
-          <div className="group relative">
-            <Info className="h-4 w-4 text-gray-400" />
-            <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover:block">
-              Enabling AI Extraction runs questionnaire answers through Claude to
-              automatically map them to normalized spec fields. Only ambiguous
-              values are sent to the API. This uses the Anthropic API and may
-              incur additional usage costs.
-            </div>
-          </div>
+          <Tooltip content="Enabling AI Extraction runs questionnaire answers through Claude to automatically map them to normalized spec fields. Only ambiguous values are sent to the API. This uses the Anthropic API and may incur additional usage costs.">
+            <Info className="h-4 w-4 cursor-help text-gray-400 hover:text-gray-600" />
+          </Tooltip>
         </div>
 
         {/* Notes textarea */}
@@ -284,7 +279,7 @@ export default function QuestionnaireUploadPage() {
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
-              <LoadingSpinner className="h-4 w-4" />
+              <LoadingSpinner inline className="h-4 w-4" />
             ) : (
               <Upload className="h-4 w-4" />
             )}

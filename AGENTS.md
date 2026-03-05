@@ -48,6 +48,7 @@ Firebase Hosting (static SPA)
 │       ├── api.ts                ← Typed fetch wrapper for /api/* endpoints
 │       ├── analytics.ts          ← Typed GA4 event tracking (no-op in dev)
 │       ├── export.ts             ← CSV/PDF export utilities
+│       ├── format.ts             ← Shared date/time formatting helpers (formatDate, formatDateTime)
 │       └── types.ts              ← ALL shared TypeScript interfaces (791 lines)
 │
 ├── functions/                    ← Firebase Cloud Functions (backend)
@@ -199,10 +200,14 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 - **Styling:** Tailwind CSS utility classes only. No CSS modules, no styled-components.
 - **Icons:** `lucide-react` exclusively.
 - **Charts:** `recharts` for all data visualizations.
-- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel` in `src/components/shared/`.
-- **Update banner:** `UpdateBanner` in `src/components/UpdateBanner.tsx` detects new versions via service worker (Workbox/PWA) and version polling, shows a dismissible top-of-viewport banner.
+- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel` in `src/components/shared/`. `LoadingSpinner` accepts an `inline` prop for use inside buttons without the default `p-12` wrapper.
+- **Responsive shell:** `AppShell` is mobile-responsive. Below `lg:` the sidebar collapses off-screen and a hamburger menu in the topbar opens it as a slide-over overlay. Above `lg:` the sidebar is always visible.
+- **Update banner:** `UpdateBanner` in `src/components/UpdateBanner.tsx` detects new versions via service worker (Workbox/PWA) and version polling. It renders inside `AppShell`'s fixed header wrapper (above the topbar) so it reserves vertical space instead of overlapping navigation.
+- **Date formatting:** Use `formatDate()` and `formatDateTime()` from `src/lib/format.ts` for all date/time display. Do not use inline `toLocaleString()` or page-local formatters.
 - **Analytics:** Use `trackEvent()` from `src/lib/analytics.ts`. Events are no-ops in development mode.
 - **Exports:** Use `exportToCsv()` and `exportToPdf()` from `src/lib/export.ts`.
+- **Destructive actions:** Confirm buttons for delete, rollback, reject, or dismiss actions must use `bg-red-600 hover:bg-red-700` (not primary indigo).
+- **Button tokens:** Use `rounded-lg` (not `rounded-md`) and `bg-indigo-600 hover:bg-indigo-700` for primary buttons consistently.
 
 ## Backend Conventions
 

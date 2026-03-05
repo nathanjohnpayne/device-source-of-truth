@@ -7,11 +7,13 @@ import Papa from 'papaparse';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import EmptyState from '../components/shared/EmptyState';
 import ClarificationPanel from '../components/shared/ClarificationPanel';
 import AIPassStatusPanel from '../components/shared/AIPassStatusPanel';
 import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { formatDate, formatDateTime } from '../lib/format';
 import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import { useAIPassStatus } from '../hooks/useAIPassStatus';
 import type {
@@ -843,7 +845,7 @@ export default function IntakeImportPage() {
             </p>
             <div className="rounded-lg bg-gray-50 p-4 space-y-1">
               <p><span className="font-medium">Imported by:</span> {rollbackModal.importedBy}</p>
-              <p><span className="font-medium">Date:</span> {new Date(rollbackModal.importedAt).toLocaleDateString()}</p>
+              <p><span className="font-medium">Date:</span> {formatDate(rollbackModal.importedAt)}</p>
               <p><span className="font-medium">File:</span> {rollbackModal.fileName}</p>
               <p><span className="font-medium">Records:</span> {rollbackModal.importedCount} imported, {rollbackModal.skippedCount} skipped</p>
               {rollbackModal.newCount != null && (
@@ -1169,7 +1171,7 @@ function ImportHistory({
           {loading ? (
             <LoadingSpinner />
           ) : history.length === 0 ? (
-            <p className="text-sm text-gray-500">No import batches yet.</p>
+            <EmptyState title="No import batches yet" />
           ) : (
             <div className="space-y-3">
               {history.map(batch => {
@@ -1181,7 +1183,7 @@ function ImportHistory({
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium text-gray-900">{batch.fileName}</p>
                       <p className="text-xs text-gray-500">
-                        {new Date(batch.importedAt).toLocaleString()} by {batch.importedBy}
+                        {formatDateTime(batch.importedAt)} by {batch.importedBy}
                       </p>
                       <p className="text-xs text-gray-500">
                         {batch.importedCount} imported, {batch.skippedCount} skipped

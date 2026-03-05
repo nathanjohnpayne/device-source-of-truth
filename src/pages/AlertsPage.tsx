@@ -7,6 +7,7 @@ import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import type { Alert, AlertType, AlertStatus, AlertDismissReason } from '../lib/types';
+import { formatDate } from '../lib/format';
 
 const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   unregistered_device: 'Unregistered Device',
@@ -41,14 +42,6 @@ const STATUS_TABS: { label: string; value: AlertStatus | 'all' }[] = [
 
 const ALERT_TYPES: AlertType[] = ['unregistered_device', 'new_partner_key', 'inactive_key'];
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 export default function AlertsPage() {
   const { isAdmin } = useAuth();
@@ -266,7 +259,7 @@ export default function AlertsPage() {
             <button
               onClick={handleDismiss}
               disabled={dismissing}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
               {dismissing ? 'Dismissing...' : 'Dismiss'}
             </button>

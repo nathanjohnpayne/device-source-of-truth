@@ -88,7 +88,7 @@ function SortableOptionRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 rounded-md border px-3 py-2 ${
+      className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
         option.isActive ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'
       }`}
     >
@@ -309,7 +309,7 @@ function OptionEditor({
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -384,11 +384,11 @@ function OptionEditor({
               }}
               placeholder="Option value..."
               autoFocus
-              className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
             <button
               onClick={handleAddOption}
-              className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
             >
               Add
             </button>
@@ -397,7 +397,7 @@ function OptionEditor({
                 setAddingOption(false);
                 setNewOptionValue('');
               }}
-              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -422,7 +422,7 @@ function OptionEditor({
             {inactiveOptions.map((option) => (
               <div
                 key={option.id}
-                className="flex items-center justify-between rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-500"
+                className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-500"
               >
                 <span>{option.displayValue}</span>
                 <button
@@ -462,14 +462,14 @@ function OptionEditor({
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setDeleteTarget(null)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirmDelete}
               disabled={deleteUsageCount === null}
-              className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
               Deactivate
             </button>
@@ -572,19 +572,19 @@ export default function ReferenceDataPage() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Dropdown Key
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Field Label
               </th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Options
               </th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Active
               </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Last Updated
               </th>
             </tr>

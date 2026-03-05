@@ -19,6 +19,7 @@ import { useAuth } from '../hooks/useAuth';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import Tooltip from '../components/shared/Tooltip';
 import type {
   QuestionnaireIntakeJob,
   QuestionnaireStagedDevice,
@@ -393,12 +394,9 @@ function FieldTable({
                       <div className="flex items-center gap-1">
                         <span className="truncate">{f.rawQuestionText}</span>
                         {f.aiReasoning && (
-                          <div className="group/tip relative">
-                            <Info className="h-3 w-3 shrink-0 text-gray-400" />
-                            <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1 hidden w-52 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg group-hover/tip:block">
-                              {f.aiReasoning}
-                            </div>
-                          </div>
+                          <Tooltip content={f.aiReasoning}>
+                            <Info className="h-3 w-3 shrink-0 cursor-help text-gray-400 hover:text-gray-600" />
+                          </Tooltip>
                         )}
                       </div>
                     </td>

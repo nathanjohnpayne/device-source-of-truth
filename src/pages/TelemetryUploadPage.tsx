@@ -18,8 +18,10 @@ import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import EmptyState from '../components/shared/EmptyState';
 import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import type { UploadHistoryWithRollback, TelemetryPreviewRow } from '../lib/types';
+import { formatDateTime } from '../lib/format';
 
 const MONTH_NAMES = [
   'january', 'february', 'march', 'april', 'may', 'june',
@@ -649,7 +651,7 @@ export default function TelemetryUploadPage() {
           {historyLoading ? (
             <LoadingSpinner />
           ) : history.length === 0 ? (
-            <p className="text-sm text-gray-500">No upload history yet.</p>
+            <EmptyState title="No upload history yet" />
           ) : (
             <div className="space-y-3">
               {history.map(batch => {
@@ -660,7 +662,7 @@ export default function TelemetryUploadPage() {
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium text-gray-900">{batch.fileName}</p>
                       <p className="text-xs text-gray-500">
-                        Snapshot: {formatSnapshotDate(batch.snapshotDate)} &middot; Uploaded {new Date(batch.uploadedAt).toLocaleString()} by {batch.uploadedByEmail}
+                        Snapshot: {formatSnapshotDate(batch.snapshotDate)} &middot; Uploaded {formatDateTime(batch.uploadedAt)} by {batch.uploadedByEmail}
                       </p>
                       <p className="text-xs text-gray-500">
                         {batch.rowCount} rows
@@ -716,7 +718,7 @@ export default function TelemetryUploadPage() {
               disabled={rollbackLoading}
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
-              {rollbackLoading && <LoadingSpinner className="h-4 w-4" />}
+              {rollbackLoading && <LoadingSpinner inline className="h-4 w-4" />}
               Rollback Upload
             </button>
           </>
@@ -727,7 +729,7 @@ export default function TelemetryUploadPage() {
             <p>This will permanently delete all telemetry snapshots from this upload batch:</p>
             <div className="rounded-lg bg-gray-50 p-4 space-y-1">
               <p><span className="font-medium">Uploaded by:</span> {rollbackModal.uploadedByEmail}</p>
-              <p><span className="font-medium">Date:</span> {new Date(rollbackModal.uploadedAt).toLocaleString()}</p>
+              <p><span className="font-medium">Date:</span> {formatDateTime(rollbackModal.uploadedAt)}</p>
               <p><span className="font-medium">File:</span> {rollbackModal.fileName}</p>
               <p><span className="font-medium">Records:</span> {rollbackModal.successCount} uploaded</p>
             </div>

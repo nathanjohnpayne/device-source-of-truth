@@ -11,7 +11,6 @@ import { ImportPrerequisiteProvider } from './hooks/useImportPrerequisites';
 import { trackPageView } from './lib/analytics';
 import { resolveAnalyticsRoute } from './lib/analyticsRoutes';
 import LoadingSpinner from './components/shared/LoadingSpinner';
-import UpdateBanner from './components/UpdateBanner';
 import AppShell from './components/layout/AppShell';
 import WelcomeModal from './components/onboarding/WelcomeModal';
 
@@ -44,23 +43,16 @@ class ErrorBoundary extends Component<
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: '2rem', fontFamily: 'monospace' }}>
-          <h2 style={{ color: 'red' }}>Application Error</h2>
-          <pre
-            style={{
-              whiteSpace: 'pre-wrap',
-              background: '#f5f5f5',
-              padding: '1rem',
-              borderRadius: '4px',
-            }}
-          >
+        <div className="p-8 font-mono">
+          <h2 className="text-lg font-bold text-red-600">Application Error</h2>
+          <pre className="mt-4 whitespace-pre-wrap rounded bg-gray-100 p-4 text-sm">
             {this.state.error.message}
             {'\n'}
             {this.state.error.stack}
           </pre>
           <button
             onClick={() => window.location.reload()}
-            style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+            className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
             Reload
           </button>
@@ -172,7 +164,6 @@ function AppRoutes() {
     <>
       <PageViewTracker />
       <OnboardingGate />
-      <UpdateBanner />
       <Suspense fallback={<LoadingSpinner className="min-h-screen" />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

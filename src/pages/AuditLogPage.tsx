@@ -4,6 +4,7 @@ import { trackEvent } from '../lib/analytics';
 import DataTable, { type Column } from '../components/shared/DataTable';
 import Badge from '../components/shared/Badge';
 import type { AuditLogEntry, AuditEntityType } from '../lib/types';
+import { formatDateTime } from '../lib/format';
 
 const ENTITY_TYPES: AuditEntityType[] = [
   'partner',
@@ -37,19 +38,6 @@ const ENTITY_TYPE_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'd
 
 const PAGE_SIZE = 25;
 
-function formatTimestamp(ts: string): string {
-  try {
-    return new Date(ts).toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return ts;
-  }
-}
 
 export default function AuditLogPage() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
@@ -104,7 +92,7 @@ export default function AuditLogPage() {
       sortable: true,
       render: (row) => (
         <span className="whitespace-nowrap text-gray-600">
-          {formatTimestamp(row.timestamp)}
+          {formatDateTime(row.timestamp)}
         </span>
       ),
     },
@@ -170,7 +158,7 @@ export default function AuditLogPage() {
             <select
               value={entityType}
               onChange={(e) => setEntityType(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             >
               <option value="">All</option>
               {ENTITY_TYPES.map((t) => (
@@ -190,7 +178,7 @@ export default function AuditLogPage() {
               placeholder="Search by email..."
               value={userEmail}
               onChange={(e) => setUserEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
@@ -202,7 +190,7 @@ export default function AuditLogPage() {
               type="date"
               value={dateStart}
               onChange={(e) => setDateStart(e.target.value)}
-              className="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
@@ -214,7 +202,7 @@ export default function AuditLogPage() {
               type="date"
               value={dateEnd}
               onChange={(e) => setDateEnd(e.target.value)}
-              className="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 

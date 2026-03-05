@@ -177,6 +177,14 @@ export default function PartnerListPage() {
             <option key={r} value={r}>{r}</option>
           ))}
         </select>
+        {(search || regionFilter) && (
+          <button
+            onClick={() => { setSearch(''); setRegionFilter(''); }}
+            className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       <DataTable
