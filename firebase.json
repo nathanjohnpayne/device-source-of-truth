@@ -31,6 +31,7 @@
     "source": "functions",
     "runtime": "nodejs22",
     "predeploy": [
+      "op inject -i functions/.env.tpl -o functions/.env -f",
       "npm run build --prefix functions"
     ]
   },
