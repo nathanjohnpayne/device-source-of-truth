@@ -79,6 +79,7 @@ Firebase Hosting (static SPA)
 ├── storage.rules                 ← Firebase Storage security rules (questionnaire files)
 ├── firestore.indexes.json        ← Composite index definitions (currently empty)
 ├── .env / .env.example           ← Firebase API keys (3 vars, all VITE_ prefixed)
+├── .env.op                       ← 1Password references for deploy auth (op:// URIs, safe to commit)
 ├── functions/.env.tpl            ← 1Password secret references (op:// URIs, safe to commit)
 └── vite.config.ts                ← Vite + Tailwind + code-split config
 ```
@@ -281,23 +282,41 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 
 ## Build & Deploy
 
-Deploying functions requires the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) to be installed and authenticated — the predeploy hook resolves secrets from 1Password before upload.
+Deploying requires the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) to be installed and authenticated. Two auth flows exist:
+
+### Non-interactive deploy (recommended — no browser prompts)
+
+Uses Application Default Credentials stored in 1Password. Run via npm or the VS Code/Cursor command palette (`Tasks: Run Build Task` → **Deploy (1Password auth)**):
 
 ```bash
-# Frontend build
-npm run build              # tsc -b && vite build
+npm run deploy                 # full deploy
+npm run deploy:hosting         # hosting only
+npm run deploy:functions       # functions only
+op-firebase-deploy --only hosting,functions  # any combo
+```
 
-# Backend build
-cd functions && npm run build   # tsc
+`op-firebase-deploy` is a global script (`~/.local/bin/op-firebase-deploy`) that reads ADC from 1Password, auto-detects the project from `.firebaserc`, writes credentials to a temp file, deploys, and cleans up. No `firebase login` or `gcloud init` required. Works for any Firebase project.
 
-# Deploy everything (requires `op` CLI for functions secrets)
+**1Password setup:** Item "GCP ADC" in the Private vault with:
+- `credential` — Application Default Credentials JSON (from `gcloud auth application-default login`)
+- `project` — the GCP/Firebase project ID (e.g., `device-source-of-truth`)
+
+### Manual deploy (interactive — requires browser login)
+
+```bash
+firebase login
 npx firebase deploy
-
-# Deploy selectively
 npx firebase deploy --only hosting
-npx firebase deploy --only functions   # runs op inject → resolves .env.tpl → .env
+npx firebase deploy --only functions
 npx firebase deploy --only firestore:rules
 npx firebase deploy --only storage
+```
+
+### Build only (no deploy)
+
+```bash
+npm run build                      # Frontend: tsc -b && vite build
+cd functions && npm run build      # Backend: tsc
 ```
 
 ## Environment Variables
@@ -318,6 +337,19 @@ Secret management flow:
 3. `functions/.env` is gitignored and only exists transiently during deploy.
 4. The canonical secret lives in **1Password** (Private vault → "DST Anthropic API Key").
 5. Never store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
+
+Deploy auth (managed via 1Password):
+1. `op-firebase-deploy` (global script at `~/.local/bin/`) reads ADC from 1Password and runs `firebase deploy`.
+2. The ADC credential lives in **1Password** (Private vault → "GCP ADC" → `credential` field).
+3. The script writes ADC to a temp file (umask 077), sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys, and deletes the temp file on exit.
+4. Project ID is auto-detected from `.firebaserc` or passed as an argument.
+5. `.env.op` is a legacy fallback — `op-firebase-deploy` does not require it.
+6. The ADC refresh token has no fixed expiry but is revoked on Google password change, explicit revocation, or 6 months of inactivity. If deploys fail with `invalid_grant` or `Token has been revoked`, renew with:
+   ```bash
+   gcloud auth application-default login --project=device-source-of-truth
+   op item edit "GCP ADC" --vault Private \
+     "credential=$(cat ~/.config/gcloud/application_default_credentials.json)"
+   ```
 
 ## Things to Watch Out For
 

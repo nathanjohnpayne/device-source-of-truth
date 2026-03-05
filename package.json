@@ -12,7 +12,10 @@
     "pretest": "npm run build:contracts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:all": "npm test && cd functions && npm test"
+    "test:all": "npm test && cd functions && npm test",
+    "deploy": "op-firebase-deploy",
+    "deploy:hosting": "op-firebase-deploy --only hosting",
+    "deploy:functions": "op-firebase-deploy --only functions"
   },
   "dependencies": {
     "@dst/contracts": "file:packages/contracts",
