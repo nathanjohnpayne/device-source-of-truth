@@ -155,7 +155,7 @@ function DeviceCard({
   matchedDeviceName: string | null;
 }) {
   const { rawHeaderLabel, platformType, isOutOfScope, matchedDeviceId, fieldSummary } = device;
-  const deviceError = (device as Record<string, unknown>).extractionError as string | null | undefined;
+  const deviceError = device.extractionError;
   const isExtracting = jobStatus === 'extracting' && fieldSummary.extractedFields === 0;
   const isComplete = fieldSummary.extractedFields > 0;
   const hasConflicts = fieldSummary.conflictCount > 0;
