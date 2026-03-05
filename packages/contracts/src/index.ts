@@ -118,11 +118,14 @@ export interface Device {
   pendingPartnerKey: string | null;
   tierId: string | null;
   tierAssignedAt: Timestamp | null;
+  lastTelemetryAt: Timestamp | null;
   phase?: DevicePhase;
   importBatchId?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+
+export const ACTIVE_DEVICES_WINDOW_DAYS = 28;
 
 // ── Questionnaire Intake Types (DST-047 / DST-048) ──
 
@@ -1001,6 +1004,7 @@ export const DeviceSchema = z.object({
   specCompleteness: z.number(),
   tierId: z.string().nullable(),
   tierAssignedAt: timestamp.nullable(),
+  lastTelemetryAt: timestamp.nullable().optional(),
   phase: DevicePhaseSchema.optional(),
   createdAt: timestamp,
   updatedAt: timestamp,
@@ -1133,6 +1137,7 @@ export const DeviceDetailSchema = DeviceSchema.extend({
 export const DashboardReportResponseSchema = z.object({
   totalDevices: z.number(),
   totalActiveDevices: z.number(),
+  lastTelemetryAt: timestamp.nullable().optional(),
   specCoverageWeighted: z.number(),
   certifiedCount: z.number(),
   pendingCount: z.number(),
@@ -1155,6 +1160,7 @@ export const DashboardReportResponseSchema = z.object({
       region: z.string(),
       activeDevices: z.number(),
       deviceCount: z.number(),
+      lastTelemetryAt: timestamp.nullable().optional(),
     }),
   ),
 });

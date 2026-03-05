@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Pencil, ArrowLeft, Monitor, Key, Plus, Power, PowerOff } from 'lucide-react';
 import { api } from '../lib/api';
+import { getFreshnessState } from '../lib/format';
 import { useAuth } from '../hooks/useAuth';
 import DataTable, { type Column } from '../components/shared/DataTable';
 import Badge from '../components/shared/Badge';
+import FreshnessBadge from '../components/shared/FreshnessBadge';
+import FreshnessMicroPanel from '../components/shared/FreshnessMicroPanel';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
@@ -26,6 +29,8 @@ function countryFlag(iso2: string): string {
   return String.fromCodePoint(cp1, cp2);
 }
 
+type DeviceRow = DeviceWithRelations & { lastTelemetryAt?: string | null };
+
 const deviceColumns: Column<DeviceWithRelations>[] = [
   { header: 'Device Name', accessor: 'displayName', sortable: true },
   { header: 'Device ID', accessor: 'deviceId', sortable: true },
@@ -35,7 +40,24 @@ const deviceColumns: Column<DeviceWithRelations>[] = [
     header: 'Active Devices',
     accessor: 'activeDeviceCount',
     sortable: true,
-    render: (row) => (row.activeDeviceCount ?? 0).toLocaleString(),
+    cellProps: (row) => ({
+      'aria-label': `Active devices: ${(row.activeDeviceCount ?? 0).toLocaleString()}, ${getFreshnessState((row as DeviceRow).lastTelemetryAt).replace('_', ' ')} data`,
+    }),
+    render: (row) => (
+      <FreshnessMicroPanel
+        lastTelemetryAt={(row as DeviceRow).lastTelemetryAt}
+        partnerName={row.partnerName}
+        partnerKeyName={row.partnerKeyName}
+      >
+        <span className="inline-flex items-center gap-2">
+          {(row.activeDeviceCount ?? 0).toLocaleString()}
+          <FreshnessBadge
+            compact
+            lastTelemetryAt={(row as DeviceRow).lastTelemetryAt}
+          />
+        </span>
+      </FreshnessMicroPanel>
+    ),
   },
   {
     header: 'Tier',
@@ -110,6 +132,11 @@ export default function PartnerDetailPage() {
   const specCoverage = totalDevices > 0
     ? Math.round((specsComplete / totalDevices) * 100)
     : 0;
+  const latestDeviceTelemetry = devices.reduce<string | null>((latest, d) => {
+    const t = (d as DeviceWithRelations & { lastTelemetryAt?: string | null }).lastTelemetryAt;
+    if (t && (!latest || t > latest)) return t;
+    return latest;
+  }, null);
 
   const handleSave = async () => {
     if (!id) return;
@@ -279,6 +306,7 @@ export default function PartnerDetailPage() {
         <div className="rounded-lg border border-gray-200 bg-white p-5">
           <p className="text-sm font-medium text-gray-500">Active Devices</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">{(activeDevices ?? 0).toLocaleString()}</p>
+          <FreshnessBadge lastTelemetryAt={latestDeviceTelemetry} />
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-5">
           <p className="text-sm font-medium text-gray-500">Spec Coverage</p>

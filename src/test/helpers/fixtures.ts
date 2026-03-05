@@ -37,6 +37,7 @@ export const minimalDevice: DeviceWithRelations = {
   pendingPartnerKey: null,
   tierId: null,
   tierAssignedAt: null,
+  lastTelemetryAt: null,
   createdAt: NOW,
   updatedAt: NOW,
 };
