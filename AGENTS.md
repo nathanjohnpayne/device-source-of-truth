@@ -56,7 +56,7 @@ Firebase Hosting (static SPA)
 │   │   ├── index.ts              ← Express app + extractDeviceTask Cloud Tasks function
 │   │   ├── middleware/auth.ts    ← Token verification, domain check, role guard
 │   │   ├── routes/               ← 15 Express routers (partners, devices, disambiguate, questionnaireIntake, etc.)
-│   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, seedFieldOptions, questionnaireParser, questionnaireExtractor, storage)
+│   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, aiImportFramework, seedFieldOptions, questionnaireParser, questionnaireExtractor, partnerResolver, partnerAliasResolver, coercion, safeNumber, storage, logger)
 │   │   └── types/index.ts        ← Backend type definitions (mirrors src/lib/types.ts)
 │   ├── package.json              ← Separate deps (firebase-admin, express, xlsx, etc.)
 │   └── tsconfig.json
@@ -273,8 +273,15 @@ Frontend (in `.env`, prefixed with `VITE_`):
 
 These are safe to expose in the client bundle (Firebase security is handled by Auth + Firestore rules, not API key secrecy).
 
-Backend (in `functions/.env`, gitignored):
-- `ANTHROPIC_API_KEY` — Anthropic API key for AI disambiguation (DST-039). **Pre-production/testing only.** Falls back gracefully if not set.
+Backend secrets (managed via 1Password):
+- `ANTHROPIC_API_KEY` — Anthropic API key for AI disambiguation (DST-039) and questionnaire extraction (DST-047). Falls back gracefully if not set.
+
+Secret management flow:
+1. `functions/.env.tpl` contains `op://` secret references (safe to commit — no actual secrets).
+2. The `firebase.json` functions predeploy hook runs `op inject -i functions/.env.tpl -o functions/.env -f` to resolve references at deploy time.
+3. `functions/.env` is gitignored and only exists transiently during deploy.
+4. The canonical secret lives in **1Password** (Private vault → "DST Anthropic API Key").
+5. Never store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
 
 ## Things to Watch Out For
 
@@ -285,9 +292,10 @@ Backend (in `functions/.env`, gitignored):
 5. **The tier engine auto-runs** on spec save and tier definition save. Don't forget this side effect when modifying those flows.
 6. **Firestore has no joins.** The backend manually fetches related collections. Watch for N+1 query patterns.
 7. **Two Cloud Functions are exported.** `api` handles all Express routes under `/api/*`. `extractDeviceTask` is a Cloud Tasks handler (`onTaskDispatched`) for per-device AI extraction. Both are in `functions/src/index.ts`.
-8. **AI disambiguation (DST-039) is pre-production/testing.** The Anthropic API key is stored in `functions/.env` (gitignored). If the key is missing or the API times out (5s), imports fall back to rule-based validation gracefully. The AI pass runs between CSV parsing and the validation preview.
+8. **AI disambiguation (DST-039) is pre-production/testing.** The Anthropic API key is resolved from 1Password at deploy time (see Environment Variables). If the key is missing or the API times out (5s), imports fall back to rule-based validation gracefully. The AI pass runs between CSV parsing and the validation preview.
 9. **Questionnaire intake (DST-047/048) uses Firebase Storage.** Uploaded questionnaire files are stored at `questionnaires/{jobId}/{filename}` via `admin.storage().bucket()`. The `storage.rules` file restricts reads to authenticated users; writes are admin-SDK only.
 10. **Questionnaire AI extraction runs via Cloud Tasks, not fire-and-forget.** Each device gets its own `extractDeviceTask` Cloud Task (queue: `extractDeviceTask` in `us-central1`). Tasks are idempotent (CAS on `extractionStatus`), retry on rate limits/timeouts (3 attempts, 60-300s backoff, 300s function timeout, 1800s dispatch deadline), and finalize the job via Firestore transaction when all devices reach a terminal state. Notifications are deduped via `notificationSentAt`. The GET `/:id` endpoint has self-healing recovery for devices stuck in `processing` > 15 minutes (using per-device `extractionProcessingAt`). Never use fire-and-forget patterns for extraction — always enqueue via `enqueueExtractionTasks()`.
+10a. **Questionnaire extraction has real-time status UI (DST-052).** The backend writes `extractionStep` (1=Reading spreadsheet, 2=Extracting fields, 3=Validating values, 4=Done), `extractionCurrentDevice`, `devicesComplete`, and `devicesFailed` to the job document as extraction progresses. The frontend `ExtractionStatusPanel` component renders a 4-step stepper during extraction, auto-collapses 2s after success, and shows failure/partial-failure banners with Restart/Retry buttons. The active device card shows an indigo pulse animation. Failed devices can be retried individually via `POST /:id/retry-device/:deviceId` without re-processing successful ones.
 11. **The questionnaire review wizard has 4 steps.** Assign Partner → Review Devices → Resolve Conflicts → Sign Off. Nothing is committed to the catalog until the admin completes Step 4. The `POST /:id/approve` endpoint runs an atomic Firestore batch that writes specs, creates device records, logs audit entries, and triggers tier/completeness recalculation.
 12. **Notifications are admin-only for now.** The `notifications` collection stores in-app notifications written by the backend when intake jobs reach `pending_review`. The `NotificationBell` component in `AppShell.tsx` polls every 30 seconds.
 13. **Button `appearance: none` must stay un-layered in `index.css`.** Tailwind CSS v4 puts all styles inside CSS cascade layers (`@layer base`, `@layer utilities`, etc.) and its preflight sets `appearance: button` on `<button>` elements inside `@layer base`. On macOS, this causes Chrome to render buttons with the native system appearance (lavender tint, oversized padding, pill-shaped border-radius), overriding Tailwind utility classes. The fix in `src/index.css` places `appearance: none` as **un-layered CSS** (outside any `@layer`), giving it the highest author-origin priority. Do NOT move this rule into `@layer base` — it will stop working.
