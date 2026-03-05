@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Pencil, ArrowLeft, Monitor, Key, Plus, Power, PowerOff } from 'lucide-react';
 import { api } from '../lib/api';
+import { getFreshnessState } from '../lib/format';
 import { useAuth } from '../hooks/useAuth';
 import DataTable, { type Column } from '../components/shared/DataTable';
 import Badge from '../components/shared/Badge';
@@ -30,15 +31,6 @@ function countryFlag(iso2: string): string {
 
 type DeviceRow = DeviceWithRelations & { lastTelemetryAt?: string | null };
 
-function getFreshnessLabel(row: DeviceRow): string {
-  const t = row.lastTelemetryAt;
-  if (!t) return 'no data';
-  const diffMs = Date.now() - new Date(t).getTime();
-  if (diffMs < 48 * 3_600_000) return 'fresh';
-  if (diffMs < 7 * 86_400_000) return 'aging';
-  return 'stale';
-}
-
 const deviceColumns: Column<DeviceWithRelations>[] = [
   { header: 'Device Name', accessor: 'displayName', sortable: true },
   { header: 'Device ID', accessor: 'deviceId', sortable: true },
@@ -49,7 +41,7 @@ const deviceColumns: Column<DeviceWithRelations>[] = [
     accessor: 'activeDeviceCount',
     sortable: true,
     cellProps: (row) => ({
-      'aria-label': `Active devices: ${(row.activeDeviceCount ?? 0).toLocaleString()}, ${getFreshnessLabel(row as DeviceRow)} data`,
+      'aria-label': `Active devices: ${(row.activeDeviceCount ?? 0).toLocaleString()}, ${getFreshnessState((row as DeviceRow).lastTelemetryAt).replace('_', ' ')} data`,
     }),
     render: (row) => (
       <FreshnessMicroPanel

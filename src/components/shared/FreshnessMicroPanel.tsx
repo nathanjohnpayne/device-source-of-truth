@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ACTIVE_DEVICES_WINDOW_DAYS } from '../../lib/types';
-import { formatRelativeTime, formatDateTime, formatDate } from '../../lib/format';
-import { getFreshnessState } from './FreshnessBadge';
+import { formatRelativeTime, formatDateTime, formatDate, getFreshnessState } from '../../lib/format';
 
 const DOT_BG: Record<string, string> = {
   fresh: 'bg-green-500',

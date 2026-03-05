@@ -23,6 +23,19 @@ export function formatNumber(value: number | null | undefined): string {
   return new Intl.NumberFormat(undefined).format(value);
 }
 
+export type FreshnessState = 'fresh' | 'aging' | 'stale' | 'no_data';
+
+export function getFreshnessState(lastTelemetryAt: string | null | undefined): FreshnessState {
+  if (!lastTelemetryAt) return 'no_data';
+  const diffMs = Date.now() - new Date(lastTelemetryAt).getTime();
+  if (Number.isNaN(diffMs)) return 'no_data';
+  const hours48 = 48 * 60 * 60 * 1000;
+  const days7 = 7 * 24 * 60 * 60 * 1000;
+  if (diffMs < hours48) return 'fresh';
+  if (diffMs < days7) return 'aging';
+  return 'stale';
+}
+
 export function formatRelativeTime(iso: string | null | undefined): string {
   if (!iso) return 'No data recorded';
   const now = Date.now();

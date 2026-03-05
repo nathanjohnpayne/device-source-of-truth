@@ -1,8 +1,6 @@
 import { ACTIVE_DEVICES_WINDOW_DAYS } from '../../lib/types';
-import { formatRelativeTime, formatDateTime, formatDate } from '../../lib/format';
+import { formatRelativeTime, formatDateTime, formatDate, getFreshnessState, type FreshnessState } from '../../lib/format';
 import Tooltip from './Tooltip';
-
-type FreshnessState = 'fresh' | 'aging' | 'stale' | 'no_data';
 
 const DOT_COLOR: Record<FreshnessState, string> = {
   fresh: 'bg-green-500',
@@ -17,17 +15,6 @@ const STATE_LABEL: Record<FreshnessState, string> = {
   stale: 'Stale',
   no_data: 'No data',
 };
-
-export function getFreshnessState(lastTelemetryAt: string | null | undefined): FreshnessState {
-  if (!lastTelemetryAt) return 'no_data';
-  const diffMs = Date.now() - new Date(lastTelemetryAt).getTime();
-  if (Number.isNaN(diffMs)) return 'no_data';
-  const hours48 = 48 * 60 * 60 * 1000;
-  const days7 = 7 * 24 * 60 * 60 * 1000;
-  if (diffMs < hours48) return 'fresh';
-  if (diffMs < days7) return 'aging';
-  return 'stale';
-}
 
 function getCoverageRange(lastTelemetryAt: string | null | undefined, windowDays: number) {
   const end = lastTelemetryAt ? new Date(lastTelemetryAt) : new Date();
