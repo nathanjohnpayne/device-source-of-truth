@@ -231,7 +231,6 @@ router.get('/:id', async (req, res) => {
         : startedAt;
       if (Date.now() - lastHeartbeat > staleThresholdMs) {
         const devicesComplete = (job.devicesComplete as number) || 0;
-        const devicesFailed = (job.devicesFailed as number) || 0;
         const recoveryUpdate: Record<string, unknown> = {
           status: devicesComplete > 0 ? 'pending_review' : 'extraction_failed',
           extractionError: `Extraction stalled after ${devicesComplete} device(s). The server process was interrupted. ${devicesComplete > 0 ? 'Partial results are available for review.' : 'Please retry extraction.'}`,
