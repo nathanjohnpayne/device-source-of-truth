@@ -45,6 +45,11 @@ const ANALYTICS_ROUTES: Array<{ pattern: RegExp; pagePath: string; pageTitle: st
     pageTitle: 'Admin / Version Registry',
   },
   {
+    pattern: /^\/admin\/users$/,
+    pagePath: '/admin/users',
+    pageTitle: 'Admin / Users',
+  },
+  {
     pattern: /^\/admin\/questionnaires$/,
     pagePath: '/admin/questionnaires',
     pageTitle: 'Admin / Questionnaires',

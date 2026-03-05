@@ -40,6 +40,8 @@ import type {
   QuestionnaireIntakeJobDetail,
   QuestionnaireStagedDevice,
   QuestionnaireStagedField,
+  User,
+  UserRole,
 } from './types';
 
 class ApiError extends Error {
@@ -494,6 +496,15 @@ export const api = {
           { method: 'PATCH' },
         ),
     },
+  },
+
+  users: {
+    list: () => apiFetch<{ users: User[] }>('/users'),
+    updateRole: (userId: string, role: UserRole) =>
+      apiFetch<{ user: User }>(`/users/${userId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      }),
   },
 
   partnerAliases: {

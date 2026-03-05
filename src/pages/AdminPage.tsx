@@ -9,6 +9,7 @@ import {
   Layers,
   RefreshCw,
   ListChecks,
+  Users,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import Badge from '../components/shared/Badge';
@@ -24,6 +25,12 @@ interface AdminCard {
 }
 
 const ADMIN_CARDS: AdminCard[] = [
+  {
+    title: 'Manage Users',
+    description: 'View all registered users and change their access roles',
+    icon: <Users className="h-6 w-6" />,
+    path: '/admin/users',
+  },
   {
     title: 'Telemetry Upload',
     description: 'Upload observability CSV exports to refresh device field counts',

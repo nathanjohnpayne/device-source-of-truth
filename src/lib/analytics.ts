@@ -43,7 +43,9 @@ export type AnalyticsEvent =
   | 'intake_ai_disambiguation'
   | 'intake_clarification_resolved'
   | 'partner_alias_saved'
-  | 'partner_aliases_seeded';
+  | 'partner_aliases_seeded'
+  | 'user_role_changed'
+  | 'user_management_viewed';
 
 export interface AnalyticsParams {
   page_view: { page_title: string; page_path: string };
@@ -89,6 +91,8 @@ export interface AnalyticsParams {
   intake_clarification_resolved: { answered: number };
   partner_alias_saved: { resolution_type: string };
   partner_aliases_seeded: { created: number };
+  user_role_changed: { target_user_id: string; old_role: string; new_role: string };
+  user_management_viewed: Record<string, never>;
 }
 
 export function trackEvent<E extends AnalyticsEvent>(
