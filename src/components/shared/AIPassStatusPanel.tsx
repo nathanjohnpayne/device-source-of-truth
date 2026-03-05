@@ -76,7 +76,7 @@ export default function AIPassStatusPanel({ passState, onRestart, collapsed }: A
     return (
       <>
         <div
-          aria-live={passState.status === 'failed' ? 'assertive' : 'polite'}
+          aria-live="polite"
           className="sr-only"
           ref={liveRef}
         >

@@ -5,7 +5,6 @@ import type {
   ImportType,
   DisambiguationResponse,
   AIPassStep,
-  AIPassStatus,
   AIPassState,
 } from '../lib/types';
 
@@ -122,7 +121,6 @@ export function useAIPassStatus(): UseAIPassStatusReturn {
           auto_resolved: resolved,
           questions: flagged,
           fallback: false,
-          partial_failure: true,
         });
 
         collapseTimerRef.current = setTimeout(() => setCollapsed(true), SUCCESS_COLLAPSE_MS);
