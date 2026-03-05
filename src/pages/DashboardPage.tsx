@@ -37,7 +37,7 @@ interface DashboardData {
     region: string;
     activeDevices: number;
     deviceCount: number;
-    lastTelemetryAt: string | null;
+    lastTelemetryAt?: string | null;
   }[];
 }
 
