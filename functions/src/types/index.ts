@@ -505,6 +505,15 @@ export interface PartnerAlias {
   updatedBy: string;
 }
 
+// ── Extraction Task Queue ──
+
+export type ExtractionStatus = 'pending' | 'processing' | 'complete' | 'failed';
+
+export interface ExtractionTaskPayload {
+  intakeJobId: string;
+  stagedDeviceId: string;
+}
+
 // ── Config ──
 
 export interface AppConfig {

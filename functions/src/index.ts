@@ -2,8 +2,10 @@ import admin from 'firebase-admin';
 import express from 'express';
 import cors from 'cors';
 import { onRequest } from 'firebase-functions/v2/https';
+import { onTaskDispatched } from 'firebase-functions/v2/tasks';
 import { authenticate } from './middleware/auth.js';
 import { requestLoggingMiddleware, log, formatError } from './services/logger.js';
+import { processDeviceExtraction } from './services/questionnaireExtractor.js';
 import partnersRouter from './routes/partners.js';
 import partnerKeysRouter from './routes/partnerKeys.js';
 import devicesRouter from './routes/devices.js';
@@ -21,6 +23,7 @@ import disambiguateRouter from './routes/disambiguate.js';
 import versionMappingsRouter from './routes/versionMappings.js';
 import partnerAliasesRouter from './routes/partnerAliases.js';
 import questionnaireIntakeRouter from './routes/questionnaireIntake.js';
+import type { ExtractionTaskPayload } from './types/index.js';
 
 admin.initializeApp();
 log.info('Firebase Admin initialized');
@@ -70,3 +73,27 @@ app.use(
 log.info('Express app configured with all routes');
 
 export const api = onRequest({ region: 'us-central1', invoker: 'private' }, app);
+
+export const extractDeviceTask = onTaskDispatched(
+  {
+    retryConfig: {
+      maxAttempts: 3,
+      minBackoffSeconds: 60,
+      maxBackoffSeconds: 300,
+    },
+    rateLimits: {
+      maxConcurrentDispatches: 3,
+    },
+    timeoutSeconds: 300,
+    memory: '512MiB',
+    region: 'us-central1',
+  },
+  async (req) => {
+    const payload = req.data as ExtractionTaskPayload;
+    if (!payload?.intakeJobId || !payload?.stagedDeviceId) {
+      log.error('extractDeviceTask received invalid payload', { data: req.data });
+      return;
+    }
+    await processDeviceExtraction(payload);
+  },
+);
