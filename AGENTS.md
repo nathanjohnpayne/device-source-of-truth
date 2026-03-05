@@ -69,6 +69,7 @@ Firebase Hosting (static SPA)
 ├── storage.rules                 ← Firebase Storage security rules (questionnaire files)
 ├── firestore.indexes.json        ← Composite index definitions (currently empty)
 ├── .env / .env.example           ← Firebase API keys (3 vars, all VITE_ prefixed)
+├── functions/.env.tpl            ← 1Password secret references (op:// URIs, safe to commit)
 └── vite.config.ts                ← Vite + Tailwind + code-split config
 ```
 
@@ -247,6 +248,8 @@ Roles are stored in the `users` Firestore collection. A user doc must exist with
 
 ## Build & Deploy
 
+Deploying functions requires the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) to be installed and authenticated — the predeploy hook resolves secrets from 1Password before upload.
+
 ```bash
 # Frontend build
 npm run build              # tsc -b && vite build
@@ -254,12 +257,12 @@ npm run build              # tsc -b && vite build
 # Backend build
 cd functions && npm run build   # tsc
 
-# Deploy everything
+# Deploy everything (requires `op` CLI for functions secrets)
 npx firebase deploy
 
 # Deploy selectively
 npx firebase deploy --only hosting
-npx firebase deploy --only functions
+npx firebase deploy --only functions   # runs op inject → resolves .env.tpl → .env
 npx firebase deploy --only firestore:rules
 npx firebase deploy --only storage
 ```
@@ -298,4 +301,5 @@ Secret management flow:
 10a. **Questionnaire extraction has real-time status UI (DST-052).** The backend writes `extractionStep` (1=Reading spreadsheet, 2=Extracting fields, 3=Validating values, 4=Done), `extractionCurrentDevice`, `devicesComplete`, and `devicesFailed` to the job document as extraction progresses. The frontend `ExtractionStatusPanel` component renders a 4-step stepper during extraction, auto-collapses 2s after success, and shows failure/partial-failure banners with Restart/Retry buttons. The active device card shows an indigo pulse animation. Failed devices can be retried individually via `POST /:id/retry-device/:deviceId` without re-processing successful ones.
 11. **The questionnaire review wizard has 4 steps.** Assign Partner → Review Devices → Resolve Conflicts → Sign Off. Nothing is committed to the catalog until the admin completes Step 4. The `POST /:id/approve` endpoint runs an atomic Firestore batch that writes specs, creates device records, logs audit entries, and triggers tier/completeness recalculation.
 12. **Notifications are admin-only for now.** The `notifications` collection stores in-app notifications written by the backend when intake jobs reach `pending_review`. The `NotificationBell` component in `AppShell.tsx` polls every 30 seconds.
-13. **Button `appearance: none` must stay un-layered in `index.css`.** Tailwind CSS v4 puts all styles inside CSS cascade layers (`@layer base`, `@layer utilities`, etc.) and its preflight sets `appearance: button` on `<button>` elements inside `@layer base`. On macOS, this causes Chrome to render buttons with the native system appearance (lavender tint, oversized padding, pill-shaped border-radius), overriding Tailwind utility classes. The fix in `src/index.css` places `appearance: none` as **un-layered CSS** (outside any `@layer`), giving it the highest author-origin priority. Do NOT move this rule into `@layer base` — it will stop working.
+13. **Tailwind v4 `appearance: button` override.** Tailwind CSS 4 applies `appearance: button` to `<button>` elements via its preflight, which on macOS Safari/Chrome renders rounded system-styled buttons. `src/index.css` contains an un-layered `button { appearance: none; }` reset that must load after Tailwind's `@import`. Do not remove it or move it inside a `@layer` — un-layered styles have higher specificity than Tailwind's layered preflight.
+14. **Partner resolution uses a shared chain (DST-046).** The `partnerResolver` service implements exact match → alias lookup → Jaro-Winkler fuzzy match (≥ 0.90). Both AllModels migration and partner key CSV import use this shared resolver. The `partnerAliasResolver` service manages alias CRUD and seeding.
