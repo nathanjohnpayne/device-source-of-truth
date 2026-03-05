@@ -12,6 +12,7 @@ import {
   Info,
   Monitor,
   Eye,
+  Sparkles,
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
@@ -740,15 +741,18 @@ function DeviceCard({
 function ReviewDevicesStep({
   devices,
   jobId,
+  job,
   onApproveDevice,
   onRejectDevice,
   onFieldUpdate,
+  onRefreshJob,
   onNext,
   actionError,
   busy,
 }: {
   devices: StagedDeviceWithFields[];
   jobId: string;
+  job: QuestionnaireIntakeJob;
   onApproveDevice: (device: StagedDeviceWithFields, identity?: Record<string, string | null>) => void;
   onRejectDevice: (device: StagedDeviceWithFields, reason?: string) => void;
   onFieldUpdate: (
@@ -756,11 +760,14 @@ function ReviewDevicesStep({
     fieldId: string,
     patch: Partial<QuestionnaireStagedField>,
   ) => void;
+  onRefreshJob: () => void;
   onNext: () => void;
   actionError: string | null;
   busy: boolean;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -772,6 +779,44 @@ function ReviewDevicesStep({
   const approved = devices.filter((d) => d.reviewStatus === 'approved').length;
   const rejected = devices.filter((d) => d.reviewStatus === 'rejected').length;
   const allDecided = devices.every((d) => d.reviewStatus !== 'pending');
+
+  const totalExtracted = devices.reduce(
+    (sum, d) => sum + d.fields.filter((f) => f.extractedValue != null).length,
+    0,
+  );
+  const canRunExtraction =
+    totalExtracted === 0 &&
+    (job.status === 'awaiting_extraction' || job.status === 'pending_review' || job.status === 'extraction_failed');
+
+  const handleRunExtraction = async () => {
+    setExtracting(true);
+    setExtractError(null);
+    try {
+      await api.questionnaireIntake.triggerExtraction(jobId);
+      const poll = async (attempts: number) => {
+        if (attempts <= 0) {
+          onRefreshJob();
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+          const detail = await api.questionnaireIntake.get(jobId);
+          if (detail.status === 'extracting') {
+            await poll(attempts - 1);
+          } else {
+            onRefreshJob();
+          }
+        } catch {
+          onRefreshJob();
+        }
+      };
+      await poll(20);
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : 'Failed to trigger extraction');
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const sorted = useMemo(() => {
     return [...devices].sort((a, b) => {
@@ -800,6 +845,38 @@ function ReviewDevicesStep({
 
   return (
     <div className="space-y-4">
+      {canRunExtraction && !extracting && (
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
+            <p className="text-sm text-amber-800">
+              No fields have been extracted. Run AI extraction to automatically populate device specs from the questionnaire.
+            </p>
+          </div>
+          <button
+            onClick={handleRunExtraction}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500"
+          >
+            <Sparkles className="h-4 w-4" />
+            Run AI Extraction
+          </button>
+        </div>
+      )}
+      {extracting && (
+        <div className="flex items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+          <Sparkles className="h-5 w-5 animate-pulse text-indigo-500" />
+          <p className="text-sm text-indigo-800">
+            AI extraction in progress — analyzing questionnaire responses for each device...
+          </p>
+        </div>
+      )}
+      {extractError && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <AlertTriangle className="h-5 w-5 text-red-500" />
+          <p className="text-sm text-red-700">{extractError}</p>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
@@ -1611,9 +1688,11 @@ export default function QuestionnaireReviewPage() {
           <ReviewDevicesStep
             devices={devices}
             jobId={id!}
+            job={job}
             onApproveDevice={handleApproveDevice}
             onRejectDevice={handleRejectDevice}
             onFieldUpdate={handleFieldUpdate}
+            onRefreshJob={loadReview}
             onNext={advanceFromStep2}
             actionError={actionError}
             busy={busy}

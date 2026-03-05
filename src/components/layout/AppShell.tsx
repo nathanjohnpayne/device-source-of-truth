@@ -52,7 +52,6 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Devices',
         path: '/devices',
         icon: <Monitor className="h-5 w-5" />,
-        badge: '0',
       },
       { label: 'Partners', path: '/partners', icon: <Building2 className="h-5 w-5" /> },
       { label: 'Hardware Tiers', path: '/tiers', icon: <Layers className="h-5 w-5" /> },
@@ -272,6 +271,17 @@ function Sidebar() {
                           item.icon
                         )}
                         <span className="flex-1">{item.label}</span>
+                        {item.label === 'Devices' && !prereqs.loading && (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              active
+                                ? 'bg-indigo-500 text-white'
+                                : 'bg-slate-700 text-slate-300'
+                            }`}
+                          >
+                            {prereqs.counts.devices.toLocaleString()}
+                          </span>
+                        )}
                         {item.badge && (
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
