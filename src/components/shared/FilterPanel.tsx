@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import Button from './Button';
 
 export interface FilterGroup {
   key: string;
@@ -58,12 +59,14 @@ export default function FilterPanel({
           )}
         </button>
         {activeCount > 0 && (
-          <button
+          <Button
             onClick={clearAll}
-            className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+            variant="ghost"
+            size="sm"
+            className="text-indigo-600 hover:text-indigo-800"
           >
             Clear all
-          </button>
+          </Button>
         )}
       </div>
 
@@ -71,7 +74,7 @@ export default function FilterPanel({
         <div className="border-t border-gray-100 px-4 py-3">
           <div className="flex flex-wrap gap-4">
             {groups.map((group) => (
-              <div key={group.key} className="min-w-[160px]">
+              <div key={group.key} className="min-w-[140px] flex-1 sm:min-w-[160px]">
                 <label className="mb-1 block text-xs font-medium text-gray-500">
                   {group.label}
                 </label>
@@ -91,7 +94,7 @@ export default function FilterPanel({
                     onChange={(e) =>
                       setValue(group.key, e.target.value || undefined)
                     }
-                    className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                   >
                     <option value="">All</option>
                     {group.options?.map((opt) => (
@@ -111,7 +114,7 @@ export default function FilterPanel({
                       );
                       setValue(group.key, selected.length ? selected : undefined);
                     }}
-                    className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                   >
                     {group.options?.map((opt) => (
                       <option key={opt.value} value={opt.value}>

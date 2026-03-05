@@ -2,6 +2,8 @@ import { useState, useMemo, type ReactNode } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import LoadingSpinner from './LoadingSpinner';
 import EmptyState from './EmptyState';
+import Button from './Button';
+import { formatNumber } from '../../lib/format';
 
 export interface Column<T> {
   header: string;
@@ -139,29 +141,33 @@ export default function DataTable<T extends { id?: string }>({
           <p className="text-sm text-gray-500">
             Showing{' '}
             <span className="font-medium">
-              {(pagination.page - 1) * pagination.pageSize + 1}
+              {formatNumber((pagination.page - 1) * pagination.pageSize + 1)}
             </span>
             –
             <span className="font-medium">
-              {Math.min(pagination.page * pagination.pageSize, pagination.total)}
+              {formatNumber(
+                Math.min(pagination.page * pagination.pageSize, pagination.total),
+              )}
             </span>{' '}
-            of <span className="font-medium">{pagination.total}</span>
+            of <span className="font-medium">{formatNumber(pagination.total)}</span>
           </p>
           <div className="flex gap-1">
-            <button
-              className="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={pagination.page <= 1}
               onClick={() => pagination.onPageChange(pagination.page - 1)}
             >
               Previous
-            </button>
-            <button
-              className="rounded-md border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={pagination.page >= totalPages}
               onClick={() => pagination.onPageChange(pagination.page + 1)}
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
       )}

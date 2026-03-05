@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { IconButton } from './Button';
 
 interface ModalProps {
   open: boolean;
@@ -25,7 +26,10 @@ export default function Modal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -65,12 +69,13 @@ export default function Modal({
           <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
             <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
             {dismissable && (
-              <button
+              <IconButton
                 onClick={onClose}
-                className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
+                variant="ghost"
+                icon={<X className="h-5 w-5" />}
+                label="Close dialog"
+                className="text-gray-400 hover:text-gray-600"
+              />
             )}
           </div>
         )}

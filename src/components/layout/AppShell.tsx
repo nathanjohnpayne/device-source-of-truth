@@ -1,7 +1,8 @@
-import { type ReactNode, useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { type ReactNode, useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { api } from '../../lib/api';
 import type { AppNotification } from '../../lib/types';
+import { formatDate, formatNumber } from '../../lib/format';
 import UpdateBanner from '../UpdateBanner';
 import {
   LayoutDashboard,
@@ -28,6 +29,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { useImportPrerequisites } from '../../hooks/useImportPrerequisites';
 import Badge from '../shared/Badge';
+import { IconButton } from '../shared/Button';
 import Logo from '../shared/Logo';
 import GlobalSearch from './GlobalSearch';
 
@@ -255,13 +257,13 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
           <h1 className="text-sm font-semibold text-white">Device Source of Truth</h1>
           <p className="text-xs text-slate-400">Disney Streaming</p>
         </div>
-        <button
+        <IconButton
           onClick={onClose}
-          className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
-          aria-label="Close sidebar"
-        >
-          <X className="h-5 w-5" />
-        </button>
+          variant="ghost"
+          icon={<X className="h-5 w-5" />}
+          label="Close sidebar"
+          className="text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"
+        />
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -307,7 +309,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                                 : 'bg-slate-700 text-slate-300'
                             }`}
                           >
-                            {prereqs.counts.devices.toLocaleString()}
+                            {formatNumber(prereqs.counts.devices)}
                           </span>
                         )}
                         {item.badge && (
@@ -380,18 +382,19 @@ function NotificationBell() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+      <IconButton
         onClick={() => setOpen(!open)}
-        className="relative rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-        title="Notifications"
+        variant="ghost"
+        icon={<Bell className="h-5 w-5" />}
+        label="Notifications"
+        className="relative text-gray-400 hover:text-gray-600"
       >
-        <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
-      </button>
+      </IconButton>
 
       {open && (
         <div className="absolute right-0 mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-lg">
@@ -413,7 +416,7 @@ function NotificationBell() {
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">{notif.body}</p>
                   <p className="mt-1 text-xs text-gray-400">
-                    {new Date(notif.createdAt).toLocaleDateString()}
+                    {formatDate(notif.createdAt)}
                   </p>
                 </button>
               ))
@@ -429,15 +432,14 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const initials = useMemo(() => {
-    if (!user?.displayName) return '?';
-    return user.displayName
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }, [user?.displayName]);
+  const initials = user?.displayName
+    ? user.displayName
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : '?';
 
   const roleBadgeVariant =
     user?.role === 'admin' ? 'danger' : user?.role === 'editor' ? 'info' : 'default';
@@ -445,13 +447,13 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   return (
     <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6">
       <div className="flex items-center gap-4">
-        <button
+        <IconButton
           onClick={onMenuClick}
-          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 lg:hidden"
-          aria-label="Open sidebar"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+          variant="ghost"
+          icon={<Menu className="h-5 w-5" />}
+          label="Open sidebar"
+          className="text-gray-500 hover:text-gray-700 lg:hidden"
+        />
         <Breadcrumbs />
       </div>
 
@@ -464,16 +466,16 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
             {initials}
           </div>
-          <button
+          <IconButton
             onClick={() => {
               signOut();
               navigate('/login');
             }}
-            className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            title="Sign out"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
+            variant="ghost"
+            icon={<LogOut className="h-5 w-5" />}
+            label="Sign out"
+            className="text-gray-400 hover:text-gray-600"
+          />
         </div>
       </div>
     </header>

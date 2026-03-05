@@ -14,15 +14,18 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { formatDateTime, formatNumber } from '../lib/format';
 import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import Badge from '../components/shared/Badge';
+import Button from '../components/shared/Button';
+import InlineNotice from '../components/shared/InlineNotice';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
 import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
 import TimeRangeDropdown from '../components/shared/TimeRangeDropdown';
+import WorkflowStepper from '../components/shared/WorkflowStepper';
 import type { UploadHistoryWithRollback, TelemetryPreviewRow } from '../lib/types';
-import { formatDateTime } from '../lib/format';
 
 const MONTH_NAMES = [
   'january', 'february', 'march', 'april', 'may', 'june',
@@ -65,6 +68,7 @@ function formatSnapshotDate(isoDate: string): string {
 }
 
 type Step = 'upload' | 'preview' | 'result';
+const STEP_KEYS: Step[] = ['upload', 'preview', 'result'];
 
 const UPSERT_BADGE: Record<string, { variant: 'info' | 'success' | 'warning' | 'default'; label: string }> = {
   new: { variant: 'success', label: 'New' },
@@ -257,7 +261,7 @@ export default function TelemetryUploadPage() {
       setRollbackModal(null);
       loadHistory();
     } catch (err) {
-      alert(`Rollback failed: ${err instanceof Error ? err.message : String(err)}`);
+      setParseError(`Rollback failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     setRollbackLoading(false);
   }, [loadHistory]);
@@ -297,9 +301,9 @@ export default function TelemetryUploadPage() {
           </a>
         </div>
         {step !== 'upload' && (
-          <button onClick={reset} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <Button onClick={reset} variant="secondary">
             Start Over
-          </button>
+          </Button>
         )}
       </div>
 
@@ -333,21 +337,16 @@ export default function TelemetryUploadPage() {
       <PrerequisitesWidget />
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2 text-sm">
-        {(['upload', 'preview', 'result'] as Step[]).map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            {i > 0 && <div className="h-px w-8 bg-gray-300" />}
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-              step === s ? 'bg-indigo-600 text-white' : s === 'result' && step === 'preview' ? 'bg-gray-200 text-gray-500' : s === 'preview' && step === 'upload' ? 'bg-gray-200 text-gray-500' : 'bg-emerald-100 text-emerald-700'
-            }`}>
-              {i + 1}
-            </div>
-            <span className={step === s ? 'font-medium text-gray-900' : 'text-gray-500'}>
-              {s === 'upload' ? 'Upload' : s === 'preview' ? 'Preview & Validate' : 'Import Complete'}
-            </span>
-          </div>
-        ))}
-      </div>
+      <WorkflowStepper
+        mode="linear3"
+        currentStep={step}
+        completedSteps={step === 'result' ? STEP_KEYS : step === 'preview' ? ['upload'] : []}
+        steps={[
+          { key: 'upload', label: 'Upload' },
+          { key: 'preview', label: 'Preview & Validate' },
+          { key: 'result', label: 'Import Complete' },
+        ]}
+      />
 
       {/* Step 1: Upload */}
       {step === 'upload' && (
@@ -400,7 +399,7 @@ export default function TelemetryUploadPage() {
                 type="date"
                 value={snapshotDate}
                 onChange={(e) => setSnapshotDate(e.target.value)}
-                className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -411,7 +410,7 @@ export default function TelemetryUploadPage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-md bg-gray-50 p-3">
+          <div className="mt-4 rounded-lg bg-gray-50 p-3">
             <p className="text-xs font-medium text-gray-600">Expected CSV Columns</p>
             <p className="mt-1 font-mono text-xs text-gray-500">
               partner, device, core_version, count_unique_device_id, count
@@ -419,10 +418,11 @@ export default function TelemetryUploadPage() {
           </div>
 
           {parseError && (
-            <div className="mt-4 flex items-start gap-3 rounded-lg bg-red-50 p-4">
-              <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
-              <p className="text-sm text-red-700">{parseError}</p>
-            </div>
+            <InlineNotice
+              severity="error"
+              className="mt-4"
+              message={parseError}
+            />
           )}
         </div>
       )}
@@ -453,18 +453,20 @@ export default function TelemetryUploadPage() {
               <div className="flex items-center gap-3">
                 <TimeRangeDropdown value={importTimeRange} onChange={setImportTimeRange} />
                 {dateReadOnly ? (
-                  <button
+                  <Button
                     onClick={() => setDateReadOnly(false)}
-                    className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    variant="secondary"
+                    size="sm"
+                    className="text-gray-600"
                   >
                     <Pencil className="h-3 w-3" /> Edit
-                  </button>
+                  </Button>
                 ) : (
                   <input
                     type="date"
                     value={snapshotDate}
                     onChange={(e) => setSnapshotDate(e.target.value)}
-                    className="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    className="rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                   />
                 )}
               </div>
@@ -547,8 +549,8 @@ export default function TelemetryUploadPage() {
                             <Badge variant="warning">Unmapped</Badge>
                           ) : '—'}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{row.uniqueDevices.toLocaleString()}</td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{row.eventCount.toLocaleString()}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{formatNumber(row.uniqueDevices)}</td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700">{formatNumber(row.eventCount)}</td>
                         <td className="px-3 py-2 text-xs">
                           {isStale && !isOverridden && (
                             <div className="mb-1">
@@ -589,10 +591,7 @@ export default function TelemetryUploadPage() {
           </div>
 
           {parseError && (
-            <div className="flex items-start gap-3 rounded-lg bg-red-50 p-4">
-              <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
-              <p className="text-sm text-red-700">{parseError}</p>
-            </div>
+            <InlineNotice severity="error" message={parseError} />
           )}
 
           {hasUnresolvedStale && (
@@ -642,7 +641,7 @@ export default function TelemetryUploadPage() {
             </p>
           </div>
           {uploadResult.errors.length > 0 && (
-            <div className="mt-4 max-h-40 overflow-y-auto rounded-md bg-red-50 p-3">
+            <div className="mt-4 max-h-40 overflow-y-auto rounded-lg bg-red-50 p-3">
               <p className="mb-1 text-xs font-medium text-red-700">Error Details</p>
               <ul className="space-y-0.5 text-xs text-red-600">
                 {uploadResult.errors.map((err, i) => (
@@ -697,13 +696,15 @@ export default function TelemetryUploadPage() {
                         </span>
                       )}
                       {canRollback ? (
-                        <button
+                        <Button
                           onClick={() => setRollbackModal(batch)}
-                          className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                          variant="secondary"
+                          size="sm"
+                          className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                           Rollback
-                        </button>
+                        </Button>
                       ) : batch.uploadBatchId ? (
                         <span className="text-xs text-gray-400">Rollback expired</span>
                       ) : null}

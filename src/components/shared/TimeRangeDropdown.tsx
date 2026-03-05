@@ -68,13 +68,6 @@ export default function TimeRangeDropdown({ value, onChange }: TimeRangeDropdown
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  useEffect(() => {
-    if (open) {
-      setSearch('');
-      requestAnimationFrame(() => searchRef.current?.focus());
-    }
-  }, [open]);
-
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') setOpen(false);
   }, []);
@@ -99,7 +92,16 @@ export default function TimeRangeDropdown({ value, onChange }: TimeRangeDropdown
     <div ref={containerRef} className="relative" onKeyDown={handleKeyDown}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          setOpen((isOpen) => {
+            const nextOpen = !isOpen;
+            if (nextOpen) {
+              setSearch('');
+              requestAnimationFrame(() => searchRef.current?.focus());
+            }
+            return nextOpen;
+          });
+        }}
         className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
           value
             ? 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
@@ -120,7 +122,7 @@ export default function TimeRangeDropdown({ value, onChange }: TimeRangeDropdown
             <p className="text-xs font-semibold text-gray-700">Import Time Range</p>
           </div>
           <div className="border-b border-gray-100 px-3 py-2">
-            <div className="flex items-center gap-2 rounded-md border border-gray-300 px-2.5 py-1.5 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500">
+            <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-2.5 py-1.5 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500">
               <svg className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />

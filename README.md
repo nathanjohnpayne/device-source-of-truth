@@ -76,6 +76,24 @@ firebase deploy --only firestore    # security rules + indexes
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including Firebase Console setup, seed data, custom domains, monitoring, and rollback procedures.
 
+## UI Consistency Guardrails
+
+```bash
+# Check for new UI drift against baseline
+npm run ui:consistency:check
+
+# Refresh baseline after intentional remediation work
+npm run ui:consistency:baseline
+```
+
+Current checks enforce delta-only drift protection for:
+- `alert()` usage in app code
+- direct `toLocaleDateString()` / `toLocaleString()` in pages/components
+- non-allowlisted `rounded-md` token drift
+- blue primary action tokens (`bg-blue-600` / `hover:bg-blue-700`)
+
+Baseline file: [`config/ui-consistency-baseline.json`](./config/ui-consistency-baseline.json)
+
 ## Project Structure
 
 ```
@@ -119,6 +137,8 @@ docs/                         Technical documentation
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Deep technical architecture: data flow, security model, design decisions |
 | [docs/DATA_MODEL.md](./docs/DATA_MODEL.md) | Firestore schema reference for all 13 collections |
 | [docs/API_REFERENCE.md](./docs/API_REFERENCE.md) | Full REST API documentation with request/response examples |
+| [docs/UI_CONSISTENCY.md](./docs/UI_CONSISTENCY.md) | UI drift guardrails and filter UX standardization matrix |
+| [specs/DST-TDI-002-UI-Drift-Remediation-PLAN.md](./specs/DST-TDI-002-UI-Drift-Remediation-PLAN.md) | UI/UX consistency remediation roadmap (Rev C) |
 | [specs/Device Source of Truth (DST).md](./specs/Device%20Source%20of%20Truth%20(DST).md) | Original product specification |
 | [specs/DST-037](./specs/DST-037-airtable-intake-import.md) | Airtable Intake Request Import |
 | [specs/DST-038](./specs/DST-038-partner-key-registry.md) | Partner Key Registry |

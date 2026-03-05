@@ -5,12 +5,15 @@ import {
 } from 'lucide-react';
 import Papa from 'papaparse';
 import Badge from '../components/shared/Badge';
+import Button from '../components/shared/Button';
+import InlineNotice from '../components/shared/InlineNotice';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
 import ClarificationPanel from '../components/shared/ClarificationPanel';
 import AIPassStatusPanel from '../components/shared/AIPassStatusPanel';
 import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
+import WorkflowStepper from '../components/shared/WorkflowStepper';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
 import { formatDate, formatDateTime } from '../lib/format';
@@ -123,6 +126,7 @@ function normalizeRegions(raw: string): IntakeRegion[] | null {
 }
 
 type Step = 'upload' | 'preview' | 'result';
+const STEP_KEYS: Step[] = ['upload', 'preview', 'result'];
 
 const PAGE_SIZE = 50;
 
@@ -376,7 +380,7 @@ export default function IntakeImportPage() {
       setRollbackModal(null);
       loadHistory();
     } catch (err) {
-      alert(`Rollback failed: ${err instanceof Error ? err.message : String(err)}`);
+      setParseError(`Rollback failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     setRollbackLoading(false);
   }, [loadHistory]);
@@ -458,9 +462,9 @@ export default function IntakeImportPage() {
           </a>
         </div>
         {step !== 'upload' && (
-          <button onClick={reset} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <Button onClick={reset} variant="secondary">
             Start Over
-          </button>
+          </Button>
         )}
       </div>
 
@@ -475,28 +479,23 @@ export default function IntakeImportPage() {
       )}
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2 text-sm">
-        {(['upload', 'preview', 'result'] as Step[]).map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            {i > 0 && <div className="h-px w-8 bg-gray-300" />}
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-              step === s ? 'bg-blue-600 text-white' : s === 'result' && step === 'preview' ? 'bg-gray-200 text-gray-500' : 'bg-emerald-100 text-emerald-700'
-            }`}>
-              {i + 1}
-            </div>
-            <span className={step === s ? 'font-medium text-gray-900' : 'text-gray-500'}>
-              {s === 'upload' ? 'Upload' : s === 'preview' ? 'Preview & Validate' : 'Import Complete'}
-            </span>
-          </div>
-        ))}
-      </div>
+      <WorkflowStepper
+        mode="linear3"
+        currentStep={step}
+        completedSteps={step === 'result' ? STEP_KEYS : step === 'preview' ? ['upload'] : []}
+        steps={[
+          { key: 'upload', label: 'Upload' },
+          { key: 'preview', label: 'Preview & Validate' },
+          { key: 'result', label: 'Import Complete' },
+        ]}
+      />
 
       {/* Step 1: Upload */}
       {step === 'upload' && (
         <div className="rounded-xl border border-gray-200 bg-white p-8">
           <div
             className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-colors ${
-              dragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+              dragging ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300 hover:border-gray-400'
             }`}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
@@ -512,7 +511,7 @@ export default function IntakeImportPage() {
                 </p>
                 <p className="mb-4 text-sm text-gray-500">or click to browse</p>
                 <label className={`rounded-lg px-6 py-2.5 text-sm font-medium text-white ${
-                  isBlocked ? 'cursor-not-allowed bg-gray-400' : 'cursor-pointer bg-blue-600 hover:bg-blue-700'
+                  isBlocked ? 'cursor-not-allowed bg-gray-400' : 'cursor-pointer bg-indigo-600 hover:bg-indigo-700'
                 }`}>
                   Select File
                   <input
@@ -560,10 +559,11 @@ export default function IntakeImportPage() {
           </div>
 
           {parseError && (
-            <div className="mt-4 flex items-start gap-3 rounded-lg bg-red-50 p-4">
-              <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
-              <p className="text-sm text-red-700">{parseError}</p>
-            </div>
+            <InlineNotice
+              severity="error"
+              className="mt-4"
+              message={parseError}
+            />
           )}
         </div>
       )}
@@ -743,14 +743,14 @@ export default function IntakeImportPage() {
                 </p>
                 <div className="flex gap-1">
                   <button
-                    className="rounded-md border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                    className="rounded-lg border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
                     disabled={page <= 1}
                     onClick={() => setPage(p => p - 1)}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
                   <button
-                    className="rounded-md border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                    className="rounded-lg border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
                     disabled={page >= totalPages}
                     onClick={() => setPage(p => p + 1)}
                   >
@@ -762,10 +762,7 @@ export default function IntakeImportPage() {
           </div>
 
           {parseError && (
-            <div className="flex items-start gap-3 rounded-lg bg-red-50 p-4">
-              <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
-              <p className="text-sm text-red-700">{parseError}</p>
-            </div>
+            <InlineNotice severity="error" message={parseError} />
           )}
 
           {/* Import button */}
@@ -773,7 +770,7 @@ export default function IntakeImportPage() {
             <button
               onClick={handleImport}
               disabled={!canImport || loading}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <LoadingSpinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
               Import {summary.ready} records
@@ -1152,6 +1149,7 @@ function ImportHistory({
   onRollback: (batch: IntakeImportBatch) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [renderedAt] = useState(() => Date.now());
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white">
@@ -1175,7 +1173,7 @@ function ImportHistory({
           ) : (
             <div className="space-y-3">
               {history.map(batch => {
-                const daysSince = (Date.now() - new Date(batch.importedAt).getTime()) / (1000 * 60 * 60 * 24);
+                const daysSince = (renderedAt - new Date(batch.importedAt).getTime()) / (1000 * 60 * 60 * 24);
                 const canRollback = daysSince <= 30;
 
                 return (
@@ -1194,13 +1192,15 @@ function ImportHistory({
                         {batch.importBatchId.slice(0, 8)}...
                       </span>
                       {canRollback ? (
-                        <button
+                        <Button
                           onClick={() => onRollback(batch)}
-                          className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                          variant="secondary"
+                          size="sm"
+                          className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                           Rollback
-                        </button>
+                        </Button>
                       ) : (
                         <span className="text-xs text-gray-400">Rollback expired</span>
                       )}
