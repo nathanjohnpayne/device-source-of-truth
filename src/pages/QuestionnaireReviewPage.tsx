@@ -15,11 +15,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
+import { formatDate } from '../lib/format';
 import { useAuth } from '../hooks/useAuth';
 import Badge from '../components/shared/Badge';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Tooltip from '../components/shared/Tooltip';
+import WorkflowStepper from '../components/shared/WorkflowStepper';
 import type {
   QuestionnaireIntakeJob,
   QuestionnaireStagedDevice,
@@ -53,75 +55,6 @@ function errorMessage(err: unknown): string {
   if (err instanceof ApiError)
     return (err.body as { error?: string })?.error ?? err.message;
   return err instanceof Error ? err.message : 'An unexpected error occurred.';
-}
-
-// ── Progress Indicator ──────────────────────────────────────────────────────
-
-const STEP_LABELS = [
-  'Assign Partner',
-  'Review Devices',
-  'Resolve Conflicts',
-  'Sign Off',
-];
-
-function ProgressIndicator({
-  current,
-  partnerAssigned,
-  conflictsSkipped,
-}: {
-  current: number;
-  partnerAssigned: boolean;
-  conflictsSkipped: boolean;
-}) {
-  return (
-    <nav className="flex items-center gap-2" aria-label="Review progress">
-      {STEP_LABELS.map((label, i) => {
-        const stepNum = i + 1;
-        const isCompleted =
-          stepNum < current ||
-          (stepNum === 1 && partnerAssigned) ||
-          (stepNum === 3 && conflictsSkipped && current > 3);
-        const isCurrent = stepNum === current;
-        const isSkipped =
-          (stepNum === 1 && partnerAssigned && current !== 1) ||
-          (stepNum === 3 && conflictsSkipped && current !== 3);
-
-        return (
-          <div key={stepNum} className="flex items-center gap-2">
-            {i > 0 && (
-              <div
-                className={`hidden h-px w-8 sm:block ${isCompleted || isCurrent ? 'bg-indigo-400' : 'bg-gray-200'}`}
-              />
-            )}
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                  isCompleted
-                    ? 'bg-indigo-600 text-white'
-                    : isCurrent
-                      ? 'border-2 border-indigo-600 text-indigo-600'
-                      : 'border border-gray-300 text-gray-400'
-                }`}
-              >
-                {isCompleted ? <Check className="h-3.5 w-3.5" /> : stepNum}
-              </span>
-              <span
-                className={`hidden text-xs font-medium sm:inline ${
-                  isCurrent
-                    ? 'text-indigo-600'
-                    : isCompleted
-                      ? 'text-gray-700'
-                      : 'text-gray-400'
-                } ${isSkipped ? 'line-through' : ''}`}
-              >
-                {label}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </nav>
-  );
 }
 
 // ── Confidence Badge ────────────────────────────────────────────────────────
@@ -1267,11 +1200,7 @@ function SignOffStep({
               {job.uploadedByEmail}
             </span>{' '}
             ·{' '}
-            {new Date(job.uploadedAt).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
+            {formatDate(job.uploadedAt)}
           </p>
         </div>
       )}
@@ -1613,6 +1542,25 @@ export default function QuestionnaireReviewPage() {
     setStep(hasConflicts ? 3 : 2);
   };
 
+  const currentStepKey =
+    step === 1
+      ? 'assign_partner'
+      : step === 2
+        ? 'review_devices'
+        : step === 3
+          ? 'resolve_conflicts'
+          : 'sign_off';
+
+  const skippedSteps = [
+    ...(partnerAssigned && step !== 1 ? ['assign_partner'] : []),
+    ...(!hasConflicts && step > 3 ? ['resolve_conflicts'] : []),
+  ];
+
+  const explicitCompletedSteps = [
+    ...(partnerAssigned && step !== 1 ? ['assign_partner'] : []),
+    ...(!hasConflicts && step > 3 ? ['resolve_conflicts'] : []),
+  ];
+
   // ── Render ──
 
   if (loading) return <LoadingSpinner />;
@@ -1664,10 +1612,17 @@ export default function QuestionnaireReviewPage() {
 
       {/* Progress */}
       <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-        <ProgressIndicator
-          current={step}
-          partnerAssigned={partnerAssigned}
-          conflictsSkipped={!hasConflicts}
+        <WorkflowStepper
+          mode="wizard4"
+          currentStep={currentStepKey}
+          completedSteps={explicitCompletedSteps}
+          skippedSteps={skippedSteps}
+          steps={[
+            { key: 'assign_partner', label: 'Assign Partner' },
+            { key: 'review_devices', label: 'Review Devices' },
+            { key: 'resolve_conflicts', label: 'Resolve Conflicts' },
+            { key: 'sign_off', label: 'Sign Off' },
+          ]}
         />
       </div>
 

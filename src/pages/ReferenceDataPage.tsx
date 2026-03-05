@@ -20,7 +20,9 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { formatDate } from '../lib/format';
 import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
+import InlineNotice from '../components/shared/InlineNotice';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import Modal from '../components/shared/Modal';
 import type { FieldOption, FieldOptionKeyInfo } from '../lib/types';
@@ -486,6 +488,10 @@ export default function ReferenceDataPage() {
   const [search, setSearch] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [seedNotice, setSeedNotice] = useState<{
+    severity: 'error' | 'success';
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -502,9 +508,13 @@ export default function ReferenceDataPage() {
 
   const handleSeed = async () => {
     setSeeding(true);
+    setSeedNotice(null);
     try {
       const result = await api.fieldOptions.seed();
-      alert(`Seed complete: ${result.created} created, ${result.skipped} skipped`);
+      setSeedNotice({
+        severity: 'success',
+        message: `Seed complete: ${result.created} created, ${result.skipped} skipped.`,
+      });
       try {
         const res = await api.fieldOptions.listKeys();
         setKeys(res.data);
@@ -512,7 +522,10 @@ export default function ReferenceDataPage() {
         // Index may still be building — reload the page after a moment
       }
     } catch {
-      alert('Failed to seed field options');
+      setSeedNotice({
+        severity: 'error',
+        message: 'Failed to seed field options.',
+      });
     } finally {
       setSeeding(false);
     }
@@ -556,6 +569,13 @@ export default function ReferenceDataPage() {
           </button>
         )}
       </div>
+
+      {seedNotice && (
+        <InlineNotice
+          severity={seedNotice.severity}
+          message={seedNotice.message}
+        />
+      )}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -603,7 +623,7 @@ export default function ReferenceDataPage() {
                 <td className="px-4 py-3 text-center text-sm text-gray-600">{key.optionCount}</td>
                 <td className="px-4 py-3 text-center text-sm text-gray-600">{key.activeCount}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-400">
-                  {key.updatedAt ? new Date(key.updatedAt).toLocaleDateString() : '—'}
+                  {formatDate(key.updatedAt ?? null)}
                 </td>
               </tr>
             ))}

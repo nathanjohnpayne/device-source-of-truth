@@ -1,4 +1,5 @@
 import { useAppUpdate } from '../hooks/useAppUpdate';
+import Button, { IconButton } from './shared/Button';
 
 export default function UpdateBanner() {
   const { updateAvailable, applyUpdate, dismiss } = useAppUpdate();
@@ -16,19 +17,21 @@ export default function UpdateBanner() {
       </span>
 
       <div className="flex items-center gap-2 shrink-0">
-        <button
+        <Button
           onClick={applyUpdate}
-          className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-500 active:bg-indigo-700 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          size="sm"
+          className="font-semibold"
         >
           Refresh
-        </button>
+        </Button>
 
-        <button
+        <IconButton
           onClick={dismiss}
           aria-label="Dismiss update notification"
-          className="rounded p-1 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-400"
-        >
-          <svg
+          label="Dismiss update notification"
+          variant="ghost"
+          className="h-8 w-8 text-neutral-400 hover:text-neutral-600"
+          icon={<svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -36,8 +39,8 @@ export default function UpdateBanner() {
             aria-hidden="true"
           >
             <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-          </svg>
-        </button>
+          </svg>}
+        />
       </div>
     </div>
   );

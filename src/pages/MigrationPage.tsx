@@ -6,11 +6,15 @@ import {
 import Papa from 'papaparse';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { formatDateTime, formatNumber } from '../lib/format';
 import { useImportPrerequisites } from '../hooks/useImportPrerequisites';
 import Badge from '../components/shared/Badge';
+import Button from '../components/shared/Button';
+import InlineNotice from '../components/shared/InlineNotice';
 import Modal from '../components/shared/Modal';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import PrerequisiteBanner from '../components/shared/PrerequisiteBanner';
+import WorkflowStepper from '../components/shared/WorkflowStepper';
 import type { MigrationBatch, IntakeRegion } from '../lib/types';
 
 const EMOJI_REGEX = /[\u{1F1E0}-\u{1F1FF}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
@@ -118,6 +122,7 @@ interface MigrationPreviewRow {
 }
 
 type Step = 'upload' | 'preview' | 'result';
+const STEP_KEYS: Step[] = ['upload', 'preview', 'result'];
 
 export default function MigrationPage() {
   const prereqs = useImportPrerequisites();
@@ -263,7 +268,7 @@ export default function MigrationPage() {
       setRollbackModal(null);
       loadHistory();
     } catch (err) {
-      alert(`Rollback failed: ${err instanceof Error ? err.message : String(err)}`);
+      setParseError(`Rollback failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     setRollbackLoading(false);
   }, [loadHistory]);
@@ -296,9 +301,9 @@ export default function MigrationPage() {
           </a>
         </div>
         {step !== 'upload' && (
-          <button onClick={reset} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <Button onClick={reset} variant="secondary">
             Start Over
-          </button>
+          </Button>
         )}
       </div>
 
@@ -321,21 +326,16 @@ export default function MigrationPage() {
       )}
 
       {/* Step indicator */}
-      <div className="flex items-center gap-2 text-sm">
-        {(['upload', 'preview', 'result'] as Step[]).map((s, i) => (
-          <div key={s} className="flex items-center gap-2">
-            {i > 0 && <div className="h-px w-8 bg-gray-300" />}
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-              step === s ? 'bg-indigo-600 text-white' : s === 'result' && step === 'preview' ? 'bg-gray-200 text-gray-500' : s === 'preview' && step === 'upload' ? 'bg-gray-200 text-gray-500' : 'bg-emerald-100 text-emerald-700'
-            }`}>
-              {i + 1}
-            </div>
-            <span className={step === s ? 'font-medium text-gray-900' : 'text-gray-500'}>
-              {s === 'upload' ? 'Upload' : s === 'preview' ? 'Preview & Validate' : 'Import Complete'}
-            </span>
-          </div>
-        ))}
-      </div>
+      <WorkflowStepper
+        mode="linear3"
+        currentStep={step}
+        completedSteps={step === 'result' ? STEP_KEYS : step === 'preview' ? ['upload'] : []}
+        steps={[
+          { key: 'upload', label: 'Upload' },
+          { key: 'preview', label: 'Preview & Validate' },
+          { key: 'result', label: 'Import Complete' },
+        ]}
+      />
 
       {/* Step 1: Upload */}
       {step === 'upload' && (
@@ -403,10 +403,11 @@ export default function MigrationPage() {
           </div>
 
           {parseError && (
-            <div className="mt-4 flex items-start gap-3 rounded-lg bg-red-50 p-4">
-              <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
-              <p className="text-sm text-red-700">{parseError}</p>
-            </div>
+            <InlineNotice
+              severity="error"
+              className="mt-4"
+              message={parseError}
+            />
           )}
         </div>
       )}
@@ -501,10 +502,7 @@ export default function MigrationPage() {
           </div>
 
           {parseError && (
-            <div className="flex items-start gap-3 rounded-lg bg-red-50 p-4">
-              <XCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
-              <p className="text-sm text-red-700">{parseError}</p>
-            </div>
+            <InlineNotice severity="error" message={parseError} />
           )}
 
           <div className="flex items-center justify-end gap-3">
@@ -527,7 +525,7 @@ export default function MigrationPage() {
             <CheckCircle className="mb-4 h-16 w-16 text-emerald-500" />
             <h2 className="text-xl font-bold text-gray-900">Migration Complete</h2>
             <p className="mt-2 text-sm text-gray-600">
-              {importResult.created} devices created, {importResult.duplicates} duplicates skipped, {importResult.errored} errors.
+              {formatNumber(importResult.created)} devices created, {formatNumber(importResult.duplicates)} duplicates skipped, {formatNumber(importResult.errored)} errors.
             </p>
             <p className="mt-1 text-xs text-gray-400">
               Batch ID: {importResult.importBatchId}
@@ -581,7 +579,7 @@ export default function MigrationPage() {
           )}
 
           {importResult.errors.length > 0 && (
-            <div className="mt-4 max-h-48 overflow-y-auto rounded-md bg-red-50 p-3">
+            <div className="mt-4 max-h-48 overflow-y-auto rounded-lg bg-red-50 p-3">
               <p className="mb-1 text-xs font-medium text-red-700">Errors</p>
               <ul className="space-y-0.5 text-xs text-red-600">
                 {importResult.errors.map((err, i) => (
@@ -591,7 +589,7 @@ export default function MigrationPage() {
             </div>
           )}
           {importResult.warnings && importResult.warnings.length > 0 && (
-            <div className="mt-4 max-h-48 overflow-y-auto rounded-md bg-amber-50 p-3">
+            <div className="mt-4 max-h-48 overflow-y-auto rounded-lg bg-amber-50 p-3">
               <p className="mb-1 text-xs font-medium text-amber-700">Partner Resolution Notes</p>
               <ul className="space-y-0.5 text-xs text-amber-600">
                 {importResult.warnings.map((w, i) => (
@@ -623,10 +621,10 @@ export default function MigrationPage() {
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium text-gray-900">{batch.fileName}</p>
                     <p className="text-xs text-gray-500">
-                      {new Date(batch.importedAt).toLocaleString()} by {batch.importedByEmail}
+                      {formatDateTime(batch.importedAt)} by {batch.importedByEmail}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {batch.created} created, {batch.duplicates} duplicates, {batch.errored} errors
+                      {formatNumber(batch.created)} created, {formatNumber(batch.duplicates)} duplicates, {formatNumber(batch.errored)} errors
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -634,13 +632,15 @@ export default function MigrationPage() {
                       {batch.importBatchId.slice(0, 8)}...
                     </span>
                     {batch.rollbackAvailable ? (
-                      <button
+                      <Button
                         onClick={() => setRollbackModal(batch)}
-                        className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                        variant="secondary"
+                        size="sm"
+                        className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
                         Rollback
-                      </button>
+                      </Button>
                     ) : (
                       <span className="text-xs text-gray-400">Rollback expired</span>
                     )}
@@ -682,9 +682,9 @@ export default function MigrationPage() {
             <p>This will permanently delete all devices created by this migration batch:</p>
             <div className="rounded-lg bg-gray-50 p-4 space-y-1">
               <p><span className="font-medium">Imported by:</span> {rollbackModal.importedByEmail}</p>
-              <p><span className="font-medium">Date:</span> {new Date(rollbackModal.importedAt).toLocaleString()}</p>
+              <p><span className="font-medium">Date:</span> {formatDateTime(rollbackModal.importedAt)}</p>
               <p><span className="font-medium">File:</span> {rollbackModal.fileName}</p>
-              <p><span className="font-medium">Devices created:</span> {rollbackModal.created}</p>
+              <p><span className="font-medium">Devices created:</span> {formatNumber(rollbackModal.created)}</p>
               <p><span className="font-medium">Batch ID:</span> {rollbackModal.importBatchId}</p>
             </div>
             <p className="font-medium text-red-600">This action cannot be undone.</p>

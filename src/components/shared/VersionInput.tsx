@@ -58,7 +58,7 @@ export default function VersionInput({ value, onChange, label = 'Live ADK Versio
       />
       {showDropdown && suggestions.length > 0 && (
         <div className="relative">
-          <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-auto">
+          <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-48 overflow-auto">
             {suggestions.map(fv => (
               <button
                 key={fv}

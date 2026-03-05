@@ -43,6 +43,9 @@ jobs:
         working-directory: packages/contracts
         run: npm ci && npm run build
       - run: npm ci
+      - run: npm run ui:consistency:check
+        env:
+          CI: true
       - run: npm test
         env:
           CI: true
