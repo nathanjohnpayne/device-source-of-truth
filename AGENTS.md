@@ -305,10 +305,10 @@ npm run deploy:functions       # functions only
 op-firebase-deploy --only hosting,functions  # any combo
 ```
 
-`op-firebase-deploy` is a global script (`~/.local/bin/op-firebase-deploy`) that reads ADC from 1Password, auto-detects the project from `.firebaserc`, writes credentials to a temp file, deploys, and cleans up. No `firebase login` or `gcloud init` required. Works for any Firebase project.
+`op-firebase-deploy` is a global script (`~/.local/bin/op-firebase-deploy`) that reads ADC from 1Password, validates the token, auto-refreshes if stale (opens browser + updates 1Password automatically), writes credentials to a temp file, deploys via `firebase deploy --non-interactive`, and cleans up. Does not depend on `firebase login` or `gcloud auth login` sessions. Works for any Firebase project.
 
 **1Password setup:** Item "GCP ADC" in the Private vault with:
-- `credential` — Application Default Credentials JSON (from `gcloud auth application-default login`)
+- `credential` — Application Default Credentials JSON (from `gcloud auth application-default login`), or a service account key JSON
 - `project` — the GCP/Firebase project ID (e.g., `device-source-of-truth`)
 
 ### Manual deploy (interactive — requires browser login)
@@ -349,17 +349,13 @@ Secret management flow:
 5. Never store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
 
 Deploy auth (managed via 1Password):
-1. `op-firebase-deploy` (global script at `~/.local/bin/`) reads ADC from 1Password and runs `firebase deploy`.
+1. `op-firebase-deploy` (global script at `~/.local/bin/`) reads ADC from 1Password, validates the token, and runs `firebase deploy --non-interactive`.
 2. The ADC credential lives in **1Password** (Private vault → "GCP ADC" → `credential` field).
 3. The script writes ADC to a temp file (umask 077), sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys, and deletes the temp file on exit.
-4. Project ID is auto-detected from `.firebaserc` or passed as an argument.
-5. `.env.op` is a legacy fallback — `op-firebase-deploy` does not require it.
-6. The ADC refresh token has no fixed expiry but is revoked on Google password change, explicit revocation, or 6 months of inactivity. If deploys fail with `invalid_grant` or `Token has been revoked`, renew with:
-   ```bash
-   gcloud auth application-default login --project=device-source-of-truth
-   op item edit "GCP ADC" --vault Private \
-     "credential=$(cat ~/.config/gcloud/application_default_credentials.json)"
-   ```
+4. **Self-healing auth:** Before deploying, the script exchanges the refresh token with Google's token endpoint. If stale, it automatically runs `gcloud auth application-default login` and updates the 1Password item — no manual `op item edit` needed.
+5. Project ID is auto-detected from `.firebaserc` or passed as an argument. The script does not call `gcloud config set project` or depend on `gcloud auth login` / `firebase login` sessions.
+6. `.env.op` is a legacy fallback — `op-firebase-deploy` does not require it.
+7. A `firebase-deployer` service account exists in the project with deploy roles (`firebase.admin`, `cloudfunctions.admin`, `iam.serviceAccountUser`, `artifactregistry.writer`, `run.admin`). The GCP org policy (`iam.disableServiceAccountKeyCreation`) currently blocks key generation. If the policy is ever lifted, generate a key and store it in 1Password for permanent non-interactive deploys (service account keys never expire).
 
 ## Things to Watch Out For
 

@@ -20,12 +20,19 @@ op-firebase-deploy --only hosting,functions  # any Firebase target combo
 
 - `op-firebase-deploy` reads ADC credentials from 1Password (`Private/GCP ADC/credential`)
 - Auto-detects the Firebase project from `.firebaserc`
-- Writes credentials to a temp file, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys, cleans up
-- No `firebase login`, `gcloud init`, or browser prompts
+- Validates the ADC token before deploying (exchanges the refresh token with Google's token endpoint)
+- If the token is stale, automatically opens `gcloud auth application-default login`, then updates 1Password with the fresh credential — no manual `op item edit` needed
+- Writes credentials to a temp file (`umask 077`), sets `GOOGLE_APPLICATION_CREDENTIALS`, runs `firebase deploy --non-interactive`, cleans up on exit
+- Does not depend on `gcloud auth login` or `firebase login` sessions — only `GOOGLE_APPLICATION_CREDENTIALS` is used
+- Supports both `authorized_user` (user ADC) and `service_account` key types; service account keys skip validation since they never expire
 
-## Token renewal
+## Token refresh
 
-The ADC refresh token has no fixed expiry but is revoked on password change, explicit revocation, or 6 months of inactivity. If deploys fail with `invalid_grant` or `Token has been revoked`:
+The script auto-detects and auto-refreshes stale tokens. No manual intervention is needed — if the token is expired, the script opens a browser for `gcloud auth application-default login` and updates 1Password automatically.
+
+The ADC refresh token has no fixed expiry but is revoked on Google password change, explicit revocation, or 6 months of inactivity. A `firebase-deployer` service account exists in the project with deploy permissions; if the GCP org policy (`iam.disableServiceAccountKeyCreation`) is ever lifted, generate a key for it and store in 1Password for permanent non-interactive deploys.
+
+To manually refresh the ADC (should not normally be needed):
 
 ```bash
 gcloud auth application-default login --project=device-source-of-truth
