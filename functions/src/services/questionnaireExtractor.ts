@@ -40,7 +40,8 @@ export interface AIExtractionResult {
 }
 
 interface DeviceExtractionContext {
-  partnerName: string;
+  submitterName: string;
+  operatingPartners: string[];
   rawHeaderLabel: string;
   platformType: string;
 }
@@ -226,10 +227,16 @@ async function extractChunk(
     .map((p, i) => `${i + 1}. Q: "${p.rawQuestionText}" | A: ${p.rawAnswerText ? `"${p.rawAnswerText}"` : '(blank)'}`)
     .join('\n');
 
-  const userPrompt = `Partner: ${context.partnerName}
+  const partnersLine = context.operatingPartners.length > 0
+    ? `\nOperating partners for this device: ${context.operatingPartners.join(', ')}`
+    : '';
+
+  const userPrompt = `Submitter: ${context.submitterName}${partnersLine}
 Device column header: ${context.rawHeaderLabel}
 Platform type: ${context.platformType}
 Batch ${chunkIndex + 1} of ${totalChunks}
+
+Do not extract partner-specific deployment values (consumer names, countries deployed, certification status) — those are captured separately.
 
 Question-answer pairs:
 ${pairsText}`;
@@ -613,12 +620,37 @@ export async function processDeviceExtraction(payload: ExtractionTaskPayload): P
       return;
     }
 
-    const partnerName = job.partnerId
-      ? await getPartnerName(db, job.partnerId as string)
+    const submitterId = (job.submitterPartnerId ?? job.partnerId) as string | null;
+    const submitterName = submitterId
+      ? await getPartnerName(db, submitterId)
       : 'Unknown';
 
+    // DST-055: resolve operating partners for this device
+    let operatingPartners: string[] = [];
+    try {
+      const dpLinksSnap = await db.collection('questionnaireStagedDevicePartners')
+        .where('stagedDeviceId', '==', stagedDeviceId)
+        .get();
+      if (!dpLinksSnap.empty) {
+        const ipIds = [...new Set(dpLinksSnap.docs.map(d => d.data().intakePartnerId as string))];
+        for (const ipId of ipIds) {
+          const ipSnap = await db.collection('questionnaireIntakePartners').doc(ipId).get();
+          if (ipSnap.exists) {
+            const ipData = ipSnap.data()!;
+            if (ipData.partnerId) {
+              const name = await getPartnerName(db, ipData.partnerId as string);
+              if (name !== 'Unknown') operatingPartners.push(name);
+            } else {
+              operatingPartners.push(ipData.rawDetectedName as string);
+            }
+          }
+        }
+      }
+    } catch { /* non-critical — proceed without partner context */ }
+
     const context: DeviceExtractionContext = {
-      partnerName,
+      submitterName,
+      operatingPartners,
       rawHeaderLabel: deviceData.rawHeaderLabel as string,
       platformType: deviceData.platformType as string,
     };

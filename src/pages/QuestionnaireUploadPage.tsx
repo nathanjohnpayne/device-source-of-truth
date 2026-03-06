@@ -24,7 +24,7 @@ export default function QuestionnaireUploadPage() {
   const { isAdmin, isEditor } = useAuth();
 
   const [file, setFile] = useState<File | null>(null);
-  const [partnerId, setPartnerId] = useState<string>('');
+  const [submitterPartnerId, setSubmitterPartnerId] = useState<string>('');
   const [useAI, setUseAI] = useState(false);
   const [notes, setNotes] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -94,7 +94,7 @@ export default function QuestionnaireUploadPage() {
 
     try {
       const job = await api.questionnaireIntake.upload(file, {
-        partnerId: partnerId || undefined,
+        submitterPartnerId: submitterPartnerId || undefined,
         aiExtraction: useAI,
         notes: notes.trim() || undefined,
       });
@@ -111,11 +111,11 @@ export default function QuestionnaireUploadPage() {
     } finally {
       setLoading(false);
     }
-  }, [file, partnerId, useAI, notes, canUpload, navigate]);
+  }, [file, submitterPartnerId, useAI, notes, canUpload, navigate]);
 
   const handleCancel = useCallback(() => {
     setFile(null);
-    setPartnerId('');
+    setSubmitterPartnerId('');
     setUseAI(false);
     setNotes('');
     setError(null);
@@ -211,8 +211,8 @@ export default function QuestionnaireUploadPage() {
             Partner
           </label>
           <select
-            value={partnerId}
-            onChange={(e) => setPartnerId(e.target.value)}
+            value={submitterPartnerId}
+            onChange={(e) => setSubmitterPartnerId(e.target.value)}
             disabled={partnersLoading}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-500"
           >

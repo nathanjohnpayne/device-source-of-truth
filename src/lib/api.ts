@@ -410,7 +410,7 @@ export const api = {
 
   questionnaireIntake: {
     upload: async (file: File, options: {
-      partnerId?: string;
+      submitterPartnerId?: string;
       aiExtraction?: boolean;
       notes?: string;
     } = {}) => {
@@ -423,7 +423,7 @@ export const api = {
         body: JSON.stringify({
           fileData,
           fileName: file.name,
-          partnerId: options.partnerId,
+          submitterPartnerId: options.submitterPartnerId,
           aiExtraction: options.aiExtraction ?? false,
           notes: options.notes,
         }),
@@ -442,7 +442,10 @@ export const api = {
         method: 'POST',
       }),
     getStagedDevices: (id: string) =>
-      apiFetch<(QuestionnaireStagedDevice & { fields: QuestionnaireStagedField[] })[]>(
+      apiFetch<(QuestionnaireStagedDevice & {
+        fields: QuestionnaireStagedField[];
+        partnerDeployments: import('./types').QuestionnaireStagedDevicePartner[];
+      })[]>(
         `/questionnaire-intake/${id}/staged-devices`,
       ),
     download: (id: string) =>
@@ -450,10 +453,14 @@ export const api = {
     getReview: (id: string) =>
       apiFetch<{
         job: QuestionnaireIntakeJob;
-        devices: (QuestionnaireStagedDevice & { fields: QuestionnaireStagedField[] })[];
-        partner: { id: string; displayName: string } | null;
+        devices: (QuestionnaireStagedDevice & {
+          fields: QuestionnaireStagedField[];
+          partnerDeployments: import('./types').QuestionnaireStagedDevicePartner[];
+        })[];
+        submitterPartner: { id: string; displayName: string } | null;
+        intakePartners: import('./types').QuestionnaireIntakePartner[];
       }>(`/questionnaire-intake/${id}/review`),
-    updateJob: (id: string, data: { partnerId?: string }) =>
+    updateJob: (id: string, data: { submitterPartnerId?: string }) =>
       apiFetch<QuestionnaireIntakeJob>(`/questionnaire-intake/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -473,6 +480,26 @@ export const api = {
         `/questionnaire-intake/${jobId}/staged-devices/${deviceId}/resolve-all`,
         { method: 'PATCH' },
       ),
+    updateIntakePartner: (jobId: string, intakePartnerId: string, data: {
+      partnerId?: string;
+      reviewStatus?: string;
+      mergeInto?: string;
+    }) =>
+      apiFetch<import('./types').QuestionnaireIntakePartner>(
+        `/questionnaire-intake/${jobId}/intake-partners/${intakePartnerId}`,
+        { method: 'PATCH', body: JSON.stringify(data) },
+      ),
+    updateDeviceDeployments: (jobId: string, deviceId: string, deployments: Array<{
+      intakePartnerId: string;
+      countries?: string[] | null;
+      certificationStatus?: string | null;
+      certificationAdkVersion?: string | null;
+      partnerModelName?: string | null;
+    }>) =>
+      apiFetch<import('./types').QuestionnaireStagedDevicePartner[]>(
+        `/questionnaire-intake/${jobId}/staged-devices/${deviceId}/deployments`,
+        { method: 'PUT', body: JSON.stringify({ deployments }) },
+      ),
     approve: (id: string) =>
       apiFetch<{ status: string; summary: Record<string, number>; affectedDeviceIds: string[] }>(
         `/questionnaire-intake/${id}/approve`,
@@ -486,6 +513,14 @@ export const api = {
     getDeviceSources: (deviceId: string) =>
       apiFetch<(import('./types').DeviceQuestionnaireSource & { jobFileName?: string })[]>(
         `/questionnaire-intake/device-sources/${deviceId}`,
+      ),
+    getDeviceDeployments: (deviceId: string) =>
+      apiFetch<(import('./types').DevicePartnerDeployment & { partnerName?: string; jobFileName?: string })[]>(
+        `/questionnaire-intake/device-deployments/${deviceId}`,
+      ),
+    getPartnerDeployments: (partnerId: string, params?: { certification_status?: string; active?: string }) =>
+      apiFetch<(import('./types').DevicePartnerDeployment & { deviceDisplayName?: string })[]>(
+        `/questionnaire-intake/partner-deployments/${partnerId}${qs(params)}`,
       ),
     notifications: {
       list: (params?: { unread?: string; limit?: number }) =>

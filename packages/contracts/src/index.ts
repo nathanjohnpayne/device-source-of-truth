@@ -29,6 +29,7 @@ export type AuditEntityType =
   | 'device'
   | 'deviceSpec'
   | 'deployment'
+  | 'device_partner_deployment'
   | 'hardwareTier'
   | 'alert'
   | 'user'
@@ -36,6 +37,8 @@ export type AuditEntityType =
   | 'intakeRequest'
   | 'partnerAlias'
   | 'questionnaireIntake'
+  | 'questionnaire_intake_partner'
+  | 'questionnaire_staged_device_partner'
   | 'system';
 
 export type Timestamp = string;
@@ -64,8 +67,10 @@ export const PartnerKeyRegionSchema = z.enum([
 
 export const AuditEntityTypeSchema = z.enum([
   'partner', 'partnerKey', 'device', 'deviceSpec', 'deployment',
-  'hardwareTier', 'alert', 'user', 'fieldOption', 'intakeRequest',
-  'partnerAlias', 'questionnaireIntake', 'system',
+  'device_partner_deployment', 'hardwareTier', 'alert', 'user',
+  'fieldOption', 'intakeRequest', 'partnerAlias', 'questionnaireIntake',
+  'questionnaire_intake_partner', 'questionnaire_staged_device_partner',
+  'system',
 ]);
 
 const timestamp = z.string();
@@ -131,6 +136,7 @@ export const ACTIVE_DEVICES_WINDOW_DAYS = 28;
 
 export type QuestionnaireFormat =
   | 'lg_stb_v1'
+  | 'lg_stb_v1_2'
   | 'gm_2024'
   | 'vodafone_combined'
   | 'android_atv'
@@ -176,9 +182,10 @@ export interface QuestionnaireIntakeJob {
   uploadedBy: string;
   uploadedByEmail: string;
   uploadedAt: Timestamp;
-  partnerId: string | null;
-  partnerConfidence: number | null;
-  partnerDetectionMethod: PartnerDetectionMethod | null;
+  submitterPartnerId: string | null;
+  submitterConfidence: number | null;
+  submitterDetectionMethod: PartnerDetectionMethod | null;
+  isMultiPartner: boolean;
   questionnaireFormat: QuestionnaireFormat;
   deviceCountDetected: number | null;
   status: QuestionnaireIntakeJobStatus;
@@ -190,6 +197,7 @@ export interface QuestionnaireIntakeJob {
   extractionCurrentDevice: string | null;
   devicesComplete: number;
   devicesFailed: number;
+  tasksEnqueued: number;
   notes: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -245,11 +253,71 @@ export interface DeviceQuestionnaireSource {
   deviceId: string;
   intakeJobId: string;
   stagedDeviceId: string;
+  partnerId: string | null;
   importedAt: Timestamp;
   importedBy: string;
   importedByEmail: string;
   fieldsImported: number;
   fieldsOverridden: number;
+}
+
+// ── Multi-Partner Questionnaire Types (DST-055) ──
+
+export type IntakePartnerDetectionSource =
+  | 'model_name_cell'
+  | 'countries_cell'
+  | 'certs_sheet'
+  | 'ai'
+  | 'admin';
+
+export type IntakePartnerMatchMethod = 'alias' | 'ai' | 'admin';
+
+export type IntakePartnerReviewStatus = 'pending' | 'confirmed' | 'rejected';
+
+export type StagedDeviceCertificationStatus =
+  | 'certified'
+  | 'cert_extended'
+  | 'not_available'
+  | 'pending';
+
+export interface QuestionnaireIntakePartner {
+  id: string;
+  intakeJobId: string;
+  partnerId: string | null;
+  rawDetectedName: string;
+  detectionSource: IntakePartnerDetectionSource;
+  matchConfidence: number | null;
+  matchMethod: IntakePartnerMatchMethod | null;
+  reviewStatus: IntakePartnerReviewStatus;
+  deviceCount: number;
+  createdAt: Timestamp;
+}
+
+export interface QuestionnaireStagedDevicePartner {
+  id: string;
+  stagedDeviceId: string;
+  intakePartnerId: string;
+  countries: string[] | null;
+  certificationStatus: StagedDeviceCertificationStatus | null;
+  certificationAdkVersion: string | null;
+  partnerModelName: string | null;
+  detectionSource: IntakePartnerDetectionSource;
+  reviewStatus: IntakePartnerReviewStatus;
+  createdAt: Timestamp;
+}
+
+export interface DevicePartnerDeployment {
+  id: string;
+  deviceId: string;
+  partnerId: string;
+  countries: string[] | null;
+  partnerModelName: string | null;
+  certificationStatus: string | null;
+  certificationAdkVersion: string | null;
+  active: boolean;
+  sourceIntakeJobId: string | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 }
 
 export interface QuestionnaireIntakeJobDetail extends QuestionnaireIntakeJob {
@@ -261,7 +329,8 @@ export interface QuestionnaireIntakeJobDetail extends QuestionnaireIntakeJob {
       newFieldCount: number;
     };
   })[];
-  partner: Partner | null;
+  submitterPartner: Partner | null;
+  intakePartners: QuestionnaireIntakePartner[];
   extractionProgress: {
     totalDevices: number;
     devicesComplete: number;

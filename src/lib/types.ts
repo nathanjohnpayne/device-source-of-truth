@@ -65,6 +65,13 @@ export type {
   DeviceQuestionnaireSource,
   QuestionnaireIntakeJobDetail,
   AppNotification,
+  IntakePartnerDetectionSource,
+  IntakePartnerMatchMethod,
+  IntakePartnerReviewStatus,
+  StagedDeviceCertificationStatus,
+  QuestionnaireIntakePartner,
+  QuestionnaireStagedDevicePartner,
+  DevicePartnerDeployment,
 } from '@dst/contracts';
 
 export { SPEC_CATEGORIES, ACTIVE_DEVICES_WINDOW_DAYS } from '@dst/contracts';

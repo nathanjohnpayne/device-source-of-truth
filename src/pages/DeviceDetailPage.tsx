@@ -218,6 +218,7 @@ export default function DeviceDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [questionnaireSources, setQuestionnaireSources] = useState<(DeviceQuestionnaireSource & { jobFileName?: string })[]>([]);
+  const [partnerDeployments, setPartnerDeployments] = useState<(import('../lib/types').DevicePartnerDeployment & { partnerName?: string; jobFileName?: string })[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     displayName: '',
@@ -250,6 +251,9 @@ export default function DeviceDetailPage() {
       .finally(() => setLoading(false));
     api.questionnaireIntake.getDeviceSources(id)
       .then(setQuestionnaireSources)
+      .catch(() => {});
+    api.questionnaireIntake.getDeviceDeployments(id)
+      .then(setPartnerDeployments)
       .catch(() => {});
   }, [id]);
 
@@ -551,6 +555,46 @@ export default function DeviceDetailPage() {
           />
         </div>
       </section>
+
+      {/* Partner Deployments (DST-055) */}
+      {partnerDeployments.length > 0 && (
+        <section className="rounded-lg border border-gray-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+            <Layers className="h-5 w-5 text-gray-400" />
+            <h2 className="text-base font-semibold text-gray-900">Partner Deployments</h2>
+            <span className="text-sm text-gray-500">({partnerDeployments.length})</span>
+          </div>
+          <div className="p-4">
+            <DataTable<typeof partnerDeployments[number]>
+              columns={[
+                { header: 'Partner', accessor: 'partnerName', sortable: true,
+                  render: (row) => <span className="font-medium text-gray-900">{row.partnerName ?? '—'}</span> },
+                { header: 'Consumer Name', accessor: 'partnerModelName',
+                  render: (row) => row.partnerModelName ?? '—' },
+                { header: 'Markets', accessor: 'countries',
+                  render: (row) => row.countries?.length ? row.countries.join(', ') : '—' },
+                { header: 'Cert Status', accessor: 'certificationStatus',
+                  render: (row) => row.certificationStatus ? row.certificationStatus.replace(/_/g, ' ') : '—' },
+                { header: 'ADK Version', accessor: 'certificationAdkVersion',
+                  render: (row) => row.certificationAdkVersion ?? '—' },
+                { header: 'Source', accessor: 'jobFileName',
+                  render: (row) => row.jobFileName ? (
+                    <span className="text-xs text-gray-500" title={row.jobFileName}>{row.jobFileName}</span>
+                  ) : '—' },
+                { header: 'Active', accessor: 'active',
+                  render: (row) => row.active ? (
+                    <Badge variant="success">Active</Badge>
+                  ) : (
+                    <Badge variant="default">Inactive</Badge>
+                  )},
+              ]}
+              data={partnerDeployments}
+              emptyTitle="No partner deployments"
+              emptyDescription="No partner deployment records for this device."
+            />
+          </div>
+        </section>
+      )}
 
       {/* Telemetry */}
       <section className="rounded-lg border border-gray-200 bg-white">

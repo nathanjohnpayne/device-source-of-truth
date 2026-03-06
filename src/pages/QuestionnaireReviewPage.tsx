@@ -26,6 +26,7 @@ import type {
   QuestionnaireIntakeJob,
   QuestionnaireStagedDevice,
   QuestionnaireStagedField,
+  QuestionnaireStagedDevicePartner,
   PartnerWithStats,
 } from '../lib/types';
 import { SPEC_CATEGORY_LABELS } from '../lib/types';
@@ -33,6 +34,7 @@ import type { SpecCategory, DeviceType } from '@dst/contracts';
 
 type StagedDeviceWithFields = QuestionnaireStagedDevice & {
   fields: QuestionnaireStagedField[];
+  partnerDeployments?: QuestionnaireStagedDevicePartner[];
 };
 
 const DEVICE_TYPES: DeviceType[] = [
@@ -69,15 +71,143 @@ function ConfidenceBadge({ value }: { value: number | null }) {
 
 // ── Step 1: Assign Partner ──────────────────────────────────────────────────
 
+function IntakePartnerRow({
+  ip,
+  allPartners,
+  loading,
+  onResolve,
+}: {
+  ip: import('../lib/types').QuestionnaireIntakePartner;
+  allPartners: PartnerWithStats[];
+  loading: boolean;
+  onResolve: (intakePartnerId: string, partnerId: string, reviewStatus: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(ip.partnerId ?? null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const filtered = useMemo(
+    () =>
+      search.trim()
+        ? allPartners.filter((p) =>
+            p.displayName.toLowerCase().includes(search.toLowerCase()),
+          )
+        : allPartners,
+    [allPartners, search],
+  );
+
+  const handleConfirm = async () => {
+    if (!selectedId) return;
+    setSaving(true);
+    try {
+      await onResolve(ip.id, selectedId, 'confirmed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (ip.reviewStatus === 'confirmed') {
+    const matchedName = allPartners.find(p => p.id === ip.partnerId)?.displayName ?? ip.rawDetectedName;
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+        <Check className="h-4 w-4 text-emerald-600" />
+        <span className="text-sm font-medium text-emerald-800">{ip.rawDetectedName}</span>
+        <span className="text-xs text-emerald-600">→ {matchedName}</span>
+        <span className="text-xs text-gray-400">· {ip.deviceCount} device(s)</span>
+      </div>
+    );
+  }
+
+  if (ip.reviewStatus === 'rejected') {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+        <X className="h-4 w-4 text-red-500" />
+        <span className="text-sm text-red-700 line-through">{ip.rawDetectedName}</span>
+        <span className="text-xs text-gray-400">· {ip.deviceCount} device(s)</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+        <span className="text-sm font-medium text-amber-800">{ip.rawDetectedName}</span>
+        <span className="text-xs text-gray-500">via {ip.detectionSource.replace(/_/g, ' ')}</span>
+        <span className="text-xs text-gray-400">· {ip.deviceCount} device(s)</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setDropdownOpen(true);
+              if (!e.target.value) setSelectedId(null);
+            }}
+            onFocus={() => setDropdownOpen(true)}
+            placeholder={loading ? 'Loading…' : 'Assign partner…'}
+            className="w-full rounded-lg border border-gray-300 py-1.5 pl-8 pr-3 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+          {dropdownOpen && !loading && (
+            <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+              {filtered.length === 0 ? (
+                <p className="px-3 py-2 text-sm text-gray-500">No partners found</p>
+              ) : (
+                filtered.slice(0, 30).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setSelectedId(p.id);
+                      setSearch(p.displayName);
+                      setDropdownOpen(false);
+                    }}
+                    className={`w-full px-3 py-1.5 text-left text-sm hover:bg-indigo-50 ${p.id === selectedId ? 'bg-indigo-50 font-medium text-indigo-700' : 'text-gray-700'}`}
+                  >
+                    {p.displayName}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={handleConfirm}
+          disabled={!selectedId || saving}
+          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Confirm'}
+        </button>
+        <button
+          onClick={() => onResolve(ip.id, '', 'rejected')}
+          disabled={saving}
+          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Reject
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AssignPartnerStep({
   job,
   partner,
+  intakePartners,
   onConfirm,
+  onResolveIntakePartner,
+  onNext,
   actionError,
 }: {
   job: QuestionnaireIntakeJob;
   partner: { id: string; displayName: string } | null;
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
   onConfirm: (partnerId: string, displayName: string) => void;
+  onResolveIntakePartner: (intakePartnerId: string, partnerId: string, reviewStatus: string) => void;
+  onNext: () => void;
   actionError: string | null;
 }) {
   const [search, setSearch] = useState('');
@@ -117,14 +247,22 @@ function AssignPartnerStep({
     setDropdownOpen(false);
   };
 
+  const pendingIntakePartners = intakePartners.filter(ip => ip.reviewStatus === 'pending');
+  const allIntakePartnersResolved = job.isMultiPartner && pendingIntakePartners.length === 0;
+  const canProceed = job.isMultiPartner
+    ? allIntakePartnersResolved
+    : partner != null;
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-gray-900">
-          Step 1: Assign Partner
+          Step 1: Assign Partner{job.isMultiPartner ? 's' : ''}
         </h2>
         <p className="mt-1 text-sm text-gray-500">
-          DST could not confidently identify the partner for this questionnaire.
+          {job.isMultiPartner
+            ? 'This questionnaire contains multiple operating brands. Confirm or assign each partner below.'
+            : 'DST could not confidently identify the partner for this questionnaire.'}
         </p>
       </div>
 
@@ -132,26 +270,26 @@ function AssignPartnerStep({
         <p className="font-medium text-gray-700">
           File: <span className="font-normal">{job.fileName}</span>
         </p>
-        {job.partnerDetectionMethod && (
+        {job.submitterDetectionMethod && (
           <div className="mt-2 space-y-1 text-gray-600">
             <p className="font-medium text-gray-700">
               Detection signals found:
             </p>
             <ul className="ml-4 list-disc">
-              {job.partnerDetectionMethod === 'filename' && (
+              {job.submitterDetectionMethod === 'filename' && (
                 <li>Filename pattern detected</li>
               )}
-              {job.partnerDetectionMethod === 'content' && (
+              {job.submitterDetectionMethod === 'content' && (
                 <li>Partner name detected in content</li>
               )}
-              {job.partnerDetectionMethod === 'ai' &&
-                job.partnerConfidence != null && (
+              {job.submitterDetectionMethod === 'ai' &&
+                job.submitterConfidence != null && (
                   <li>
                     AI suggestion (confidence:{' '}
-                    {Math.round(job.partnerConfidence * 100)}%)
+                    {Math.round(job.submitterConfidence * 100)}%)
                   </li>
                 )}
-              {!job.partnerDetectionMethod && (
+              {!job.submitterDetectionMethod && (
                 <li>No recognizable partner pattern</li>
               )}
             </ul>
@@ -159,57 +297,149 @@ function AssignPartnerStep({
         )}
       </div>
 
-      {partner ? (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-          <Check className="h-5 w-5 text-emerald-600" />
-          <span className="text-sm font-medium text-emerald-800">
-            Partner confirmed: {partner.displayName}
-          </span>
-        </div>
-      ) : (
+      {/* Multi-partner: interactive intake partner resolution */}
+      {job.isMultiPartner && intakePartners.length > 0 && (
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700">
-            Assign partner
-          </label>
-          <div className="relative">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setDropdownOpen(true);
-                  if (!e.target.value) {
-                    setSelectedId(null);
-                    setSelectedName('');
-                  }
-                }}
-                onFocus={() => setDropdownOpen(true)}
-                placeholder={loading ? 'Loading partners…' : 'Search partners…'}
-                className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-              />
+          <h3 className="text-sm font-semibold text-gray-800">
+            Operating Brands ({intakePartners.length})
+          </h3>
+          {intakePartners.map((ip) => (
+            <IntakePartnerRow
+              key={ip.id}
+              ip={ip}
+              allPartners={partners}
+              loading={loading}
+              onResolve={onResolveIntakePartner}
+            />
+          ))}
+          {pendingIntakePartners.length > 0 && (
+            <p className="text-xs text-amber-600">
+              {pendingIntakePartners.length} brand(s) still need confirmation before proceeding.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Single-partner or submitter assignment */}
+      {!job.isMultiPartner && (
+        <>
+          {partner ? (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+              <Check className="h-5 w-5 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-800">
+                Partner confirmed: {partner.displayName}
+              </span>
             </div>
-            {dropdownOpen && !loading && (
-              <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                {filtered.length === 0 ? (
-                  <p className="px-4 py-3 text-sm text-gray-500">
-                    No partners found
-                  </p>
-                ) : (
-                  filtered.slice(0, 50).map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => select(p)}
-                      className={`w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 ${p.id === selectedId ? 'bg-indigo-50 font-medium text-indigo-700' : 'text-gray-700'}`}
-                    >
-                      {p.displayName}
-                    </button>
-                  ))
+          ) : (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Assign partner
+              </label>
+              <div className="relative">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setDropdownOpen(true);
+                      if (!e.target.value) {
+                        setSelectedId(null);
+                        setSelectedName('');
+                      }
+                    }}
+                    onFocus={() => setDropdownOpen(true)}
+                    placeholder={loading ? 'Loading partners…' : 'Search partners…'}
+                    className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                {dropdownOpen && !loading && (
+                  <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {filtered.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-gray-500">
+                        No partners found
+                      </p>
+                    ) : (
+                      filtered.slice(0, 50).map((p) => (
+                        <button
+                          key={p.id}
+                          onClick={() => select(p)}
+                          className={`w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 ${p.id === selectedId ? 'bg-indigo-50 font-medium text-indigo-700' : 'text-gray-700'}`}
+                        >
+                          {p.displayName}
+                        </button>
+                      ))
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Submitter assignment for multi-partner (optional) */}
+      {job.isMultiPartner && (
+        <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-800">
+            Submitter (optional)
+          </h3>
+          <p className="text-xs text-gray-500">
+            The umbrella organization that submitted this questionnaire, if applicable.
+          </p>
+          {partner ? (
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm text-emerald-800">{partner.displayName}</span>
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setDropdownOpen(true);
+                    if (!e.target.value) {
+                      setSelectedId(null);
+                      setSelectedName('');
+                    }
+                  }}
+                  onFocus={() => setDropdownOpen(true)}
+                  placeholder={loading ? 'Loading partners…' : 'Assign submitter (optional)…'}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              {dropdownOpen && !loading && (
+                <div className="absolute z-20 mt-1 max-h-40 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                  {filtered.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-gray-500">No partners found</p>
+                  ) : (
+                    filtered.slice(0, 30).map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => select(p)}
+                        className={`w-full px-3 py-1.5 text-left text-sm hover:bg-indigo-50 ${p.id === selectedId ? 'bg-indigo-50 font-medium text-indigo-700' : 'text-gray-700'}`}
+                      >
+                        {p.displayName}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+              {selectedId && (
+                <button
+                  onClick={() => { if (selectedId && selectedName) onConfirm(selectedId, selectedName); }}
+                  className="mt-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                >
+                  Set as submitter
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -220,7 +450,8 @@ function AssignPartnerStep({
         </div>
       )}
 
-      {!partner && (
+      {/* Single-partner: confirm button. Multi-partner: next (requires all resolved) */}
+      {!job.isMultiPartner && !partner && (
         <div className="flex justify-end">
           <button
             onClick={() => {
@@ -230,6 +461,18 @@ function AssignPartnerStep({
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Confirm Partner
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {canProceed && (
+        <div className="flex justify-end">
+          <button
+            onClick={onNext}
+            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Next: Review Devices
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -669,10 +912,56 @@ function DeviceCard({
 
 // ── Step 2: Review Devices ──────────────────────────────────────────────────
 
+function DeployedByTable({ deployments, intakePartners }: {
+  deployments: import('../lib/types').QuestionnaireStagedDevicePartner[];
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
+}) {
+  if (deployments.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Deployed by</p>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
+            <th className="pb-1 pr-4 font-medium">Partner</th>
+            <th className="pb-1 pr-4 font-medium">Markets</th>
+            <th className="pb-1 font-medium">Cert Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {deployments.map((dep) => {
+            const ip = intakePartners.find(p => p.id === dep.intakePartnerId);
+            return (
+              <tr key={dep.id} className="border-b border-gray-50 last:border-0">
+                <td className="py-1.5 pr-4 font-medium text-gray-900">
+                  {ip?.rawDetectedName ?? 'Unknown'}
+                </td>
+                <td className="py-1.5 pr-4 text-gray-600">
+                  {dep.countries?.join(', ') ?? '—'}
+                </td>
+                <td className="py-1.5 text-gray-600">
+                  {dep.certificationStatus
+                    ? dep.certificationStatus.replace(/_/g, ' ')
+                    : '—'}
+                  {dep.certificationAdkVersion && (
+                    <span className="ml-1 text-gray-400">(ADK {dep.certificationAdkVersion})</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ReviewDevicesStep({
   devices,
   jobId,
   job,
+  intakePartners,
   onApproveDevice,
   onRejectDevice,
   onFieldUpdate,
@@ -684,6 +973,7 @@ function ReviewDevicesStep({
   devices: StagedDeviceWithFields[];
   jobId: string;
   job: QuestionnaireIntakeJob;
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
   onApproveDevice: (device: StagedDeviceWithFields, identity?: Record<string, string | null>) => void;
   onRejectDevice: (device: StagedDeviceWithFields, reason?: string) => void;
   onFieldUpdate: (
@@ -844,17 +1134,24 @@ function ReviewDevicesStep({
 
       <div className="space-y-3">
         {sorted.map((d) => (
-          <DeviceCard
-            key={d.id}
-            device={d}
-            jobId={jobId}
-            expanded={expanded.has(d.id)}
-            onToggle={() => toggle(d.id)}
-            onApprove={onApproveDevice}
-            onReject={onRejectDevice}
-            onFieldUpdate={onFieldUpdate}
-            busy={busy}
-          />
+          <div key={d.id}>
+            <DeviceCard
+              device={d}
+              jobId={jobId}
+              expanded={expanded.has(d.id)}
+              onToggle={() => toggle(d.id)}
+              onApprove={onApproveDevice}
+              onReject={onRejectDevice}
+              onFieldUpdate={onFieldUpdate}
+              busy={busy}
+            />
+            {job.isMultiPartner && d.partnerDeployments && d.partnerDeployments.length > 0 && (
+              <DeployedByTable
+                deployments={d.partnerDeployments}
+                intakePartners={intakePartners}
+              />
+            )}
+          </div>
         ))}
       </div>
 
@@ -1089,6 +1386,7 @@ function SignOffStep({
   job,
   devices,
   partner,
+  intakePartners,
   onConfirm,
   onBack,
   actionError,
@@ -1097,6 +1395,7 @@ function SignOffStep({
   job: QuestionnaireIntakeJob;
   devices: StagedDeviceWithFields[];
   partner: { id: string; displayName: string } | null;
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
   onConfirm: () => void;
   onBack: () => void;
   actionError: string | null;
@@ -1114,8 +1413,12 @@ function SignOffStep({
     ),
   );
 
+  const multiPartnerReady = job.isMultiPartner &&
+    intakePartners.length > 0 &&
+    intakePartners.every(ip => ip.reviewStatus !== 'pending');
+
   const canCommit =
-    pending.length === 0 && !hasUnresolvedConflicts && partner != null;
+    pending.length === 0 && !hasUnresolvedConflicts && (partner != null || multiPartnerReady);
 
   return (
     <div className="space-y-5">
@@ -1257,6 +1560,7 @@ export default function QuestionnaireReviewPage() {
     id: string;
     displayName: string;
   } | null>(null);
+  const [intakePartners, setIntakePartners] = useState<import('../lib/types').QuestionnaireIntakePartner[]>([]);
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -1268,7 +1572,10 @@ export default function QuestionnaireReviewPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [rejectBusy, setRejectBusy] = useState(false);
 
-  const partnerAssigned = partner != null;
+  const multiPartnerResolved = job?.isMultiPartner &&
+    intakePartners.length > 0 &&
+    intakePartners.every(ip => ip.reviewStatus !== 'pending');
+  const partnerAssigned = partner != null || multiPartnerResolved;
 
   const hasConflicts = useMemo(
     () =>
@@ -1292,9 +1599,14 @@ export default function QuestionnaireReviewPage() {
       const data = await api.questionnaireIntake.getReview(id);
       setJob(data.job);
       setDevices(data.devices);
-      setPartner(data.partner);
+      setPartner(data.submitterPartner);
+      setIntakePartners(data.intakePartners ?? []);
 
-      if (data.partner) {
+      const ips = (data.intakePartners ?? []) as { reviewStatus: string }[];
+      const allIpResolved = data.job.isMultiPartner &&
+        ips.length > 0 &&
+        ips.every(ip => ip.reviewStatus !== 'pending');
+      if (data.submitterPartner || allIpResolved) {
         setStep(2);
       } else {
         setStep(1);
@@ -1318,22 +1630,42 @@ export default function QuestionnaireReviewPage() {
       setActionError(null);
       setBusy(true);
       try {
-        await api.questionnaireIntake.updateJob(id, { partnerId });
+        await api.questionnaireIntake.updateJob(id, { submitterPartnerId: partnerId });
         setPartner({ id: partnerId, displayName });
         setJob((prev) =>
           prev
             ? {
                 ...prev,
-                partnerId,
-                partnerDetectionMethod: 'admin' as const,
+                submitterPartnerId: partnerId,
+                submitterDetectionMethod: 'admin' as const,
               }
             : prev,
         );
-        setStep(2);
+        if (!job?.isMultiPartner) setStep(2);
       } catch (err) {
         setActionError(errorMessage(err));
       } finally {
         setBusy(false);
+      }
+    },
+    [id, job?.isMultiPartner],
+  );
+
+  const handleResolveIntakePartner = useCallback(
+    async (intakePartnerId: string, partnerId: string, reviewStatus: string) => {
+      if (!id) return;
+      setActionError(null);
+      try {
+        const updated = await api.questionnaireIntake.updateIntakePartner(
+          id,
+          intakePartnerId,
+          { partnerId: partnerId || undefined, reviewStatus },
+        );
+        setIntakePartners((prev) =>
+          prev.map((ip) => (ip.id === intakePartnerId ? { ...ip, ...updated } : ip)),
+        );
+      } catch (err) {
+        setActionError(errorMessage(err));
       }
     },
     [id],
@@ -1627,7 +1959,10 @@ export default function QuestionnaireReviewPage() {
           <AssignPartnerStep
             job={job}
             partner={partner}
+            intakePartners={intakePartners}
             onConfirm={handleConfirmPartner}
+            onResolveIntakePartner={handleResolveIntakePartner}
+            onNext={() => setStep(2)}
             actionError={actionError}
           />
         )}
@@ -1637,6 +1972,7 @@ export default function QuestionnaireReviewPage() {
             devices={devices}
             jobId={id!}
             job={job}
+            intakePartners={intakePartners}
             onApproveDevice={handleApproveDevice}
             onRejectDevice={handleRejectDevice}
             onFieldUpdate={handleFieldUpdate}
@@ -1663,6 +1999,7 @@ export default function QuestionnaireReviewPage() {
             job={job}
             devices={devices}
             partner={partner}
+            intakePartners={intakePartners}
             onConfirm={handleConfirmImport}
             onBack={goBackFromStep4}
             actionError={actionError}

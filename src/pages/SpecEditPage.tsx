@@ -413,7 +413,7 @@ function SpecEditForm() {
       setSavePhase('uploading');
       try {
         const job = await api.questionnaireIntake.upload(questionnaireFile, {
-          partnerId: partnerId ?? undefined,
+          submitterPartnerId: partnerId ?? undefined,
           aiExtraction: false,
         });
         trackEvent('questionnaire_upload', { device_id: job.id });

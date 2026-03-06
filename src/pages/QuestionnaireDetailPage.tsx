@@ -440,7 +440,7 @@ export default function QuestionnaireDetailPage() {
 
   const handleOpenPartnerModal = async () => {
     setShowPartnerModal(true);
-    setSelectedPartnerId(job?.partnerId ?? '');
+    setSelectedPartnerId(job?.submitterPartnerId ?? '');
     try {
       const res = await api.partners.list({ pageSize: 500 });
       setPartners(res.data ?? []);
@@ -454,7 +454,7 @@ export default function QuestionnaireDetailPage() {
     setSavingPartner(true);
     try {
       await api.questionnaireIntake.updateJob(id, {
-        partnerId: selectedPartnerId || undefined,
+        submitterPartnerId: selectedPartnerId || undefined,
       });
       await fetchJob();
       setShowPartnerModal(false);
@@ -515,10 +515,10 @@ export default function QuestionnaireDetailPage() {
               <span>Uploaded by {job.uploadedByEmail}</span>
               <span>{formatDate(job.uploadedAt)}</span>
               <span className="flex items-center gap-1">
-                Partner:{' '}
-                {job.partner ? (
+                Submitter:{' '}
+                {job.submitterPartner ? (
                   <>
-                    <span className="font-medium text-gray-900">{job.partner.displayName}</span>
+                    <span className="font-medium text-gray-900">{job.submitterPartner.displayName}</span>
                     {isAdmin && (
                       <button
                         onClick={handleOpenPartnerModal}
