@@ -305,10 +305,10 @@ npm run deploy:functions       # functions only
 op-firebase-deploy --only hosting,functions  # any combo
 ```
 
-`op-firebase-deploy` is a global script (`~/.local/bin/op-firebase-deploy`) that reads ADC from 1Password, validates the token, auto-refreshes if stale (opens browser + updates 1Password automatically), writes credentials to a temp file, deploys via `firebase deploy --non-interactive`, and cleans up. Does not depend on `firebase login` or `gcloud auth login` sessions. Works for any Firebase project.
+`op-firebase-deploy` is a global script (`~/.local/bin/op-firebase-deploy`) that reads a service account key from 1Password, writes it to a temp file, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up. No `firebase login`, `gcloud auth login`, or browser prompts required — the only interactive step is the 1Password biometric (Touch ID). The key never expires unless explicitly deleted. Works for any Firebase project.
 
 **1Password setup:** Item "GCP ADC" in the Private vault with:
-- `credential` — Application Default Credentials JSON (from `gcloud auth application-default login`), or a service account key JSON
+- `credential` — Service account key JSON for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`
 - `project` — the GCP/Firebase project ID (e.g., `device-source-of-truth`)
 
 ### Manual deploy (interactive — requires browser login)
@@ -349,13 +349,13 @@ Secret management flow:
 5. Never store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
 
 Deploy auth (managed via 1Password):
-1. `op-firebase-deploy` (global script at `~/.local/bin/`) reads ADC from 1Password, validates the token, and runs `firebase deploy --non-interactive`.
-2. The ADC credential lives in **1Password** (Private vault → "GCP ADC" → `credential` field).
-3. The script writes ADC to a temp file (umask 077), sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys, and deletes the temp file on exit.
-4. **Self-healing auth:** Before deploying, the script exchanges the refresh token with Google's token endpoint. If stale, it automatically runs `gcloud auth application-default login` and updates the 1Password item — no manual `op item edit` needed.
-5. Project ID is auto-detected from `.firebaserc` or passed as an argument. The script does not call `gcloud config set project` or depend on `gcloud auth login` / `firebase login` sessions.
+1. `op-firebase-deploy` (global script at `~/.local/bin/`) reads a service account key from 1Password and runs `firebase deploy --non-interactive`.
+2. The service account key lives in **1Password** (Private vault → "GCP ADC" → `credential` field).
+3. The script writes the key to a temp file (umask 077), sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys, and deletes the temp file on exit.
+4. The only interactive step is the 1Password biometric prompt (Touch ID). No `firebase login`, `gcloud auth login`, or browser prompts are needed.
+5. Project ID is auto-detected from `.firebaserc` or passed as an argument.
 6. `.env.op` is a legacy fallback — `op-firebase-deploy` does not require it.
-7. A `firebase-deployer` service account exists in the project with deploy roles (`firebase.admin`, `cloudfunctions.admin`, `iam.serviceAccountUser`, `artifactregistry.writer`, `run.admin`). Two GCP org policies block service account keys entirely: `iam.disableServiceAccountKeyCreation` (blocks Google-generated keys) and `iam.disableServiceAccountKeyUpload` (blocks user-provided keys). If both policies are ever lifted, generate a key and store it in 1Password for permanent non-interactive deploys (service account keys never expire).
+7. The `firebase-deployer` service account has deploy roles: `firebase.admin`, `cloudfunctions.admin`, `iam.serviceAccountUser`, `artifactregistry.writer`, `run.admin`. The key never expires unless explicitly deleted. To rotate: delete the old key via `gcloud iam service-accounts keys delete KEY_ID --iam-account=firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, generate a new one with `gcloud iam service-accounts keys create`, and update 1Password.
 
 ## Things to Watch Out For
 

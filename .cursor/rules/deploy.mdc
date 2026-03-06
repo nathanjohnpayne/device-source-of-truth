@@ -18,26 +18,26 @@ op-firebase-deploy --only hosting,functions  # any Firebase target combo
 
 ## How it works
 
-- `op-firebase-deploy` reads ADC credentials from 1Password (`Private/GCP ADC/credential`)
+- `op-firebase-deploy` reads a service account key from 1Password (`Private/GCP ADC/credential`)
 - Auto-detects the Firebase project from `.firebaserc`
-- Validates the ADC token before deploying (exchanges the refresh token with Google's token endpoint)
-- If the token is stale, automatically opens `gcloud auth application-default login`, then updates 1Password with the fresh credential — no manual `op item edit` needed
-- Writes credentials to a temp file (`umask 077`), sets `GOOGLE_APPLICATION_CREDENTIALS`, runs `firebase deploy --non-interactive`, cleans up on exit
-- Does not depend on `gcloud auth login` or `firebase login` sessions — only `GOOGLE_APPLICATION_CREDENTIALS` is used
-- Supports both `authorized_user` (user ADC) and `service_account` key types; service account keys skip validation since they never expire
+- Writes the key to a temp file (`umask 077`), sets `GOOGLE_APPLICATION_CREDENTIALS`, runs `firebase deploy --non-interactive`, cleans up on exit
+- The only interactive step is the 1Password biometric prompt (Touch ID). No `firebase login`, `gcloud auth login`, or browser prompts needed
+- The service account key never expires unless explicitly deleted
+- Also supports `authorized_user` ADC tokens (auto-validates and self-heals if stale)
 
-## Token refresh
+## Key rotation
 
-The script auto-detects and auto-refreshes stale tokens. No manual intervention is needed — if the token is expired, the script opens a browser for `gcloud auth application-default login` and updates 1Password automatically.
-
-The ADC refresh token has no fixed expiry but is revoked on Google password change, explicit revocation, or 6 months of inactivity. A `firebase-deployer` service account exists in the project with deploy permissions; two GCP org policies (`iam.disableServiceAccountKeyCreation` and `iam.disableServiceAccountKeyUpload`) block all service account key creation. If both policies are ever lifted, generate a key and store it in 1Password for permanent non-interactive deploys.
-
-To manually refresh the ADC (should not normally be needed):
+The service account key (`firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`) does not expire. To rotate it if compromised:
 
 ```bash
-gcloud auth application-default login --project=device-source-of-truth
-op item edit "GCP ADC" --vault Private \
-  "credential=$(cat ~/.config/gcloud/application_default_credentials.json)"
+gcloud iam service-accounts keys list \
+  --iam-account=firebase-deployer@device-source-of-truth.iam.gserviceaccount.com
+gcloud iam service-accounts keys delete KEY_ID \
+  --iam-account=firebase-deployer@device-source-of-truth.iam.gserviceaccount.com
+gcloud iam service-accounts keys create /tmp/sa-key.json \
+  --iam-account=firebase-deployer@device-source-of-truth.iam.gserviceaccount.com
+op item edit "GCP ADC" --vault Private "credential=$(cat /tmp/sa-key.json)"
+rm /tmp/sa-key.json
 ```
 
 ## Rules
