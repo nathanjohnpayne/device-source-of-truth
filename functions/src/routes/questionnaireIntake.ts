@@ -412,11 +412,24 @@ router.get('/', async (req, res) => {
       .orderBy('uploadedAt', 'desc');
 
     if (status) query = query.where('status', '==', status);
-    if (partner_id) query = query.where('submitterPartnerId', '==', partner_id);
     if (uploaded_by) query = query.where('uploadedBy', '==', uploaded_by);
 
     const snap = await query.get();
-    let allJobs = snap.docs.map(d => d.data());
+    let allJobs = snap.docs.map(d => {
+      const job = d.data();
+      // Normalize legacy jobs: surface partnerId as submitterPartnerId
+      if (!job.submitterPartnerId && job.partnerId) {
+        job.submitterPartnerId = job.partnerId;
+      }
+      return job;
+    });
+
+    // Post-query partner filter covers both submitterPartnerId and legacy partnerId
+    if (partner_id) {
+      allJobs = allJobs.filter(j =>
+        j.submitterPartnerId === partner_id || j.partnerId === partner_id,
+      );
+    }
 
     if (search && typeof search === 'string' && search.trim()) {
       const q = search.trim().toLowerCase();
@@ -955,10 +968,16 @@ router.patch('/:id/staged-devices/:deviceId/resolve-all', requireRole('admin'), 
 router.patch('/:id/intake-partners/:intakePartnerId', requireRole('admin'), async (req, res) => {
   try {
     const db = admin.firestore();
+    const jobId = (req.params.id as string);
     const ipRef = db.collection('questionnaireIntakePartners').doc((req.params.intakePartnerId as string));
     const ipSnap = await ipRef.get();
     if (!ipSnap.exists) {
       res.status(404).json({ error: 'Intake partner not found' });
+      return;
+    }
+
+    if (ipSnap.data()!.intakeJobId !== jobId) {
+      res.status(403).json({ error: 'Intake partner does not belong to this job' });
       return;
     }
 
@@ -1071,6 +1090,17 @@ router.put('/:id/staged-devices/:deviceId/deployments', requireRole('admin'), as
 
     if (!Array.isArray(deployments)) {
       res.status(400).json({ error: 'deployments array is required' });
+      return;
+    }
+
+    // Verify staged device belongs to this job
+    const deviceSnap = await db.collection('questionnaireStagedDevices').doc(stagedDeviceId).get();
+    if (!deviceSnap.exists) {
+      res.status(404).json({ error: 'Staged device not found' });
+      return;
+    }
+    if (deviceSnap.data()!.intakeJobId !== jobId) {
+      res.status(403).json({ error: 'Staged device does not belong to this job' });
       return;
     }
 
@@ -1342,7 +1372,7 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
 
       // DST-055: write deployment records and partner-scoped source links
       const devicePartnerLinks = allDevicePartnerLinks.get(deviceDoc.id) ?? [];
-      const confirmedLinks = devicePartnerLinks.filter(l => l.reviewStatus !== 'rejected');
+      const confirmedLinks = devicePartnerLinks.filter(l => l.reviewStatus === 'confirmed');
 
       if (confirmedLinks.length > 0) {
         for (const link of confirmedLinks) {

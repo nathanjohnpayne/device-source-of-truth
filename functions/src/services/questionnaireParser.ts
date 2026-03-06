@@ -290,9 +290,10 @@ export async function detectPartner(
       displayName: d.data().displayName as string,
     }));
 
+    const partnerLookup = new Map(partners.map(p => [p.id, p.displayName]));
     const nameTokens = extractPartnerTokensFromFilename(filename);
     for (const token of nameTokens) {
-      const aliasResult = resolvePartnerAlias(token, aliases, new Map());
+      const aliasResult = resolvePartnerAlias(token, aliases, partnerLookup);
       if (aliasResult) {
         return {
           partnerId: aliasResult.partnerId,
@@ -527,6 +528,7 @@ export async function detectMultiPartnerSignals(
   const intakePartners: DetectedIntakePartner[] = [];
   const devicePartnerLinks: DetectedDevicePartnerLink[] = [];
   const partnerNameIndex = new Map<string, number>();
+  const partnerLookup = new Map(partners.map(p => [p.id, p.displayName]));
 
   function getOrCreatePartner(
     rawName: string,
@@ -540,7 +542,7 @@ export async function detectMultiPartnerSignals(
     let matchConfidence: number | null = null;
     let matchMethod: IntakePartnerMatchMethod | null = null;
 
-    const aliasResult = resolvePartnerAlias(rawName, aliases, new Map());
+    const aliasResult = resolvePartnerAlias(rawName, aliases, partnerLookup);
     if (aliasResult) {
       partnerId = aliasResult.partnerId;
       matchConfidence = 0.95;
