@@ -117,7 +117,7 @@ export default function DangerZonePage() {
               disabled={!isConfirmed || clearing}
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {clearing && <LoadingSpinner className="h-4 w-4" />}
+              {clearing && <LoadingSpinner inline className="h-4 w-4" />}
               Clear All Data
             </button>
           </>

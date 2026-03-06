@@ -270,7 +270,7 @@ export default function VersionRegistryPage() {
               disabled={seeding}
               className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
-              {seeding ? <LoadingSpinner className="h-4 w-4" /> : <Database className="h-4 w-4" />}
+              {seeding ? <LoadingSpinner inline className="h-4 w-4" /> : <Database className="h-4 w-4" />}
               Seed Defaults
             </button>
           )}
@@ -382,7 +382,7 @@ export default function VersionRegistryPage() {
               disabled={addSaving || !addCoreVersion.trim() || !addFriendlyVersion.trim()}
               className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
             >
-              {addSaving ? <LoadingSpinner className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+              {addSaving ? <LoadingSpinner inline className="h-4 w-4" /> : <Check className="h-4 w-4" />}
               Save
             </button>
             <button
@@ -467,7 +467,7 @@ export default function VersionRegistryPage() {
                               disabled={editSaving}
                               className="rounded p-1 text-emerald-600 hover:bg-emerald-50"
                             >
-                              {editSaving ? <LoadingSpinner className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+                              {editSaving ? <LoadingSpinner inline className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                             </button>
                             <button onClick={() => setEditId(null)} className="rounded p-1 text-gray-400 hover:bg-gray-100">
                               <X className="h-4 w-4" />
@@ -580,7 +580,7 @@ export default function VersionRegistryPage() {
               Cancel
             </button>
             <button onClick={handleDeactivate} disabled={deactivateLoading} className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
-              {deactivateLoading && <LoadingSpinner className="h-4 w-4" />}
+              {deactivateLoading && <LoadingSpinner inline className="h-4 w-4" />}
               Deactivate
             </button>
           </>
@@ -608,7 +608,7 @@ export default function VersionRegistryPage() {
               Cancel
             </button>
             <button onClick={confirmEdit} disabled={editSaving} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
-              {editSaving && <LoadingSpinner className="h-4 w-4" />}
+              {editSaving && <LoadingSpinner inline className="h-4 w-4" />}
               Continue
             </button>
           </>

@@ -772,7 +772,7 @@ export default function IntakeImportPage() {
               disabled={!canImport || loading}
               className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? <LoadingSpinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+              {loading ? <LoadingSpinner inline className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
               Import {summary.ready} records
             </button>
           </div>
@@ -827,7 +827,7 @@ export default function IntakeImportPage() {
               disabled={rollbackLoading}
               className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
-              {rollbackLoading && <LoadingSpinner className="h-4 w-4" />}
+              {rollbackLoading && <LoadingSpinner inline className="h-4 w-4" />}
               Rollback Import
             </button>
           </>

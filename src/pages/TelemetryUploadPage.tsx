@@ -612,7 +612,7 @@ export default function TelemetryUploadPage() {
               disabled={loading || (previewSummary?.total ?? 0) === 0 || !importTimeRange}
               className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? <LoadingSpinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+              {loading ? <LoadingSpinner inline className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
               Upload {previewSummary?.total ?? 0} records
             </button>
           </div>
