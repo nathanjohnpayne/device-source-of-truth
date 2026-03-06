@@ -56,23 +56,45 @@ router.patch('/:id/role', requireRole('admin'), async (req, res) => {
       return;
     }
 
+    // Demoting an admin requires a transactional check to prevent racing
+    // two concurrent demotions past the "at least one admin" invariant.
     if (oldRole === 'admin') {
-      const adminsSnap = await db
-        .collection('users')
-        .where('role', '==', 'admin')
-        .get();
-      if (adminsSnap.size <= 1) {
-        res.status(409).json({ error: 'Cannot remove the last admin' });
-        return;
+      const now = new Date().toISOString();
+      try {
+        await db.runTransaction(async (txn) => {
+          const freshDoc = await txn.get(userRef);
+          if (!freshDoc.exists || freshDoc.data()!.role !== 'admin') {
+            throw new Error('ROLE_CHANGED');
+          }
+          const adminsSnap = await db
+            .collection('users')
+            .where('role', '==', 'admin')
+            .get();
+          if (adminsSnap.size <= 1) {
+            throw new Error('LAST_ADMIN');
+          }
+          txn.update(userRef, { role, updatedAt: now, updatedBy: req.user!.email });
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '';
+        if (msg === 'LAST_ADMIN') {
+          res.status(409).json({ error: 'Cannot remove the last admin' });
+          return;
+        }
+        if (msg === 'ROLE_CHANGED') {
+          res.status(409).json({ error: 'User role was modified concurrently. Please refresh and retry.' });
+          return;
+        }
+        throw err;
       }
+    } else {
+      const now = new Date().toISOString();
+      await userRef.update({
+        role,
+        updatedAt: now,
+        updatedBy: req.user!.email,
+      });
     }
-
-    const now = new Date().toISOString();
-    await userRef.update({
-      role,
-      updatedAt: now,
-      updatedBy: req.user!.email,
-    });
 
     await logAuditEntry({
       entityType: 'user',

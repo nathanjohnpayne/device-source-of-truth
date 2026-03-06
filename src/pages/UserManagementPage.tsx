@@ -55,18 +55,18 @@ function RoleSelector({
   isLastAdmin: boolean;
   onRoleChange: (userId: string, newRole: UserRole, oldRole: UserRole) => Promise<void>;
 }) {
-  const [loading, setLoading] = useState(false);
+  const [loadingRole, setLoadingRole] = useState<UserRole | null>(null);
   const isSelf = user.id === currentUserId;
   const isOnlyAdmin = isLastAdmin && user.role === 'admin';
   const disabled = isSelf || isOnlyAdmin;
 
   const handleClick = async (role: UserRole) => {
-    if (disabled || role === user.role || loading) return;
-    setLoading(true);
+    if (disabled || role === user.role || loadingRole) return;
+    setLoadingRole(role);
     try {
       await onRoleChange(user.id, role, user.role);
     } finally {
-      setLoading(false);
+      setLoadingRole(null);
     }
   };
 
@@ -75,6 +75,7 @@ function RoleSelector({
       {ROLES.map((role) => {
         const isActive = user.role === role;
         const isLockedAdmin = isOnlyAdmin && role === 'admin';
+        const isThisLoading = loadingRole === role;
 
         let title: string | undefined;
         if (isSelf) title = 'You cannot change your own role.';
@@ -84,7 +85,7 @@ function RoleSelector({
           <button
             key={role}
             onClick={() => handleClick(role)}
-            disabled={disabled || loading}
+            disabled={disabled || loadingRole !== null}
             title={title}
             className={`relative flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
               isActive
@@ -94,7 +95,7 @@ function RoleSelector({
                   : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
           >
-            {loading && !isActive ? (
+            {isThisLoading ? (
               <LoadingSpinner inline className="h-3.5 w-3.5" />
             ) : (
               <>
@@ -175,7 +176,6 @@ export default function UserManagementPage() {
       } else {
         setToast({ message: 'Failed to update role. Please try again.', type: 'error' });
       }
-      throw err;
     }
   };
 
