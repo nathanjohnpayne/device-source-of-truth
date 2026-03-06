@@ -34,7 +34,7 @@ Firebase Hosting (static SPA)
 │   ├── App.tsx                   ← Router, auth guards, lazy-loaded routes
 │   ├── main.tsx                  ← Entry point
 │   ├── index.css                 ← Tailwind imports + global styles
-│   ├── pages/                    ← 27 route-level page components
+│   ├── pages/                    ← 28 route-level page components
 │   ├── components/
 │   │   ├── layout/               ← AppShell (sidebar + topbar), GlobalSearch
 │   │   ├── shared/               ← DataTable, Badge, Modal, FilterPanel, Logo, etc.
@@ -61,7 +61,7 @@ Firebase Hosting (static SPA)
 │   ├── src/
 │   │   ├── index.ts              ← Express app + extractDeviceTask Cloud Tasks function
 │   │   ├── middleware/auth.ts    ← Token verification, domain check, role guard
-│   │   ├── routes/               ← 17 Express routers (partners, devices, disambiguate, questionnaireIntake, versionMappings, partnerAliases, etc.)
+│   │   ├── routes/               ← 18 Express routers (partners, devices, users, disambiguate, questionnaireIntake, versionMappings, partnerAliases, etc.)
 │   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, aiImportFramework, seedFieldOptions, questionnaireParser, questionnaireExtractor, partnerResolver, partnerAliasResolver, coercion, safeNumber, storage, logger)
 │   │   └── types/index.ts        ← Backend type definitions (mirrors src/lib/types.ts)
 │   ├── package.json              ← Separate deps (firebase-admin, express, xlsx, etc.)
@@ -107,7 +107,7 @@ Firebase Hosting (static SPA)
 | `auditLog` | Append-only change log | entityType, entityId, field, oldValue, newValue, userId |
 | `alerts` | Unregistered device/key alerts | type, partnerKey, deviceId, status, dismissReason |
 | `uploadHistory` | Telemetry upload log | uploadedBy, fileName, rowCount, successCount |
-| `users` | Role assignments | email, role (viewer/editor/admin) |
+| `users` | Role assignments (managed in-app by admins) | email, role (viewer/editor/admin), displayName, photoUrl, lastLogin, updatedAt, updatedBy |
 | `config` | App-level settings | retentionDailyDays, retentionWeeklyYears |
 | `fieldOptions` | Controlled vocabulary dropdown options | dropdownKey, displayLabel, displayValue, sortOrder, isActive |
 | `partnerKeyImportBatches` | Partner key CSV import history | importedBy, fileName, keyCount, status |
@@ -211,6 +211,8 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | GET | /version-mappings/friendly-versions | any | Distinct active friendly versions |
 | GET | /version-mappings/usage/:id | any | Count telemetry rows using a mapping |
 | POST | /version-mappings/seed | admin | Seed default version mappings |
+| GET | /users | admin | List all users with roles |
+| PATCH | /users/:id/role | admin | Update a user's role (transactional last-admin guard) |
 | GET | /partner-aliases | any | List partner aliases |
 | POST | /partner-aliases | admin | Create a partner alias |
 | PUT | /partner-aliases/:id | admin | Update a partner alias |
@@ -225,9 +227,9 @@ Three roles, checked by `requireRole()` middleware on the backend and `useAuth()
 |---|---|
 | `viewer` | Read all data, run simulations, use search |
 | `editor` | Everything viewer can do + create/edit devices, specs, partners |
-| `admin` | Everything editor can do + manage tiers, upload telemetry, manage partner keys, import intake requests, run migrations, dismiss alerts, rollback imports, review/approve/reject questionnaire imports |
+| `admin` | Everything editor can do + manage tiers, upload telemetry, manage partner keys, import intake requests, run migrations, dismiss alerts, rollback imports, review/approve/reject questionnaire imports, manage user roles |
 
-Roles are stored in the `users` Firestore collection. A user doc must exist with matching email for login to succeed. Users not in the collection get a default `viewer` role on the frontend but will fail backend writes.
+Roles are stored in the `users` Firestore collection. A user doc is auto-provisioned with `role: 'viewer'` on first login via the `authenticate` middleware. Admins can change roles in-app via the User Management page (`/admin/users`). Guardrails prevent self-demotion (403) and last-admin removal (409, enforced via Firestore transaction). Role changes take effect on the affected user's next API request; the frontend reflects the change on their next page load.
 
 ## Frontend Conventions
 
@@ -368,4 +370,5 @@ Deploy auth (managed via 1Password):
 12. **Notifications are admin-only for now.** The `notifications` collection stores in-app notifications written by the backend when intake jobs reach `pending_review`. The `NotificationBell` component in `AppShell.tsx` polls every 30 seconds.
 13. **Tailwind v4 `appearance: button` override.** Tailwind CSS 4 applies `appearance: button` to `<button>` elements via its preflight, which on macOS Safari/Chrome renders rounded system-styled buttons. `src/index.css` contains an un-layered `button { appearance: none; }` reset that must load after Tailwind's `@import`. Do not remove it or move it inside a `@layer` — un-layered styles have higher specificity than Tailwind's layered preflight.
 14. **Partner resolution uses a shared chain (DST-046).** The `partnerResolver` service implements exact match → alias lookup → Jaro-Winkler fuzzy match (≥ 0.90). Both AllModels migration and partner key CSV import use this shared resolver. The `partnerAliasResolver` service manages alias CRUD and seeding.
-15. **Telemetry freshness (DST-053).** `lastTelemetryAt` (ISO string) is written to each device doc during telemetry upload. The `FreshnessBadge` component shows a green/amber/red/gray dot (< 48h / 2–7d / 7d+ / null) on Dashboard, Partner detail, Device detail, and region cards. The `FreshnessMicroPanel` provides a structured hover card in device table rows. Freshness thresholds are hardcoded (`ACTIVE_DEVICES_WINDOW_DAYS = 28` in contracts). All devices in a single upload batch share the same timestamp — this is a known, documented limitation. The `getFreshnessState()` utility and `FreshnessState` type live in `src/lib/format.ts` (not in the component file) to satisfy `react-refresh/only-export-components`.
+15. **User role management is in-app (DST-054).** Admins manage roles via `UserManagementPage` at `/admin/users`. The `PATCH /api/users/:id/role` route uses a Firestore transaction for admin demotions to prevent concurrent requests from removing all admins. Self-demotion returns 403; last-admin demotion returns 409. Every role change is audit-logged with `entityType: 'user'`. The `User` type includes `updatedAt` and `updatedBy` for provenance. The page uses an inline segmented role selector (not a dropdown) with per-button loading state.
+16. **Telemetry freshness (DST-053).** `lastTelemetryAt` (ISO string) is written to each device doc during telemetry upload. The `FreshnessBadge` component shows a green/amber/red/gray dot (< 48h / 2–7d / 7d+ / null) on Dashboard, Partner detail, Device detail, and region cards. The `FreshnessMicroPanel` provides a structured hover card in device table rows. Freshness thresholds are hardcoded (`ACTIVE_DEVICES_WINDOW_DAYS = 28` in contracts). All devices in a single upload batch share the same timestamp — this is a known, documented limitation. The `getFreshnessState()` utility and `FreshnessState` type live in `src/lib/format.ts` (not in the component file) to satisfy `react-refresh/only-export-components`.
