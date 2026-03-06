@@ -358,11 +358,13 @@ function SpecEditForm() {
       const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
       if (!ACCEPTED_EXTENSIONS.includes(ext)) {
         setError('Only .xlsx and .xls files are accepted.');
+        setQuestionnaireFile(null);
         e.target.value = '';
         return;
       }
       if (file.size > MAX_QUESTIONNAIRE_SIZE) {
         setError('File must be under 20 MB.');
+        setQuestionnaireFile(null);
         e.target.value = '';
         return;
       }
@@ -510,11 +512,12 @@ function SpecEditForm() {
             />
           </div>
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
+            <label htmlFor="questionnaire-file" className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
               <Upload className="h-3.5 w-3.5" />
               Upload Questionnaire File
             </label>
             <input
+              id="questionnaire-file"
               type="file"
               accept=".xlsx,.xls"
               onChange={handleFileChange}
