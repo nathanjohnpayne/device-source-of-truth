@@ -12,7 +12,6 @@ import type {
   AlertStatus,
   AlertDismissReason,
   Partner,
-  PartnerKeyWithDisplay,
   DeviceType,
 } from '../lib/types';
 import { formatDate } from '../lib/format';
@@ -85,14 +84,19 @@ function CreateKeyModal({ open, onClose, alert, partners, onResolved }: CreateKe
     setSubmitting(true);
     setError(null);
     try {
-      await api.partnerKeys.create({
+      const created = await api.partnerKeys.create({
         key: alert.partnerKey,
         partnerId: partnerId || null,
         chipset: chipset || null,
         oem: oem || null,
       });
-      const updated = await api.alerts.dismiss(alert.id, 'Key Created');
-      onResolved(alert.id, updated);
+      // Backend auto-dismissed matching new_partner_key alerts; update local state
+      const dismissed = (created as unknown as { dismissedAlertIds?: string[] }).dismissedAlertIds;
+      if (dismissed?.length) {
+        for (const aid of dismissed) {
+          onResolved(aid, { status: 'dismissed', dismissReason: 'Key Created' });
+        }
+      }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create partner key');
@@ -211,7 +215,6 @@ interface RegisterDeviceModalProps {
   open: boolean;
   onClose: () => void;
   alert: Alert | null;
-  alerts: Alert[];
   partners: Partner[];
   onResolved: (alertId: string, updated: Partial<Alert>) => void;
 }
@@ -220,7 +223,6 @@ function RegisterDeviceModal({
   open,
   onClose,
   alert,
-  alerts,
   partners,
   onResolved,
 }: RegisterDeviceModalProps) {
@@ -251,11 +253,9 @@ function RegisterDeviceModal({
 
     setKeyLoading(true);
     api.partnerKeys
-      .list({ pageSize: 500 })
+      .list({ exactKey: alert.partnerKey })
       .then((res) => {
-        const match = res.data.find(
-          (pk: PartnerKeyWithDisplay) => pk.key === alert.partnerKey,
-        );
+        const match = res.data[0];
         if (match) {
           setKeyMatch({
             id: match.id,
@@ -288,15 +288,12 @@ function RegisterDeviceModal({
       setKeyMatch({ id: created.id, key: created.key, partnerDisplayName: partnerName });
       setKeyMissing(false);
 
-      const matchingKeyAlert = alerts.find(
-        (a) =>
-          a.type === 'new_partner_key' &&
-          a.partnerKey === alert.partnerKey &&
-          a.status === 'open',
-      );
-      if (matchingKeyAlert) {
-        const updated = await api.alerts.dismiss(matchingKeyAlert.id, 'Key Created');
-        onResolved(matchingKeyAlert.id, updated);
+      // Backend auto-dismissed matching new_partner_key alerts; update local state
+      const dismissed = (created as unknown as { dismissedAlertIds?: string[] }).dismissedAlertIds;
+      if (dismissed?.length) {
+        for (const aid of dismissed) {
+          onResolved(aid, { status: 'dismissed', dismissReason: 'Key Created' });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create partner key');
@@ -542,17 +539,21 @@ export default function AlertsPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      api.alerts.list({ pageSize: 500 }),
-      api.partners.list({ pageSize: 500 }),
-    ])
-      .then(([alertsRes, partnersRes]) => {
-        setAlerts(alertsRes.data);
-        setPartners(partnersRes.data);
-      })
+    api.alerts
+      .list({ pageSize: 2000 })
+      .then((res) => setAlerts(res.data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  // Partners are only needed for admin modals; fetch separately so a failure doesn't block the page
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.partners
+      .list({ pageSize: 500 })
+      .then((res) => setPartners(res.data))
+      .catch(() => {});
+  }, [isAdmin]);
 
   const filtered = useMemo(() => {
     let result = alerts;
@@ -870,7 +871,6 @@ export default function AlertsPage() {
         open={registerModalOpen}
         onClose={() => setRegisterModalOpen(false)}
         alert={registerTarget}
-        alerts={alerts}
         partners={partners}
         onResolved={handleAlertResolved}
       />
