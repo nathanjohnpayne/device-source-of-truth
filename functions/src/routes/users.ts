@@ -61,15 +61,15 @@ router.patch('/:id/role', requireRole('admin'), async (req, res) => {
     if (oldRole === 'admin') {
       const now = new Date().toISOString();
       try {
+        const adminsQuery = db.collection('users').where('role', '==', 'admin');
         await db.runTransaction(async (txn) => {
-          const freshDoc = await txn.get(userRef);
+          const [freshDoc, adminsSnap] = await Promise.all([
+            txn.get(userRef),
+            txn.get(adminsQuery),
+          ]);
           if (!freshDoc.exists || freshDoc.data()!.role !== 'admin') {
             throw new Error('ROLE_CHANGED');
           }
-          const adminsSnap = await db
-            .collection('users')
-            .where('role', '==', 'admin')
-            .get();
           if (adminsSnap.size <= 1) {
             throw new Error('LAST_ADMIN');
           }

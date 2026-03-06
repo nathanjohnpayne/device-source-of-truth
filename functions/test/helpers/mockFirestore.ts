@@ -224,7 +224,9 @@ export class MockBatch {
 export class MockTransaction {
   private ops: Array<() => Promise<void>> = [];
 
-  async get(ref: MockDocRef): Promise<MockDocSnapshot> {
+  async get(ref: MockDocRef): Promise<MockDocSnapshot>;
+  async get(ref: MockCollectionRef): Promise<MockQuerySnapshot>;
+  async get(ref: MockDocRef | MockCollectionRef): Promise<MockDocSnapshot | MockQuerySnapshot> {
     return ref.get();
   }
 
