@@ -21,7 +21,7 @@ export type PartnerKeyRegion = 'APAC' | 'EMEA' | 'LATAM' | 'DOMESTIC' | 'GLOBAL'
 
 export type AlertStatus = 'open' | 'dismissed';
 
-export type AlertDismissReason = 'Test Device' | 'Duplicate Key' | 'Will Register' | 'Internal / Deprecated';
+export type AlertDismissReason = 'Test Device' | 'Duplicate Key' | 'Will Register' | 'Internal / Deprecated' | 'Device Registered' | 'Key Created';
 
 export type AuditEntityType =
   | 'partner'
