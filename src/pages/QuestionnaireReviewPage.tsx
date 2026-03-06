@@ -1415,7 +1415,7 @@ function SignOffStep({
 
   const multiPartnerReady = job.isMultiPartner &&
     intakePartners.length > 0 &&
-    intakePartners.every(ip => ip.reviewStatus === 'confirmed');
+    intakePartners.every(ip => ip.reviewStatus !== 'pending');
 
   const canCommit =
     pending.length === 0 && !hasUnresolvedConflicts && (partner != null || multiPartnerReady);

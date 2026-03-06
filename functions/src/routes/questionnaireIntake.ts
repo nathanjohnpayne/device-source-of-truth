@@ -996,6 +996,17 @@ router.patch('/:id/intake-partners/:intakePartnerId', requireRole('admin'), asyn
       const targetIpId = req.body.mergeInto as string;
       const sourceIpId = (req.params.intakePartnerId as string);
 
+      // Verify merge target belongs to the same job
+      const targetIpSnap = await db.collection('questionnaireIntakePartners').doc(targetIpId).get();
+      if (!targetIpSnap.exists) {
+        res.status(404).json({ error: 'Merge target intake partner not found' });
+        return;
+      }
+      if (targetIpSnap.data()!.intakeJobId !== jobId) {
+        res.status(403).json({ error: 'Merge target intake partner does not belong to this job' });
+        return;
+      }
+
       const [linksSnap, targetLinksSnap] = await Promise.all([
         db.collection('questionnaireStagedDevicePartners')
           .where('intakePartnerId', '==', sourceIpId)

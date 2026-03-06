@@ -327,7 +327,7 @@ export async function detectPartner(
           const val = cellValue(sheet, r, c);
           if (val) {
             const partnerName = String(val).trim();
-            const aliasResult = resolvePartnerAlias(partnerName, aliases, new Map());
+            const aliasResult = resolvePartnerAlias(partnerName, aliases, partnerLookup);
             if (aliasResult) {
               return {
                 partnerId: aliasResult.partnerId,
