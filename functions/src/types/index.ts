@@ -80,6 +80,7 @@ export type {
   QuestionnaireIntakePartner,
   QuestionnaireStagedDevicePartner,
   DevicePartnerDeployment,
+  ExtractionStatus,
 } from '@dst/contracts';
 
 // ── Backend-only types below ──
@@ -516,8 +517,6 @@ export interface PartnerAlias {
 }
 
 // ── Extraction Task Queue ──
-
-export type ExtractionStatus = 'pending' | 'processing' | 'complete' | 'failed';
 
 export interface ExtractionTaskPayload {
   intakeJobId: string;

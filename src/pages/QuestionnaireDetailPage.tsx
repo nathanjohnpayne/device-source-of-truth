@@ -164,7 +164,10 @@ function DeviceCard({
 }) {
   const { rawHeaderLabel, platformType, isOutOfScope, matchedDeviceId, fieldSummary } = device;
   const deviceError = device.extractionError;
-  const isExtracting = jobStatus === 'extracting' && fieldSummary.extractedFields === 0 && !deviceError;
+  const extractionStatus = device.extractionStatus;
+  const isDeviceProcessing = extractionStatus === 'processing';
+  const isDevicePending = extractionStatus === 'pending' && jobStatus === 'extracting';
+  const isExtracting = (isDeviceProcessing || isDevicePending) && !deviceError;
   const isComplete = fieldSummary.extractedFields > 0;
   const hasConflicts = fieldSummary.conflictCount > 0;
   const isDeviceFailed = !!deviceError;
@@ -225,7 +228,14 @@ function DeviceCard({
               )}
             </div>
             <div>
-              {fieldSummary.totalFields > 0 ? (
+              {isDeviceProcessing && fieldSummary.extractedFields === 0 ? (
+                <span className="flex items-center gap-1 text-indigo-600">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Extracting fields…
+                </span>
+              ) : isDevicePending && fieldSummary.extractedFields === 0 ? (
+                <span className="text-gray-400">Waiting in queue…</span>
+              ) : fieldSummary.totalFields > 0 ? (
                 <span>
                   {fieldSummary.extractedFields} / {fieldSummary.totalFields} fields extracted
                   {hasConflicts && (
@@ -264,12 +274,14 @@ function DeviceCard({
         <div className="flex shrink-0 items-center">
           {isRetrying ? (
             <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
-          ) : isActiveDevice ? (
+          ) : isActiveDevice || isDeviceProcessing ? (
             <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
           ) : isComplete ? (
             <CheckCircle className="h-5 w-5 text-emerald-500" />
           ) : isDeviceFailed ? (
             <XCircle className="h-5 w-5 text-red-500" />
+          ) : isDevicePending ? (
+            <Clock className="h-5 w-5 text-gray-400" />
           ) : isExtracting ? (
             <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
           ) : (

@@ -574,10 +574,19 @@ router.get('/:id', async (req, res) => {
 
     let extractionProgress = null;
     if (job.status === 'extracting' || job.status === 'extraction_failed') {
+      // Compute live counts from staged devices instead of stale job-doc values
+      // (job.devicesComplete is only written when ALL devices finish)
+      let liveComplete = 0;
+      let liveFailed = 0;
+      for (const sd of stagedDevices) {
+        const es = (sd as Record<string, unknown>).extractionStatus;
+        if (es === 'complete') liveComplete++;
+        else if (es === 'failed') liveFailed++;
+      }
       extractionProgress = {
         totalDevices: stagedDevices.length,
-        devicesComplete: (job.devicesComplete as number) || 0,
-        devicesFailed: (job.devicesFailed as number) || 0,
+        devicesComplete: liveComplete,
+        devicesFailed: liveFailed,
         step: (job.extractionStep as 1 | 2 | 3 | 4) || null,
         currentDevice: (job.extractionCurrentDevice as string) || null,
       };

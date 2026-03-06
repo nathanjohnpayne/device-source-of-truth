@@ -193,6 +193,95 @@ function IntakePartnerRow({
   );
 }
 
+// ── Reusable inline partner resolution panel (Steps 2-4) ────────────────────
+
+function IntakePartnerPanel({
+  intakePartners,
+  onResolve,
+}: {
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
+  onResolve: (intakePartnerId: string, partnerId: string, reviewStatus: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const [partners, setPartners] = useState<PartnerWithStats[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.partners.list({ pageSize: 500 });
+        setPartners((res.data ?? []) as PartnerWithStats[]);
+      } catch { /* non-blocking */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const pending = intakePartners.filter(ip => ip.reviewStatus === 'pending');
+  const matchedPending = pending.filter(ip => ip.partnerId);
+  const confirmed = intakePartners.filter(ip => ip.reviewStatus === 'confirmed').length;
+  const rejected = intakePartners.filter(ip => ip.reviewStatus === 'rejected').length;
+
+  if (intakePartners.length === 0) return null;
+
+  const allResolved = pending.length === 0;
+  const borderColor = allResolved ? 'border-emerald-200' : 'border-amber-200';
+  const bgColor = allResolved ? 'bg-emerald-50/50' : 'bg-amber-50/50';
+
+  return (
+    <div className={`rounded-lg border ${borderColor} ${bgColor} overflow-hidden`}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm"
+      >
+        <div className="flex items-center gap-2">
+          {allResolved
+            ? <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+            : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
+          <span className={`font-medium ${allResolved ? 'text-emerald-800' : 'text-amber-800'}`}>
+            {pending.length > 0
+              ? `${pending.length} intake partner${pending.length !== 1 ? 's' : ''} pending review`
+              : `All ${intakePartners.length} intake partners resolved`}
+          </span>
+          <span className="text-xs text-gray-500">
+            ({confirmed} confirmed · {rejected} rejected{pending.length > 0 ? ` · ${pending.length} pending` : ''})
+          </span>
+        </div>
+        {expanded
+          ? <ChevronUp className="h-4 w-4 text-gray-400" />
+          : <ChevronDown className="h-4 w-4 text-gray-400" />}
+      </button>
+
+      {expanded && (
+        <div className="space-y-2 border-t border-amber-200 bg-white px-4 py-3">
+          {matchedPending.length > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={async () => {
+                  for (const ip of matchedPending) {
+                    await onResolve(ip.id, ip.partnerId!, 'confirmed');
+                  }
+                }}
+                className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+              >
+                Confirm All Matched ({matchedPending.length})
+              </button>
+            </div>
+          )}
+          {intakePartners.map((ip) => (
+            <IntakePartnerRow
+              key={ip.id}
+              ip={ip}
+              allPartners={partners}
+              loading={loading}
+              onResolve={onResolve}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AssignPartnerStep({
   job,
   partner,
@@ -300,9 +389,24 @@ function AssignPartnerStep({
       {/* Multi-partner: interactive intake partner resolution */}
       {job.isMultiPartner && intakePartners.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-gray-800">
-            Operating Brands ({intakePartners.length})
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-800">
+              Operating Brands ({intakePartners.length})
+            </h3>
+            {pendingIntakePartners.filter(ip => ip.partnerId).length > 0 && (
+              <button
+                onClick={async () => {
+                  const matched = pendingIntakePartners.filter(ip => ip.partnerId);
+                  for (const ip of matched) {
+                    await onResolveIntakePartner(ip.id, ip.partnerId!, 'confirmed');
+                  }
+                }}
+                className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
+              >
+                Confirm All Matched ({pendingIntakePartners.filter(ip => ip.partnerId).length})
+              </button>
+            )}
+          </div>
           {intakePartners.map((ip) => (
             <IntakePartnerRow
               key={ip.id}
@@ -967,6 +1071,7 @@ function ReviewDevicesStep({
   onFieldUpdate,
   onRefreshJob,
   onNext,
+  onResolveIntakePartner,
   actionError,
   busy,
 }: {
@@ -983,6 +1088,7 @@ function ReviewDevicesStep({
   ) => void;
   onRefreshJob: () => void;
   onNext: () => void;
+  onResolveIntakePartner: (intakePartnerId: string, partnerId: string, reviewStatus: string) => void;
   actionError: string | null;
   busy: boolean;
 }) {
@@ -1096,6 +1202,12 @@ function ReviewDevicesStep({
           <AlertTriangle className="h-5 w-5 text-red-500" />
           <p className="text-sm text-red-700">{extractError}</p>
         </div>
+      )}
+      {job.isMultiPartner && (
+        <IntakePartnerPanel
+          intakePartners={intakePartners}
+          onResolve={onResolveIntakePartner}
+        />
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1389,6 +1501,7 @@ function SignOffStep({
   intakePartners,
   onConfirm,
   onBack,
+  onResolveIntakePartner,
   actionError,
   busy,
 }: {
@@ -1398,6 +1511,7 @@ function SignOffStep({
   intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
   onConfirm: () => void;
   onBack: () => void;
+  onResolveIntakePartner: (intakePartnerId: string, partnerId: string, reviewStatus: string) => void;
   actionError: string | null;
   busy: boolean;
 }) {
@@ -1416,9 +1530,15 @@ function SignOffStep({
   const multiPartnerReady = job.isMultiPartner &&
     intakePartners.length > 0 &&
     intakePartners.every(ip => ip.reviewStatus !== 'pending');
+  const pendingIntakePartnerCount = job.isMultiPartner
+    ? intakePartners.filter(ip => ip.reviewStatus === 'pending').length
+    : 0;
 
   const canCommit =
-    pending.length === 0 && !hasUnresolvedConflicts && (partner != null || multiPartnerReady);
+    pending.length === 0 &&
+    !hasUnresolvedConflicts &&
+    (partner != null || multiPartnerReady) &&
+    pendingIntakePartnerCount === 0;
 
   return (
     <div className="space-y-5">
@@ -1508,15 +1628,24 @@ function SignOffStep({
         </div>
       )}
 
-      {!canCommit && (
+      {!canCommit && pendingIntakePartnerCount === 0 && (
         <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          {pending.length > 0
-            ? `${pending.length} device${pending.length !== 1 ? 's' : ''} still pending review.`
-            : hasUnresolvedConflicts
-              ? 'Some conflicts are still unresolved.'
-              : 'A partner must be assigned before importing.'}
+          <span>
+            {pending.length > 0
+              ? `${pending.length} device${pending.length !== 1 ? 's' : ''} still pending review.`
+              : hasUnresolvedConflicts
+                ? 'Some conflicts are still unresolved.'
+                : 'A partner must be assigned before importing.'}
+          </span>
         </div>
+      )}
+
+      {job.isMultiPartner && pendingIntakePartnerCount > 0 && (
+        <IntakePartnerPanel
+          intakePartners={intakePartners}
+          onResolve={onResolveIntakePartner}
+        />
       )}
 
       {actionError && (
@@ -1978,6 +2107,7 @@ export default function QuestionnaireReviewPage() {
             onFieldUpdate={handleFieldUpdate}
             onRefreshJob={loadReview}
             onNext={advanceFromStep2}
+            onResolveIntakePartner={handleResolveIntakePartner}
             actionError={actionError}
             busy={busy}
           />
@@ -2002,6 +2132,7 @@ export default function QuestionnaireReviewPage() {
             intakePartners={intakePartners}
             onConfirm={handleConfirmImport}
             onBack={goBackFromStep4}
+            onResolveIntakePartner={handleResolveIntakePartner}
             actionError={actionError}
             busy={busy}
           />

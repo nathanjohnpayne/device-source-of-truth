@@ -21,7 +21,7 @@ export type PartnerKeyRegion = 'APAC' | 'EMEA' | 'LATAM' | 'DOMESTIC' | 'GLOBAL'
 
 export type AlertStatus = 'open' | 'dismissed';
 
-export type AlertDismissReason = 'Test Device' | 'Duplicate Key' | 'Will Register' | 'Internal / Deprecated';
+export type AlertDismissReason = 'Test Device' | 'Duplicate Key' | 'Will Register' | 'Internal / Deprecated' | 'Device Registered' | 'Key Created';
 
 export type AuditEntityType =
   | 'partner'
@@ -162,6 +162,8 @@ export type PartnerDetectionMethod = 'filename' | 'content' | 'ai' | 'admin';
 
 export type ExtractionMethod = 'ai' | 'rule_based' | 'skipped' | 'admin_override';
 
+export type ExtractionStatus = 'pending' | 'processing' | 'complete' | 'failed';
+
 export type ConflictStatus =
   | 'new_field'
   | 'matches_existing'
@@ -224,6 +226,7 @@ export interface QuestionnaireStagedDevice {
   confirmedModelNumber: string | null;
   confirmedManufacturer: string | null;
   confirmedDeviceType: DeviceType | null;
+  extractionStatus: ExtractionStatus | null;
   extractionError: string | null;
   createdAt: Timestamp;
 }

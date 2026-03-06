@@ -54,6 +54,7 @@ export type {
   PlatformType,
   PartnerDetectionMethod,
   ExtractionMethod,
+  ExtractionStatus,
   ConflictStatus,
   FieldResolution,
   StagedDeviceReviewStatus,
