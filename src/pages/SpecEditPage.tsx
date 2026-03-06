@@ -21,6 +21,9 @@ import type { QuestionnaireFieldDef, QuestionnaireSectionDef } from '../lib/ques
 import type { SaveDeviceSpecRequest } from '@dst/contracts';
 import type { SpecCategory } from '../lib/types';
 
+const MAX_QUESTIONNAIRE_SIZE = 20 * 1024 * 1024;
+const ACCEPTED_EXTENSIONS = ['.xlsx', '.xls'];
+
 function countFilledFields(obj: Record<string, unknown>): number {
   return Object.values(obj).filter((v) => v !== null && v !== undefined && v !== '').length;
 }
@@ -277,12 +280,13 @@ function SpecEditForm() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savePhase, setSavePhase] = useState<'idle' | 'saving' | 'uploading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState('');
   const [formData, setFormData] = useState<Record<string, Record<string, unknown>>>(buildEmptySpec());
   const [questionnaireUrl, setQuestionnaireUrl] = useState('');
   const [questionnaireFile, setQuestionnaireFile] = useState<File | null>(null);
+  const [partnerId, setPartnerId] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const initialData = useRef<string>('');
@@ -307,6 +311,7 @@ function SpecEditForm() {
         const device = await api.devices.get(deviceId);
         setDeviceName(device.displayName);
         setQuestionnaireUrl(device.questionnaireUrl ?? '');
+        setPartnerId(device.partner?.id ?? device.partnerKey?.partnerId ?? null);
 
         if (device.spec) {
           const { id: _id, deviceId: _did, updatedAt: _u, ...rest } = device.spec;
@@ -347,6 +352,27 @@ function SpecEditForm() {
     [],
   );
 
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    if (file) {
+      const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+      if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+        setError('Only .xlsx and .xls files are accepted.');
+        setQuestionnaireFile(null);
+        e.target.value = '';
+        return;
+      }
+      if (file.size > MAX_QUESTIONNAIRE_SIZE) {
+        setError('File must be under 20 MB.');
+        setQuestionnaireFile(null);
+        e.target.value = '';
+        return;
+      }
+      setError(null);
+    }
+    setQuestionnaireFile(file);
+  }, []);
+
   const { filledTotal, totalFields, completionPct } = useMemo(() => {
     let filled = 0;
     let total = 0;
@@ -364,7 +390,7 @@ function SpecEditForm() {
 
   const handleSave = async () => {
     if (!deviceId) return;
-    setSaving(true);
+    setSavePhase('saving');
     setError(null);
 
     try {
@@ -377,11 +403,29 @@ function SpecEditForm() {
       setIsDirty(false);
       initialData.current = JSON.stringify(formData);
       trackEvent('spec_form_save', { device_id: deviceId, category: 'all' });
-      navigate(`/devices/${deviceId}`);
     } catch {
       setError('Failed to save specifications. Please try again.');
-    } finally {
-      setSaving(false);
+      setSavePhase('idle');
+      return;
+    }
+
+    if (questionnaireFile) {
+      setSavePhase('uploading');
+      try {
+        const job = await api.questionnaireIntake.upload(questionnaireFile, {
+          partnerId: partnerId ?? undefined,
+          aiExtraction: false,
+        });
+        trackEvent('questionnaire_upload', { device_id: job.id });
+        navigate(`/admin/questionnaires/${job.id}`);
+      } catch {
+        setError(
+          'Specs saved, but questionnaire upload failed. Click Save to retry, or upload from the Questionnaires page.',
+        );
+        setSavePhase('idle');
+      }
+    } else {
+      navigate(`/devices/${deviceId}`);
     }
   };
 
@@ -413,11 +457,11 @@ function SpecEditForm() {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={savePhase !== 'idle'}
             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
-            {saving ? 'Saving…' : 'Save'}
+            {savePhase === 'uploading' ? 'Uploading…' : savePhase === 'saving' ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
@@ -468,14 +512,15 @@ function SpecEditForm() {
             />
           </div>
           <div>
-            <label className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
+            <label htmlFor="questionnaire-file" className="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
               <Upload className="h-3.5 w-3.5" />
               Upload Questionnaire File
             </label>
             <input
+              id="questionnaire-file"
               type="file"
-              accept=".pdf,.xls,.xlsx"
-              onChange={(e) => setQuestionnaireFile(e.target.files?.[0] ?? null)}
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
               className="w-full text-sm text-gray-500 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
             />
             {questionnaireFile && (
@@ -511,11 +556,15 @@ function SpecEditForm() {
         </button>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={savePhase !== 'idle'}
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
-          {saving ? 'Saving…' : 'Save Specifications'}
+          {savePhase === 'uploading'
+            ? 'Uploading questionnaire…'
+            : savePhase === 'saving'
+              ? 'Saving…'
+              : 'Save Specifications'}
         </button>
       </div>
 
