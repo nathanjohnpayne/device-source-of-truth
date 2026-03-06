@@ -11,12 +11,13 @@ router.get('/dashboard', async (req, res) => {
     const db = admin.firestore();
     req.log?.debug('Generating dashboard report');
 
-    const [devicesSnap, alertsSnap, keysSnap, partnersSnap, tiersSnap] = await Promise.all([
+    const [devicesSnap, alertsSnap, keysSnap, partnersSnap, tiersSnap, latestUploadSnap] = await Promise.all([
       db.collection('devices').get(),
       db.collection('alerts').where('status', '==', 'open').get(),
       db.collection('partnerKeys').get(),
       db.collection('partners').get(),
       db.collection('hardwareTiers').get(),
+      db.collection('uploadHistory').orderBy('uploadedAt', 'desc').limit(1).get(),
     ]);
 
     req.log?.debug('Dashboard data loaded', {
@@ -132,10 +133,15 @@ router.get('/dashboard', async (req, res) => {
       openAlerts: alertsSnap.size,
     });
 
+    const importTimeRange: string | null = latestUploadSnap.empty
+      ? null
+      : (latestUploadSnap.docs[0].data().importTimeRange as string) ?? null;
+
     res.json({
       totalDevices,
       totalActiveDevices,
       lastTelemetryAt: latestTelemetryAt,
+      importTimeRange,
       specCoverageWeighted,
       certifiedCount,
       pendingCount,

@@ -1207,6 +1207,7 @@ export const DashboardReportResponseSchema = z.object({
   totalDevices: z.number(),
   totalActiveDevices: z.number(),
   lastTelemetryAt: timestamp.nullable().optional(),
+  importTimeRange: z.string().nullable().optional(),
   specCoverageWeighted: z.number(),
   certifiedCount: z.number(),
   pendingCount: z.number(),

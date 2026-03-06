@@ -20,6 +20,7 @@ interface DashboardData {
   totalActiveDevices: number;
   totalDevices: number;
   lastTelemetryAt: string | null;
+  importTimeRange: string | null;
   specCoverageWeighted: number;
   certifiedCount: number;
   pendingCount: number;
@@ -101,6 +102,7 @@ export default function DashboardPage() {
           totalActiveDevices: res.totalActiveDevices ?? 0,
           totalDevices: res.totalDevices ?? 0,
           lastTelemetryAt: res.lastTelemetryAt ?? null,
+          importTimeRange: res.importTimeRange ?? null,
           specCoverageWeighted: res.specCoverageWeighted ?? 0,
           certifiedCount: res.certifiedCount ?? 0,
           pendingCount: res.pendingCount ?? 0,
@@ -148,7 +150,7 @@ export default function DashboardPage() {
           label="Total Active Devices"
           value={data.totalActiveDevices ?? 0}
         >
-          <FreshnessBadge lastTelemetryAt={data.lastTelemetryAt} />
+          <FreshnessBadge lastTelemetryAt={data.lastTelemetryAt} importTimeRange={data.importTimeRange} />
         </KpiCard>
         <KpiCard
           icon={<Cpu className="h-5 w-5" />}
@@ -312,7 +314,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-400">
                       {(r.deviceCount ?? 0).toLocaleString()} devices registered
                     </p>
-                    <FreshnessBadge lastTelemetryAt={r.lastTelemetryAt} />
+                    <FreshnessBadge lastTelemetryAt={r.lastTelemetryAt} importTimeRange={data.importTimeRange} />
                   </div>
                 </div>
               );
