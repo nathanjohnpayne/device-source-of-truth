@@ -37,6 +37,8 @@ export type AuditEntityType =
   | 'intakeRequest'
   | 'partnerAlias'
   | 'questionnaireIntake'
+  | 'questionnaire_intake_partner'
+  | 'questionnaire_staged_device_partner'
   | 'system';
 
 export type Timestamp = string;
@@ -67,6 +69,7 @@ export const AuditEntityTypeSchema = z.enum([
   'partner', 'partnerKey', 'device', 'deviceSpec', 'deployment',
   'device_partner_deployment', 'hardwareTier', 'alert', 'user',
   'fieldOption', 'intakeRequest', 'partnerAlias', 'questionnaireIntake',
+  'questionnaire_intake_partner', 'questionnaire_staged_device_partner',
   'system',
 ]);
 

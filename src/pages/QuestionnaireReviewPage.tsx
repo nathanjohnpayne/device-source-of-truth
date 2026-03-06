@@ -26,6 +26,7 @@ import type {
   QuestionnaireIntakeJob,
   QuestionnaireStagedDevice,
   QuestionnaireStagedField,
+  QuestionnaireStagedDevicePartner,
   PartnerWithStats,
 } from '../lib/types';
 import { SPEC_CATEGORY_LABELS } from '../lib/types';
@@ -33,6 +34,7 @@ import type { SpecCategory, DeviceType } from '@dst/contracts';
 
 type StagedDeviceWithFields = QuestionnaireStagedDevice & {
   fields: QuestionnaireStagedField[];
+  partnerDeployments?: QuestionnaireStagedDevicePartner[];
 };
 
 const DEVICE_TYPES: DeviceType[] = [
@@ -930,9 +932,9 @@ function ReviewDevicesStep({
               onFieldUpdate={onFieldUpdate}
               busy={busy}
             />
-            {job.isMultiPartner && (d as unknown as { partnerDeployments?: import('../lib/types').QuestionnaireStagedDevicePartner[] }).partnerDeployments && (
+            {job.isMultiPartner && d.partnerDeployments && d.partnerDeployments.length > 0 && (
               <DeployedByTable
-                deployments={(d as unknown as { partnerDeployments: import('../lib/types').QuestionnaireStagedDevicePartner[] }).partnerDeployments}
+                deployments={d.partnerDeployments}
                 intakePartners={intakePartners}
               />
             )}
@@ -1171,6 +1173,7 @@ function SignOffStep({
   job,
   devices,
   partner,
+  intakePartners,
   onConfirm,
   onBack,
   actionError,
@@ -1179,6 +1182,7 @@ function SignOffStep({
   job: QuestionnaireIntakeJob;
   devices: StagedDeviceWithFields[];
   partner: { id: string; displayName: string } | null;
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
   onConfirm: () => void;
   onBack: () => void;
   actionError: string | null;
@@ -1196,8 +1200,12 @@ function SignOffStep({
     ),
   );
 
+  const multiPartnerReady = job.isMultiPartner &&
+    intakePartners.length > 0 &&
+    intakePartners.every(ip => ip.reviewStatus === 'confirmed');
+
   const canCommit =
-    pending.length === 0 && !hasUnresolvedConflicts && partner != null;
+    pending.length === 0 && !hasUnresolvedConflicts && (partner != null || multiPartnerReady);
 
   return (
     <div className="space-y-5">
@@ -1749,6 +1757,7 @@ export default function QuestionnaireReviewPage() {
             job={job}
             devices={devices}
             partner={partner}
+            intakePartners={intakePartners}
             onConfirm={handleConfirmImport}
             onBack={goBackFromStep4}
             actionError={actionError}

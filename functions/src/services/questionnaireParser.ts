@@ -46,6 +46,7 @@ export interface DetectedIntakePartner {
   detectionSource: IntakePartnerDetectionSource;
   matchConfidence: number | null;
   matchMethod: IntakePartnerMatchMethod | null;
+  deviceCount: number;
 }
 
 export interface DetectedDevicePartnerLink {
@@ -562,6 +563,7 @@ export async function detectMultiPartnerSignals(
       detectionSource,
       matchConfidence,
       matchMethod,
+      deviceCount: 0,
     });
     partnerNameIndex.set(key, idx);
     return idx;
@@ -610,14 +612,12 @@ export async function detectMultiPartnerSignals(
   const uniqueBrands = new Set(intakePartners.map(p => p.rawDetectedName.toLowerCase().trim()));
   const isMultiPartner = uniqueBrands.size >= 2;
 
-  // Update device counts per intake partner
   for (const ip of intakePartners) {
     const idx = intakePartners.indexOf(ip);
     const deviceCols = new Set(
       devicePartnerLinks.filter(l => l.intakePartnerIndex === idx).map(l => l.deviceColumnIndex),
     );
-    ip.detectionSource = ip.detectionSource; // keep original
-    (ip as { deviceCount?: number }).deviceCount = deviceCols.size;
+    ip.deviceCount = deviceCols.size;
   }
 
   log.info('Multi-partner detection complete', {
@@ -667,7 +667,7 @@ export async function parseQuestionnaire(
   let intakePartners: DetectedIntakePartner[] = [];
   let devicePartnerLinks: DetectedDevicePartnerLink[] = [];
 
-  if (format === 'lg_stb_v1_2' || hasCertsSheet(workbook.SheetNames)) {
+  if (format === 'lg_stb_v1_2') {
     try {
       const signals = await detectMultiPartnerSignals(workbook, sheet, format, devices, db);
       isMultiPartner = signals.isMultiPartner;

@@ -102,7 +102,7 @@ export default function PartnerDetailPage() {
   const [savingKey, setSavingKey] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState<PartnerKey | null>(null);
   const [toggling, setToggling] = useState(false);
-  const [partnerDeployments, setPartnerDeployments] = useState<(import('../lib/types').DevicePartnerDeployment & { deviceDisplayName?: string })[]>([]);
+  const [partnerDeployments, setPartnerDeployments] = useState<(import('../lib/types').DevicePartnerDeployment & { deviceDisplayName?: string; jobFileName?: string })[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -445,7 +445,7 @@ export default function PartnerDetailPage() {
             <h2 className="text-lg font-semibold text-gray-900">Deployed Devices</h2>
             <span className="text-sm text-gray-500">({partnerDeployments.length})</span>
           </div>
-          <DataTable<typeof partnerDeployments[number]>
+            <DataTable<typeof partnerDeployments[number]>
             columns={[
               { header: 'Device', accessor: 'deviceDisplayName', sortable: true,
                 render: (row) => (
@@ -456,12 +456,18 @@ export default function PartnerDetailPage() {
                     {row.deviceDisplayName ?? row.deviceId}
                   </button>
                 )},
+              { header: 'Consumer Name', accessor: 'partnerModelName',
+                render: (row) => row.partnerModelName ?? '—' },
               { header: 'Markets', accessor: 'countries',
                 render: (row) => row.countries?.length ? row.countries.join(', ') : '—' },
               { header: 'Cert Status', accessor: 'certificationStatus',
                 render: (row) => row.certificationStatus ? row.certificationStatus.replace(/_/g, ' ') : '—' },
               { header: 'ADK', accessor: 'certificationAdkVersion',
                 render: (row) => row.certificationAdkVersion ?? '—' },
+              { header: 'Source', accessor: 'jobFileName',
+                render: (row) => row.jobFileName ? (
+                  <span className="text-xs text-gray-500" title={row.jobFileName}>{row.jobFileName}</span>
+                ) : '—' },
               { header: 'Active', accessor: 'active',
                 render: (row) => row.active ? (
                   <Badge variant="success">Active</Badge>

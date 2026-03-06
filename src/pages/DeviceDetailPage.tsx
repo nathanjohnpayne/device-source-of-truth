@@ -218,7 +218,7 @@ export default function DeviceDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [questionnaireSources, setQuestionnaireSources] = useState<(DeviceQuestionnaireSource & { jobFileName?: string })[]>([]);
-  const [partnerDeployments, setPartnerDeployments] = useState<(import('../lib/types').DevicePartnerDeployment & { partnerName?: string })[]>([]);
+  const [partnerDeployments, setPartnerDeployments] = useState<(import('../lib/types').DevicePartnerDeployment & { partnerName?: string; jobFileName?: string })[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     displayName: '',
@@ -569,12 +569,18 @@ export default function DeviceDetailPage() {
               columns={[
                 { header: 'Partner', accessor: 'partnerName', sortable: true,
                   render: (row) => <span className="font-medium text-gray-900">{row.partnerName ?? '—'}</span> },
+                { header: 'Consumer Name', accessor: 'partnerModelName',
+                  render: (row) => row.partnerModelName ?? '—' },
                 { header: 'Markets', accessor: 'countries',
                   render: (row) => row.countries?.length ? row.countries.join(', ') : '—' },
                 { header: 'Cert Status', accessor: 'certificationStatus',
                   render: (row) => row.certificationStatus ? row.certificationStatus.replace(/_/g, ' ') : '—' },
                 { header: 'ADK Version', accessor: 'certificationAdkVersion',
                   render: (row) => row.certificationAdkVersion ?? '—' },
+                { header: 'Source', accessor: 'jobFileName',
+                  render: (row) => row.jobFileName ? (
+                    <span className="text-xs text-gray-500" title={row.jobFileName}>{row.jobFileName}</span>
+                  ) : '—' },
                 { header: 'Active', accessor: 'active',
                   render: (row) => row.active ? (
                     <Badge variant="success">Active</Badge>
