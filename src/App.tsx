@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useState, Component, type ReactNode } from 'react';
 import {
-  BrowserRouter,
-  Routes,
-  Route,
+  createBrowserRouter,
+  RouterProvider,
   Navigate,
+  Outlet,
   useLocation,
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -86,19 +86,11 @@ const IntakeImportPage = lazyRetry(() => import('./pages/IntakeImportPage'));
 const PartnerKeyRegistryPage = lazyRetry(() => import('./pages/PartnerKeyRegistryPage'));
 const DangerZonePage = lazyRetry(() => import('./pages/DangerZonePage'));
 const VersionRegistryPage = lazyRetry(() => import('./pages/VersionRegistryPage'));
+const UserManagementPage = lazyRetry(() => import('./pages/UserManagementPage'));
 const QuestionnaireQueuePage = lazyRetry(() => import('./pages/QuestionnaireQueuePage'));
 const QuestionnaireUploadPage = lazyRetry(() => import('./pages/QuestionnaireUploadPage'));
 const QuestionnaireDetailPage = lazyRetry(() => import('./pages/QuestionnaireDetailPage'));
 const QuestionnaireReviewPage = lazyRetry(() => import('./pages/QuestionnaireReviewPage'));
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-
-  if (loading) return <LoadingSpinner className="min-h-screen" />;
-  if (!user) return <Navigate to="/login" replace />;
-
-  return <>{children}</>;
-}
 
 function EditorRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isEditor } = useAuth();
@@ -159,193 +151,128 @@ function OnboardingGate() {
   return <WelcomeModal open={showOnboarding} onClose={handleClose} />;
 }
 
-function AppRoutes() {
+function RootLayout() {
   return (
-    <>
+    <AuthProvider>
       <PageViewTracker />
       <OnboardingGate />
       <Suspense fallback={<LoadingSpinner className="min-h-screen" />}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-
-          <Route
-            element={
-              <ProtectedRoute>
-                <ImportPrerequisiteProvider>
-                  <AppShell />
-                </ImportPrerequisiteProvider>
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<DashboardPage />} />
-            <Route path="devices" element={<DeviceListPage />} />
-            <Route
-              path="devices/new"
-              element={
-                <EditorRoute>
-                  <DeviceCreatePage />
-                </EditorRoute>
-              }
-            />
-            <Route path="devices/:id" element={<DeviceDetailPage />} />
-            <Route
-              path="devices/:id/specs/edit"
-              element={
-                <EditorRoute>
-                  <SpecEditPage />
-                </EditorRoute>
-              }
-            />
-            <Route path="partners" element={<PartnerListPage />} />
-            <Route path="partners/:id" element={<PartnerDetailPage />} />
-            <Route path="tiers" element={<TierBrowserPage />} />
-            <Route
-              path="tiers/configure"
-              element={
-                <AdminRoute>
-                  <TierConfigPage />
-                </AdminRoute>
-              }
-            />
-            <Route path="tiers/simulate" element={<SimulatorPage />} />
-            <Route path="reports/coverage" element={<SpecCoveragePage />} />
-            <Route
-              path="admin"
-              element={
-                <AdminRoute>
-                  <AdminPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/upload"
-              element={
-                <AdminRoute>
-                  <TelemetryUploadPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/alerts"
-              element={
-                <AdminRoute>
-                  <AlertsPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/audit"
-              element={
-                <AdminRoute>
-                  <AuditLogPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/migration"
-              element={
-                <AdminRoute>
-                  <MigrationPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/readiness"
-              element={
-                <AdminRoute>
-                  <ReadinessPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/reference-data"
-              element={
-                <AdminRoute>
-                  <ReferenceDataPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/partner-keys"
-              element={
-                <AdminRoute>
-                  <PartnerKeyRegistryPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/intake-import"
-              element={
-                <AdminRoute>
-                  <IntakeImportPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/questionnaires"
-              element={
-                <ProtectedRoute>
-                  <QuestionnaireQueuePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="admin/questionnaires/upload"
-              element={
-                <EditorRoute>
-                  <QuestionnaireUploadPage />
-                </EditorRoute>
-              }
-            />
-            <Route
-              path="admin/questionnaires/:id"
-              element={
-                <ProtectedRoute>
-                  <QuestionnaireDetailPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="admin/questionnaires/:id/review"
-              element={
-                <AdminRoute>
-                  <QuestionnaireReviewPage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/danger-zone"
-              element={
-                <AdminRoute>
-                  <DangerZonePage />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="admin/version-registry"
-              element={
-                <AdminRoute>
-                  <VersionRegistryPage />
-                </AdminRoute>
-              }
-            />
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Outlet />
       </Suspense>
-    </>
+    </AuthProvider>
   );
 }
+
+function ProtectedLayout() {
+  const { user, loading } = useAuth();
+
+  if (loading) return <LoadingSpinner className="min-h-screen" />;
+  if (!user) return <Navigate to="/login" replace />;
+
+  return (
+    <ImportPrerequisiteProvider>
+      <AppShell />
+    </ImportPrerequisiteProvider>
+  );
+}
+
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      { path: 'login', element: <LoginPage /> },
+      {
+        element: <ProtectedLayout />,
+        children: [
+          { index: true, element: <DashboardPage /> },
+          { path: 'devices', element: <DeviceListPage /> },
+          {
+            path: 'devices/new',
+            element: <EditorRoute><DeviceCreatePage /></EditorRoute>,
+          },
+          { path: 'devices/:id', element: <DeviceDetailPage /> },
+          {
+            path: 'devices/:id/specs/edit',
+            element: <EditorRoute><SpecEditPage /></EditorRoute>,
+          },
+          { path: 'partners', element: <PartnerListPage /> },
+          { path: 'partners/:id', element: <PartnerDetailPage /> },
+          { path: 'tiers', element: <TierBrowserPage /> },
+          {
+            path: 'tiers/configure',
+            element: <AdminRoute><TierConfigPage /></AdminRoute>,
+          },
+          { path: 'tiers/simulate', element: <SimulatorPage /> },
+          { path: 'reports/coverage', element: <SpecCoveragePage /> },
+          {
+            path: 'admin',
+            element: <AdminRoute><AdminPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/upload',
+            element: <AdminRoute><TelemetryUploadPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/alerts',
+            element: <AdminRoute><AlertsPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/audit',
+            element: <AdminRoute><AuditLogPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/migration',
+            element: <AdminRoute><MigrationPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/readiness',
+            element: <AdminRoute><ReadinessPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/reference-data',
+            element: <AdminRoute><ReferenceDataPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/partner-keys',
+            element: <AdminRoute><PartnerKeyRegistryPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/intake-import',
+            element: <AdminRoute><IntakeImportPage /></AdminRoute>,
+          },
+          { path: 'admin/questionnaires', element: <QuestionnaireQueuePage /> },
+          {
+            path: 'admin/questionnaires/upload',
+            element: <EditorRoute><QuestionnaireUploadPage /></EditorRoute>,
+          },
+          { path: 'admin/questionnaires/:id', element: <QuestionnaireDetailPage /> },
+          {
+            path: 'admin/questionnaires/:id/review',
+            element: <AdminRoute><QuestionnaireReviewPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/users',
+            element: <AdminRoute><UserManagementPage /></AdminRoute>,
+          },
+          {
+            path: 'admin/danger-zone',
+            element: <AdminRoute><DangerZonePage /></AdminRoute>,
+          },
+          {
+            path: 'admin/version-registry',
+            element: <AdminRoute><VersionRegistryPage /></AdminRoute>,
+          },
+        ],
+      },
+      { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
+]);
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </ErrorBoundary>
   );
 }

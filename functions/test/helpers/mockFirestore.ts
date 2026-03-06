@@ -221,6 +221,34 @@ export class MockBatch {
   }
 }
 
+export class MockTransaction {
+  private ops: Array<() => Promise<void>> = [];
+
+  async get(ref: MockDocRef): Promise<MockDocSnapshot>;
+  async get(ref: MockCollectionRef): Promise<MockQuerySnapshot>;
+  async get(ref: MockDocRef | MockCollectionRef): Promise<MockDocSnapshot | MockQuerySnapshot> {
+    return ref.get();
+  }
+
+  update(ref: MockDocRef, data: DocData): void {
+    this.ops.push(() => ref.update(data));
+  }
+
+  set(ref: MockDocRef, data: DocData, options?: { merge?: boolean }): void {
+    this.ops.push(() => ref.set(data, options));
+  }
+
+  delete(ref: MockDocRef): void {
+    this.ops.push(() => ref.delete());
+  }
+
+  async _commit(): Promise<void> {
+    for (const op of this.ops) {
+      await op();
+    }
+  }
+}
+
 export class MockFirestoreDB {
   private store: Map<string, Map<string, DocData>> = new Map();
 
@@ -230,6 +258,13 @@ export class MockFirestoreDB {
 
   batch(): MockBatch {
     return new MockBatch();
+  }
+
+  async runTransaction<T>(fn: (txn: MockTransaction) => Promise<T>): Promise<T> {
+    const txn = new MockTransaction();
+    const result = await fn(txn);
+    await txn._commit();
+    return result;
   }
 
   seed(collectionName: string, docs: Array<{ id: string; [k: string]: unknown }>) {

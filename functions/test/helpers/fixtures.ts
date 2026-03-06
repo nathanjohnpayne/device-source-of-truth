@@ -197,6 +197,18 @@ export const fixtures = {
       displayName: 'Test User',
       photoUrl: null,
       lastLogin: NOW,
+      updatedAt: null,
+      updatedBy: null,
+    },
+    {
+      id: 'user-2',
+      email: 'viewer@disney.com',
+      role: 'viewer',
+      displayName: 'Viewer User',
+      photoUrl: null,
+      lastLogin: NOW,
+      updatedAt: null,
+      updatedBy: null,
     },
   ],
 

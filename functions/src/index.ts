@@ -23,6 +23,7 @@ import disambiguateRouter from './routes/disambiguate.js';
 import versionMappingsRouter from './routes/versionMappings.js';
 import partnerAliasesRouter from './routes/partnerAliases.js';
 import questionnaireIntakeRouter from './routes/questionnaireIntake.js';
+import usersRouter from './routes/users.js';
 import type { ExtractionTaskPayload } from './types/index.js';
 
 admin.initializeApp();
@@ -52,6 +53,7 @@ app.use('/api/import/disambiguate', disambiguateRouter);
 app.use('/api/version-mappings', versionMappingsRouter);
 app.use('/api/partner-aliases', partnerAliasesRouter);
 app.use('/api/questionnaire-intake', questionnaireIntakeRouter);
+app.use('/api/users', usersRouter);
 
 app.use(
   (

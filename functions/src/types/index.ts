@@ -100,6 +100,8 @@ export interface User {
   displayName: string;
   photoUrl: string | null;
   lastLogin: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
 }
 
 // ── Partner Key Import ──

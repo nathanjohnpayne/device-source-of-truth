@@ -25,6 +25,7 @@ import {
   Check,
   Menu,
   X,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useImportPrerequisites } from '../../hooks/useImportPrerequisites';
@@ -129,6 +130,12 @@ const NAV_SECTIONS: NavSection[] = [
     heading: 'Admin',
     adminOnly: true,
     items: [
+      {
+        label: 'Users',
+        path: '/admin/users',
+        icon: <Users className="h-5 w-5" />,
+        adminOnly: true,
+      },
       {
         label: 'Alerts',
         path: '/admin/alerts',
