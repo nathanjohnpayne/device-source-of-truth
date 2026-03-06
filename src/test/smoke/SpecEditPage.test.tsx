@@ -104,7 +104,7 @@ describe('SpecEditPage questionnaire upload', () => {
 
     expect(mockUpload).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'test.xlsx' }),
-      { partnerId: 'p1', aiExtraction: false },
+      { submitterPartnerId: 'p1', aiExtraction: false },
     );
   });
 
@@ -154,7 +154,7 @@ describe('SpecEditPage questionnaire upload', () => {
     await waitFor(() => {
       expect(mockUpload).toHaveBeenCalledWith(
         expect.anything(),
-        { partnerId: undefined, aiExtraction: false },
+        { submitterPartnerId: undefined, aiExtraction: false },
       );
     });
   });

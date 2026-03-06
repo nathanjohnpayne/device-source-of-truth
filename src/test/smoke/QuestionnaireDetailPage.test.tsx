@@ -45,9 +45,9 @@ const minimalJobDetail = {
   uploadedBy: 'test-uid',
   uploadedByEmail: 'admin@disney.com',
   uploadedAt: '2026-03-01T00:00:00.000Z',
-  partnerId: null,
-  partnerConfidence: null,
-  partnerDetectionMethod: null,
+  submitterPartnerId: null,
+  submitterConfidence: null,
+  submitterDetectionMethod: null,
   questionnaireFormat: 'unknown',
   deviceCountDetected: 0,
   status: 'awaiting_extraction',
@@ -63,7 +63,8 @@ const minimalJobDetail = {
   createdAt: '2026-03-01T00:00:00.000Z',
   updatedAt: '2026-03-01T00:00:00.000Z',
   stagedDevices: [],
-  partner: null,
+  submitterPartner: null,
+  intakePartners: [],
   extractionProgress: null,
 };
 
@@ -96,8 +97,8 @@ describe('QuestionnaireDetailPage smoke test', () => {
   it('renders with null partner', async () => {
     (api.questionnaireIntake.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       ...minimalJobDetail,
-      partner: null,
-      partnerId: null,
+      submitterPartner: null,
+      submitterPartnerId: null,
     });
 
     renderPage();
@@ -110,8 +111,8 @@ describe('QuestionnaireDetailPage smoke test', () => {
   it('renders with partner assigned', async () => {
     (api.questionnaireIntake.get as ReturnType<typeof vi.fn>).mockResolvedValue({
       ...minimalJobDetail,
-      partnerId: 'p1',
-      partner: { id: 'p1', displayName: 'Acme Devices' },
+      submitterPartnerId: 'p1',
+      submitterPartner: { id: 'p1', displayName: 'Acme Devices' },
     });
 
     renderPage();

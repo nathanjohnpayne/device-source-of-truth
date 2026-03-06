@@ -39,9 +39,9 @@ describe('POST /api/questionnaire-intake', () => {
       .send({ ...validPayload, partnerId: 'p1' })
       .expect(201);
 
-    expect(res.body.partnerId).toBe('p1');
-    expect(res.body.partnerDetectionMethod).toBe('admin');
-    expect(res.body.partnerConfidence).toBe(1.0);
+    expect(res.body.submitterPartnerId).toBe('p1');
+    expect(res.body.submitterDetectionMethod).toBe('admin');
+    expect(res.body.submitterConfidence).toBe(1.0);
   });
 
   it('returns 400 when fileData is missing', async () => {
@@ -133,21 +133,21 @@ describe('GET /api/questionnaire-intake/:id', () => {
     }
   });
 
-  it('includes partner when partnerId is set', async () => {
+  it('includes submitterPartner when partnerId is set', async () => {
     const res = await request(app)
       .get('/api/questionnaire-intake/qj1')
       .expect(200);
 
-    expect(res.body.partner).toBeDefined();
-    expect(res.body.partner.displayName).toBe('Acme Devices');
+    expect(res.body.submitterPartner).toBeDefined();
+    expect(res.body.submitterPartner.displayName).toBe('Acme Devices');
   });
 
-  it('partner is null when partnerId is not set', async () => {
+  it('submitterPartner is null when partnerId is not set', async () => {
     const res = await request(app)
       .get('/api/questionnaire-intake/qj2')
       .expect(200);
 
-    expect(res.body.partner).toBeNull();
+    expect(res.body.submitterPartner).toBeNull();
   });
 
   it('returns 404 for nonexistent job', async () => {
@@ -261,8 +261,8 @@ describe('PATCH /api/questionnaire-intake/:id', () => {
       .send({ partnerId: 'p1' })
       .expect(200);
 
-    expect(res.body.partnerId).toBe('p1');
-    expect(res.body.partnerDetectionMethod).toBe('admin');
+    expect(res.body.submitterPartnerId).toBe('p1');
+    expect(res.body.submitterDetectionMethod).toBe('admin');
   });
 
   it('returns 404 for nonexistent job', async () => {

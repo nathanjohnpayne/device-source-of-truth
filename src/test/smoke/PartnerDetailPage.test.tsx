@@ -15,6 +15,9 @@ vi.mock('../../lib/api', () => ({
     devices: {
       list: vi.fn(),
     },
+    questionnaireIntake: {
+      getPartnerDeployments: vi.fn().mockResolvedValue([]),
+    },
   },
 }));
 

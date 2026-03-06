@@ -17,6 +17,7 @@ vi.mock('../../lib/api', () => ({
       reject: vi.fn(),
       triggerExtraction: vi.fn(),
       get: vi.fn(),
+      updateIntakePartner: vi.fn(),
     },
   },
   ApiError: class ApiError extends Error {
@@ -55,9 +56,10 @@ const minimalJob = {
   uploadedBy: 'test-uid',
   uploadedByEmail: 'admin@disney.com',
   uploadedAt: '2026-03-01T00:00:00.000Z',
-  partnerId: null,
-  partnerConfidence: null,
-  partnerDetectionMethod: null,
+  submitterPartnerId: null,
+  submitterConfidence: null,
+  submitterDetectionMethod: null,
+  isMultiPartner: false,
   questionnaireFormat: 'unknown',
   deviceCountDetected: 0,
   status: 'pending_review',
@@ -73,9 +75,10 @@ const minimalJob = {
 describe('QuestionnaireReviewPage smoke test', () => {
   it('renders Step 1 (Assign Partner) when no partner is assigned', async () => {
     (api.questionnaireIntake.getReview as ReturnType<typeof vi.fn>).mockResolvedValue({
-      job: { ...minimalJob, partnerId: null },
+      job: { ...minimalJob, submitterPartnerId: null },
       devices: [],
-      partner: null,
+      submitterPartner: null,
+      intakePartners: [],
     });
 
     renderPage();
@@ -87,9 +90,10 @@ describe('QuestionnaireReviewPage smoke test', () => {
 
   it('renders Step 2 (Review Devices) when partner is assigned', async () => {
     (api.questionnaireIntake.getReview as ReturnType<typeof vi.fn>).mockResolvedValue({
-      job: { ...minimalJob, partnerId: 'p1' },
+      job: { ...minimalJob, submitterPartnerId: 'p1' },
       devices: [],
-      partner: { id: 'p1', displayName: 'Acme Devices' },
+      submitterPartner: { id: 'p1', displayName: 'Acme Devices' },
+      intakePartners: [],
     });
 
     renderPage();
@@ -101,9 +105,10 @@ describe('QuestionnaireReviewPage smoke test', () => {
 
   it('renders with empty devices array', async () => {
     (api.questionnaireIntake.getReview as ReturnType<typeof vi.fn>).mockResolvedValue({
-      job: { ...minimalJob, partnerId: 'p1' },
+      job: { ...minimalJob, submitterPartnerId: 'p1' },
       devices: [],
-      partner: { id: 'p1', displayName: 'Acme' },
+      submitterPartner: { id: 'p1', displayName: 'Acme' },
+      intakePartners: [],
     });
 
     renderPage();
@@ -115,7 +120,7 @@ describe('QuestionnaireReviewPage smoke test', () => {
 
   it('renders devices with fields', async () => {
     (api.questionnaireIntake.getReview as ReturnType<typeof vi.fn>).mockResolvedValue({
-      job: { ...minimalJob, partnerId: 'p1', deviceCountDetected: 1 },
+      job: { ...minimalJob, submitterPartnerId: 'p1', deviceCountDetected: 1 },
       devices: [
         {
           id: 'qsd1',
@@ -156,7 +161,8 @@ describe('QuestionnaireReviewPage smoke test', () => {
           ],
         },
       ],
-      partner: { id: 'p1', displayName: 'Acme' },
+      submitterPartner: { id: 'p1', displayName: 'Acme' },
+      intakePartners: [],
     });
 
     renderPage();
@@ -182,16 +188,17 @@ describe('QuestionnaireReviewPage smoke test', () => {
     (api.questionnaireIntake.getReview as ReturnType<typeof vi.fn>).mockResolvedValue({
       job: {
         ...minimalJob,
-        partnerId: null,
-        partnerConfidence: null,
-        partnerDetectionMethod: null,
+        submitterPartnerId: null,
+        submitterConfidence: null,
+        submitterDetectionMethod: null,
         questionnaireFormat: 'unknown',
         deviceCountDetected: null,
         extractionError: null,
         notes: null,
       },
       devices: [],
-      partner: null,
+      submitterPartner: null,
+      intakePartners: [],
     });
 
     renderPage();
