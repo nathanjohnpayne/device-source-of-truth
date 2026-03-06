@@ -355,7 +355,7 @@ Deploy auth (managed via 1Password):
 4. **Self-healing auth:** Before deploying, the script exchanges the refresh token with Google's token endpoint. If stale, it automatically runs `gcloud auth application-default login` and updates the 1Password item — no manual `op item edit` needed.
 5. Project ID is auto-detected from `.firebaserc` or passed as an argument. The script does not call `gcloud config set project` or depend on `gcloud auth login` / `firebase login` sessions.
 6. `.env.op` is a legacy fallback — `op-firebase-deploy` does not require it.
-7. A `firebase-deployer` service account exists in the project with deploy roles (`firebase.admin`, `cloudfunctions.admin`, `iam.serviceAccountUser`, `artifactregistry.writer`, `run.admin`). The GCP org policy (`iam.disableServiceAccountKeyCreation`) currently blocks key generation. If the policy is ever lifted, generate a key and store it in 1Password for permanent non-interactive deploys (service account keys never expire).
+7. A `firebase-deployer` service account exists in the project with deploy roles (`firebase.admin`, `cloudfunctions.admin`, `iam.serviceAccountUser`, `artifactregistry.writer`, `run.admin`). Two GCP org policies block service account keys entirely: `iam.disableServiceAccountKeyCreation` (blocks Google-generated keys) and `iam.disableServiceAccountKeyUpload` (blocks user-provided keys). If both policies are ever lifted, generate a key and store it in 1Password for permanent non-interactive deploys (service account keys never expire).
 
 ## Things to Watch Out For
 

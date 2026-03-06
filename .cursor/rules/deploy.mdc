@@ -30,7 +30,7 @@ op-firebase-deploy --only hosting,functions  # any Firebase target combo
 
 The script auto-detects and auto-refreshes stale tokens. No manual intervention is needed — if the token is expired, the script opens a browser for `gcloud auth application-default login` and updates 1Password automatically.
 
-The ADC refresh token has no fixed expiry but is revoked on Google password change, explicit revocation, or 6 months of inactivity. A `firebase-deployer` service account exists in the project with deploy permissions; if the GCP org policy (`iam.disableServiceAccountKeyCreation`) is ever lifted, generate a key for it and store in 1Password for permanent non-interactive deploys.
+The ADC refresh token has no fixed expiry but is revoked on Google password change, explicit revocation, or 6 months of inactivity. A `firebase-deployer` service account exists in the project with deploy permissions; two GCP org policies (`iam.disableServiceAccountKeyCreation` and `iam.disableServiceAccountKeyUpload`) block all service account key creation. If both policies are ever lifted, generate a key and store it in 1Password for permanent non-interactive deploys.
 
 To manually refresh the ADC (should not normally be needed):
 
