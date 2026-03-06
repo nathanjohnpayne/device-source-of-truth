@@ -63,6 +63,79 @@ const SEED_ALIASES: {
     canonicalPartnerName: 'DT',
     notes: 'Abbreviation for Deutsche Telekom used in AllModels Partner column',
   },
+  // DST-055: Liberty Global umbrella organization aliases
+  {
+    alias: 'UK (VMO2)',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Virgin Media',
+    notes: 'Certs sheet label for Virgin Media O2 in LG questionnaires',
+  },
+  {
+    alias: 'NL (Ziggo)',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'VodafoneZiggo',
+    notes: 'Certs sheet label for VodafoneZiggo in LG questionnaires',
+  },
+  {
+    alias: 'BE (Telenet)',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Telenet',
+    notes: 'Certs sheet label for Telenet in LG questionnaires',
+  },
+  {
+    alias: 'VodafoneZiggo NL',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'VodafoneZiggo',
+    notes: 'Model name cell brand mention in LG questionnaires',
+  },
+  {
+    alias: 'Virgin Media UK',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Virgin Media',
+    notes: 'Model name cell brand mention in LG questionnaires',
+  },
+  {
+    alias: 'Virgin Media UK & IE',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Virgin Media',
+    notes: 'Model name cell brand mention covering UK + Ireland in LG questionnaires',
+  },
+  {
+    alias: 'Telenet BE',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Telenet',
+    notes: 'Model name cell brand mention in LG questionnaires',
+  },
+  {
+    alias: 'Sunrise',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Sunrise',
+    notes: 'Swiss LG operating brand',
+  },
+  {
+    alias: 'Sunrise/UPC',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Sunrise',
+    notes: 'Combined brand name for Sunrise (formerly UPC Switzerland)',
+  },
+  {
+    alias: 'UPC CH',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Sunrise',
+    notes: 'Legacy UPC Switzerland brand (now Sunrise)',
+  },
+  {
+    alias: 'UPC PL',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'UPC Poland',
+    notes: 'UPC Poland operating brand in LG questionnaires',
+  },
+  {
+    alias: 'LGI',
+    resolutionType: 'direct',
+    canonicalPartnerName: 'Liberty Global',
+    notes: 'Abbreviation for Liberty Global used in questionnaire content',
+  },
 ];
 
 const MOVISTAR_RULE_PARTNERS = ['Movistar Spain', 'Movistar HispAm'];

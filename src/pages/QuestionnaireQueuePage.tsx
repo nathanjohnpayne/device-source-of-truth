@@ -146,11 +146,12 @@ export default function QuestionnaireQueuePage() {
       ),
     },
     {
-      header: 'Partner',
-      accessor: 'partnerId',
+      header: 'Submitter',
+      accessor: 'submitterPartnerId',
       sortable: true,
       render: (row) => {
-        const name = row.partnerId ? partnerMap.get(row.partnerId) : null;
+        const pid = row.submitterPartnerId;
+        const name = pid ? partnerMap.get(pid) : null;
         if (!name) {
           return (
             <span className="text-amber-600 font-medium">Unassigned</span>

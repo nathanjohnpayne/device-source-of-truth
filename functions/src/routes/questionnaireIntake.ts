@@ -1,5 +1,6 @@
 /**
- * DST-047 + DST-048: Questionnaire Intake, AI Extraction, Review & Sign-Off routes.
+ * DST-047 + DST-048 + DST-055: Questionnaire Intake, AI Extraction,
+ * Multi-Partner Detection, Review & Sign-Off routes.
  */
 
 import { Router } from 'express';
@@ -14,6 +15,89 @@ import { calculateSpecCompleteness } from '../services/specCompleteness.js';
 import { assignTierToDevice } from '../services/tierEngine.js';
 import type { ExtractionStatus } from '../types/index.js';
 
+// ── DST-055: Legacy migration helper ──
+
+async function migrateJobToSubmitterModel(
+  db: FirebaseFirestore.Firestore,
+  jobRef: FirebaseFirestore.DocumentReference,
+  job: FirebaseFirestore.DocumentData,
+): Promise<void> {
+  if (job.submitterPartnerId !== undefined) return;
+  if (!job.partnerId) return;
+
+  const now = new Date().toISOString();
+  const batch = db.batch();
+
+  batch.update(jobRef, {
+    submitterPartnerId: job.partnerId,
+    submitterConfidence: job.partnerConfidence ?? 1.0,
+    submitterDetectionMethod: job.partnerDetectionMethod ?? 'admin',
+    isMultiPartner: false,
+    updatedAt: now,
+  });
+
+  const ipId = db.collection('questionnaireIntakePartners').doc().id;
+  batch.set(db.collection('questionnaireIntakePartners').doc(ipId), {
+    id: ipId,
+    intakeJobId: jobRef.id,
+    partnerId: job.partnerId,
+    rawDetectedName: 'Legacy migration',
+    detectionSource: 'admin',
+    matchConfidence: 1.0,
+    matchMethod: 'admin',
+    reviewStatus: 'confirmed',
+    deviceCount: 0,
+    createdAt: now,
+  });
+
+  const devicesSnap = await db.collection('questionnaireStagedDevices')
+    .where('intakeJobId', '==', jobRef.id)
+    .get();
+
+  for (const dDoc of devicesSnap.docs) {
+    const sdpId = db.collection('questionnaireStagedDevicePartners').doc().id;
+    batch.set(db.collection('questionnaireStagedDevicePartners').doc(sdpId), {
+      id: sdpId,
+      stagedDeviceId: dDoc.id,
+      intakePartnerId: ipId,
+      countries: null,
+      certificationStatus: null,
+      certificationAdkVersion: null,
+      partnerModelName: null,
+      detectionSource: 'admin',
+      reviewStatus: 'confirmed',
+      createdAt: now,
+    });
+  }
+
+  await batch.commit();
+  log.info('Legacy job migrated to submitter model', { jobId: jobRef.id });
+}
+
+function resolveSubmitterId(job: FirebaseFirestore.DocumentData): string | null {
+  return (job.submitterPartnerId as string) ?? (job.partnerId as string) ?? null;
+}
+
+async function fetchIntakePartners(
+  db: FirebaseFirestore.Firestore,
+  jobId: string,
+): Promise<FirebaseFirestore.DocumentData[]> {
+  const snap = await db.collection('questionnaireIntakePartners')
+    .where('intakeJobId', '==', jobId)
+    .get();
+  return snap.docs.map(d => d.data());
+}
+
+async function fetchDevicePartnerLinks(
+  db: FirebaseFirestore.Firestore,
+  stagedDeviceId: string,
+): Promise<FirebaseFirestore.DocumentData[]> {
+  const snap = await db.collection('questionnaireStagedDevicePartners')
+    .where('stagedDeviceId', '==', stagedDeviceId)
+    .get();
+  return snap.docs.map(d => d.data());
+}
+
 const router = Router();
 
 // ── DST-047: Upload ──
@@ -21,7 +105,8 @@ const router = Router();
 router.post('/', requireRole('editor', 'admin'), async (req, res) => {
   try {
     const db = admin.firestore();
-    const { fileData, fileName, partnerId, aiExtraction, notes } = req.body;
+    const { fileData, fileName, aiExtraction, notes } = req.body;
+    const submitterPartnerId = req.body.submitterPartnerId || req.body.partnerId || null;
 
     if (!fileData || !fileName) {
       res.status(400).json({ error: 'fileData and fileName are required' });
@@ -42,9 +127,10 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
       uploadedBy: req.user!.uid,
       uploadedByEmail: req.user!.email,
       uploadedAt: now,
-      partnerId: partnerId || null,
-      partnerConfidence: partnerId ? 1.0 : null,
-      partnerDetectionMethod: partnerId ? 'admin' : null,
+      submitterPartnerId: submitterPartnerId,
+      submitterConfidence: submitterPartnerId ? 1.0 : null,
+      submitterDetectionMethod: submitterPartnerId ? 'admin' : null,
+      isMultiPartner: false,
       questionnaireFormat: 'unknown',
       deviceCountDetected: null,
       status: 'parsing',
@@ -52,6 +138,7 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
       aiExtractionStartedAt: null,
       aiExtractionCompletedAt: null,
       extractionError: null,
+      tasksEnqueued: 0,
       notes: notes || null,
       createdAt: now,
       updatedAt: now,
@@ -59,11 +146,10 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
 
     await db.collection('questionnaireIntakeJobs').doc(jobId).set(jobData);
 
-    // Parse synchronously for files under 5MB; otherwise return immediately
     try {
       const parseResult = await parseQuestionnaire(fileBuffer, fileName, db);
 
-      const deviceDocs: { id: string; data: Record<string, unknown> }[] = [];
+      const deviceDocs: { id: string; data: Record<string, unknown>; columnIndex: number }[] = [];
       for (const device of parseResult.devices) {
         const deviceId = db.collection('questionnaireStagedDevices').doc().id;
         const deviceData = {
@@ -91,7 +177,7 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
           extractionError: null,
           createdAt: now,
         };
-        deviceDocs.push({ id: deviceId, data: deviceData });
+        deviceDocs.push({ id: deviceId, data: deviceData, columnIndex: device.columnIndex });
       }
 
       const batch = db.batch();
@@ -99,7 +185,6 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
         batch.set(db.collection('questionnaireStagedDevices').doc(doc.id), doc.data);
       }
 
-      // Create staged field records for each device's Q/A pairs
       for (let i = 0; i < parseResult.devices.length; i++) {
         const device = parseResult.devices[i];
         const pairs = parseResult.qaPairsByDevice.get(device.columnIndex) ?? [];
@@ -129,22 +214,77 @@ router.post('/', requireRole('editor', 'admin'), async (req, res) => {
         }
       }
 
-      // Update job with parse results (don't set 'extracting' yet — wait for enqueue)
       const jobUpdate: Record<string, unknown> = {
         questionnaireFormat: parseResult.format,
         deviceCountDetected: parseResult.devices.length,
+        isMultiPartner: parseResult.isMultiPartner,
         status: 'awaiting_extraction',
         updatedAt: now,
       };
 
-      if (!partnerId && parseResult.partnerDetection.partnerId) {
-        jobUpdate.partnerId = parseResult.partnerDetection.partnerId;
-        jobUpdate.partnerConfidence = parseResult.partnerDetection.confidence;
-        jobUpdate.partnerDetectionMethod = parseResult.partnerDetection.method;
+      if (!submitterPartnerId && parseResult.submitterDetection.partnerId) {
+        jobUpdate.submitterPartnerId = parseResult.submitterDetection.partnerId;
+        jobUpdate.submitterConfidence = parseResult.submitterDetection.confidence;
+        jobUpdate.submitterDetectionMethod = parseResult.submitterDetection.method;
       }
 
       batch.update(db.collection('questionnaireIntakeJobs').doc(jobId), jobUpdate);
       await batch.commit();
+
+      // DST-055: persist multi-partner detection results
+      if (parseResult.isMultiPartner && parseResult.intakePartners.length > 0) {
+        const mpBatch = db.batch();
+        const intakePartnerIds: string[] = [];
+
+        for (const ip of parseResult.intakePartners) {
+          const ipId = db.collection('questionnaireIntakePartners').doc().id;
+          intakePartnerIds.push(ipId);
+          mpBatch.set(db.collection('questionnaireIntakePartners').doc(ipId), {
+            id: ipId,
+            intakeJobId: jobId,
+            partnerId: ip.partnerId,
+            rawDetectedName: ip.rawDetectedName,
+            detectionSource: ip.detectionSource,
+            matchConfidence: ip.matchConfidence,
+            matchMethod: ip.matchMethod,
+            reviewStatus: ip.partnerId ? 'confirmed' : 'pending',
+            deviceCount: 0,
+            createdAt: now,
+          });
+        }
+
+        for (const link of parseResult.devicePartnerLinks) {
+          const stagedDevice = deviceDocs.find(d => d.columnIndex === link.deviceColumnIndex);
+          if (!stagedDevice) continue;
+          const sdpId = db.collection('questionnaireStagedDevicePartners').doc().id;
+          mpBatch.set(db.collection('questionnaireStagedDevicePartners').doc(sdpId), {
+            id: sdpId,
+            stagedDeviceId: stagedDevice.id,
+            intakePartnerId: intakePartnerIds[link.intakePartnerIndex],
+            countries: link.countries,
+            certificationStatus: link.certificationStatus,
+            certificationAdkVersion: link.certificationAdkVersion,
+            partnerModelName: link.partnerModelName,
+            detectionSource: link.detectionSource,
+            reviewStatus: 'pending',
+            createdAt: now,
+          });
+        }
+
+        // Update device counts on intake partners
+        for (let i = 0; i < intakePartnerIds.length; i++) {
+          const count = parseResult.devicePartnerLinks
+            .filter(l => l.intakePartnerIndex === i)
+            .map(l => l.deviceColumnIndex)
+            .filter((v, idx, arr) => arr.indexOf(v) === idx).length;
+          mpBatch.update(
+            db.collection('questionnaireIntakePartners').doc(intakePartnerIds[i]),
+            { deviceCount: count },
+          );
+        }
+
+        await mpBatch.commit();
+      }
 
       if (aiExtraction) {
         const deviceIds = deviceDocs.map(d => d.id);
@@ -191,7 +331,7 @@ router.get('/', async (req, res) => {
       .orderBy('uploadedAt', 'desc');
 
     if (status) query = query.where('status', '==', status);
-    if (partner_id) query = query.where('partnerId', '==', partner_id);
+    if (partner_id) query = query.where('submitterPartnerId', '==', partner_id);
     if (uploaded_by) query = query.where('uploadedBy', '==', uploaded_by);
 
     const snap = await query.get();
@@ -323,14 +463,21 @@ router.get('/:id', async (req, res) => {
       }),
     );
 
-    // Fetch partner if assigned
-    let partner = null;
-    if (job.partnerId) {
-      const partnerSnap = await db.collection('partners').doc(job.partnerId).get();
-      if (partnerSnap.exists) partner = partnerSnap.data();
+    // DST-055: legacy migration
+    await migrateJobToSubmitterModel(db, jobSnap.ref, job);
+    if (job.partnerId && !job.submitterPartnerId) {
+      job = { ...job, submitterPartnerId: job.partnerId };
     }
 
-    // Extraction progress (DST-052: include step and current device)
+    const submitterId = resolveSubmitterId(job);
+    let submitterPartner = null;
+    if (submitterId) {
+      const partnerSnap = await db.collection('partners').doc(submitterId).get();
+      if (partnerSnap.exists) submitterPartner = partnerSnap.data();
+    }
+
+    const intakePartners = await fetchIntakePartners(db, (req.params.id as string));
+
     let extractionProgress = null;
     if (job.status === 'extracting' || job.status === 'extraction_failed') {
       extractionProgress = {
@@ -345,7 +492,8 @@ router.get('/:id', async (req, res) => {
     res.json({
       ...job,
       stagedDevices,
-      partner,
+      submitterPartner,
+      intakePartners,
       extractionProgress,
     });
   } catch (err) {
@@ -502,13 +650,17 @@ router.get('/:id/staged-devices', async (req, res) => {
 
     const devices = await Promise.all(
       devicesSnap.docs.map(async (d) => {
-        const fieldsSnap = await db.collection('questionnaireStagedFields')
-          .where('stagedDeviceId', '==', d.id)
-          .get();
+        const [fieldsSnap, partnerDeployments] = await Promise.all([
+          db.collection('questionnaireStagedFields')
+            .where('stagedDeviceId', '==', d.id)
+            .get(),
+          fetchDevicePartnerLinks(db, d.id),
+        ]);
 
         return {
           ...d.data(),
           fields: fieldsSnap.docs.map(f => f.data()),
+          partnerDeployments,
         };
       }),
     );
@@ -554,29 +706,40 @@ router.get('/:id/review', async (req, res) => {
       .where('intakeJobId', '==', (req.params.id as string))
       .get();
 
+    // DST-055: legacy migration
+    await migrateJobToSubmitterModel(db, jobSnap.ref, job);
+
     const devices = await Promise.all(
       devicesSnap.docs.map(async (d) => {
-        const fieldsSnap = await db.collection('questionnaireStagedFields')
-          .where('stagedDeviceId', '==', d.id)
-          .get();
+        const [fieldsSnap, partnerDeployments] = await Promise.all([
+          db.collection('questionnaireStagedFields')
+            .where('stagedDeviceId', '==', d.id)
+            .get(),
+          fetchDevicePartnerLinks(db, d.id),
+        ]);
 
         return {
           ...d.data(),
           fields: fieldsSnap.docs.map(f => f.data()),
+          partnerDeployments,
         };
       }),
     );
 
-    let partner = null;
-    if (job.partnerId) {
-      const partnerSnap = await db.collection('partners').doc(job.partnerId).get();
-      if (partnerSnap.exists) partner = partnerSnap.data();
+    const submitterId = resolveSubmitterId(job);
+    let submitterPartner = null;
+    if (submitterId) {
+      const partnerSnap = await db.collection('partners').doc(submitterId).get();
+      if (partnerSnap.exists) submitterPartner = partnerSnap.data();
     }
+
+    const intakePartners = await fetchIntakePartners(db, (req.params.id as string));
 
     res.json({
       job,
       devices,
-      partner,
+      submitterPartner,
+      intakePartners,
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to get review state', detail: formatError(err) });
@@ -596,10 +759,11 @@ router.patch('/:id', requireRole('admin'), async (req, res) => {
     }
 
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    if (req.body.partnerId !== undefined) {
-      updates.partnerId = req.body.partnerId;
-      updates.partnerDetectionMethod = 'admin';
-      updates.partnerConfidence = 1.0;
+    const newPartnerId = req.body.submitterPartnerId ?? req.body.partnerId;
+    if (newPartnerId !== undefined) {
+      updates.submitterPartnerId = newPartnerId;
+      updates.submitterDetectionMethod = 'admin';
+      updates.submitterConfidence = 1.0;
     }
 
     await jobRef.update(updates);
@@ -705,7 +869,135 @@ router.patch('/:id/staged-devices/:deviceId/resolve-all', requireRole('admin'), 
   }
 });
 
-// ── DST-048: Approve / Commit ──
+// ── DST-055: Update intake partner (brand resolution) ──
+
+router.patch('/:id/intake-partners/:intakePartnerId', requireRole('admin'), async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const ipRef = db.collection('questionnaireIntakePartners').doc((req.params.intakePartnerId as string));
+    const ipSnap = await ipRef.get();
+    if (!ipSnap.exists) {
+      res.status(404).json({ error: 'Intake partner not found' });
+      return;
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (req.body.partnerId !== undefined) {
+      updates.partnerId = req.body.partnerId;
+      updates.matchMethod = 'admin';
+      updates.matchConfidence = 1.0;
+    }
+    if (req.body.reviewStatus !== undefined) {
+      updates.reviewStatus = req.body.reviewStatus;
+    }
+
+    // Duplicate merge: if mergeInto is specified, re-point staged device partner links
+    if (req.body.mergeInto) {
+      const targetIpId = req.body.mergeInto as string;
+      const sourceIpId = (req.params.intakePartnerId as string);
+
+      const linksSnap = await db.collection('questionnaireStagedDevicePartners')
+        .where('intakePartnerId', '==', sourceIpId)
+        .get();
+
+      const mergeBatch = db.batch();
+      for (const linkDoc of linksSnap.docs) {
+        const linkData = linkDoc.data();
+        const existingSnap = await db.collection('questionnaireStagedDevicePartners')
+          .where('stagedDeviceId', '==', linkData.stagedDeviceId)
+          .where('intakePartnerId', '==', targetIpId)
+          .get();
+
+        if (!existingSnap.empty) {
+          const existing = existingSnap.docs[0].data();
+          mergeBatch.update(existingSnap.docs[0].ref, {
+            countries: mergeArrays(existing.countries, linkData.countries),
+            certificationStatus: linkData.certificationStatus ?? existing.certificationStatus,
+            certificationAdkVersion: linkData.certificationAdkVersion ?? existing.certificationAdkVersion,
+            partnerModelName: linkData.partnerModelName ?? existing.partnerModelName,
+          });
+          mergeBatch.delete(linkDoc.ref);
+        } else {
+          mergeBatch.update(linkDoc.ref, { intakePartnerId: targetIpId });
+        }
+      }
+
+      updates.reviewStatus = 'rejected';
+      mergeBatch.update(ipRef, updates);
+      await mergeBatch.commit();
+
+      const updatedDoc = await ipRef.get();
+      res.json(updatedDoc.data());
+      return;
+    }
+
+    await ipRef.update(updates);
+    const updated = await ipRef.get();
+    res.json(updated.data());
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update intake partner', detail: formatError(err) });
+  }
+});
+
+function mergeArrays(a: string[] | null, b: string[] | null): string[] | null {
+  if (!a && !b) return null;
+  return [...new Set([...(a ?? []), ...(b ?? [])])];
+}
+
+// ── DST-055: Replace deployments for a staged device ──
+
+router.put('/:id/staged-devices/:deviceId/deployments', requireRole('admin'), async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const stagedDeviceId = (req.params.deviceId as string);
+    const deployments = req.body.deployments as Array<{
+      intakePartnerId: string;
+      countries?: string[] | null;
+      certificationStatus?: string | null;
+      certificationAdkVersion?: string | null;
+      partnerModelName?: string | null;
+    }>;
+
+    if (!Array.isArray(deployments)) {
+      res.status(400).json({ error: 'deployments array is required' });
+      return;
+    }
+
+    const existingSnap = await db.collection('questionnaireStagedDevicePartners')
+      .where('stagedDeviceId', '==', stagedDeviceId)
+      .get();
+
+    const batch = db.batch();
+    for (const doc of existingSnap.docs) {
+      batch.delete(doc.ref);
+    }
+
+    const now = new Date().toISOString();
+    for (const dep of deployments) {
+      const sdpId = db.collection('questionnaireStagedDevicePartners').doc().id;
+      batch.set(db.collection('questionnaireStagedDevicePartners').doc(sdpId), {
+        id: sdpId,
+        stagedDeviceId,
+        intakePartnerId: dep.intakePartnerId,
+        countries: dep.countries ?? null,
+        certificationStatus: dep.certificationStatus ?? null,
+        certificationAdkVersion: dep.certificationAdkVersion ?? null,
+        partnerModelName: dep.partnerModelName ?? null,
+        detectionSource: 'admin',
+        reviewStatus: 'confirmed',
+        createdAt: now,
+      });
+    }
+
+    await batch.commit();
+    const updated = await fetchDevicePartnerLinks(db, stagedDeviceId);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update device deployments', detail: formatError(err) });
+  }
+});
+
+// ── DST-048 + DST-055: Approve / Commit ──
 
 router.post('/:id/approve', requireRole('admin'), async (req, res) => {
   try {
@@ -718,9 +1010,27 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
     }
 
     const job = jobSnap.data()!;
-    if (!job.partnerId) {
-      res.status(422).json({ error: 'Partner must be assigned before approval' });
-      return;
+
+    // DST-055: legacy migration
+    await migrateJobToSubmitterModel(db, jobRef, job);
+
+    // Partner guard
+    if (job.isMultiPartner) {
+      const intakePartners = await fetchIntakePartners(db, (req.params.id as string));
+      const pendingPartners = intakePartners.filter(ip => ip.reviewStatus === 'pending');
+      if (pendingPartners.length > 0) {
+        res.status(409).json({
+          error: `${pendingPartners.length} intake partner(s) still pending review`,
+          pendingPartners: pendingPartners.map(ip => ip.rawDetectedName),
+        });
+        return;
+      }
+    } else {
+      const submitterId = resolveSubmitterId(job);
+      if (!submitterId) {
+        res.status(422).json({ error: 'Partner must be assigned before approval' });
+        return;
+      }
     }
 
     const devicesSnap = await db.collection('questionnaireStagedDevices')
@@ -877,22 +1187,88 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
         batch.set(specRef, flatUpdates, { merge: true });
       }
 
-      // Create source link
-      const sourceId = db.collection('deviceQuestionnaireSources').doc().id;
-      batch.set(db.collection('deviceQuestionnaireSources').doc(sourceId), {
-        id: sourceId,
-        deviceId: targetDeviceDocId,
-        intakeJobId: (req.params.id as string),
-        stagedDeviceId: deviceDoc.id,
-        importedAt: now,
-        importedBy: req.user!.uid,
-        importedByEmail: req.user!.email,
-        fieldsImported: summary.fieldsWritten,
-        fieldsOverridden: summary.fieldsOverridden,
-      });
+      // DST-055: write deployment records and partner-scoped source links
+      const devicePartnerLinks = await fetchDevicePartnerLinks(db, deviceDoc.id);
+      const confirmedLinks = devicePartnerLinks.filter(l => l.reviewStatus !== 'rejected');
+      const intakePartners = await fetchIntakePartners(db, (req.params.id as string));
+
+      if (confirmedLinks.length > 0) {
+        for (const link of confirmedLinks) {
+          const ip = intakePartners.find(p => p.id === link.intakePartnerId);
+          const deploymentPartnerId = ip?.partnerId;
+          if (!deploymentPartnerId) continue;
+
+          const deploymentDocId = `${targetDeviceDocId}_${deploymentPartnerId}`;
+          const existingDeploy = await db.collection('devicePartnerDeployments').doc(deploymentDocId).get();
+
+          if (existingDeploy.exists) {
+            batch.update(db.collection('devicePartnerDeployments').doc(deploymentDocId), {
+              countries: link.countries ?? existingDeploy.data()!.countries ?? null,
+              partnerModelName: link.partnerModelName ?? existingDeploy.data()!.partnerModelName ?? null,
+              certificationStatus: link.certificationStatus ?? existingDeploy.data()!.certificationStatus ?? null,
+              certificationAdkVersion: link.certificationAdkVersion ?? existingDeploy.data()!.certificationAdkVersion ?? null,
+              sourceIntakeJobId: (req.params.id as string),
+              updatedAt: now,
+            });
+          } else {
+            batch.set(db.collection('devicePartnerDeployments').doc(deploymentDocId), {
+              id: deploymentDocId,
+              deviceId: targetDeviceDocId,
+              partnerId: deploymentPartnerId,
+              countries: link.countries,
+              partnerModelName: link.partnerModelName,
+              certificationStatus: link.certificationStatus,
+              certificationAdkVersion: link.certificationAdkVersion,
+              active: true,
+              sourceIntakeJobId: (req.params.id as string),
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+
+          await logAuditEntry({
+            entityType: 'device_partner_deployment',
+            entityId: deploymentDocId,
+            field: existingDeploy.exists ? 'update' : 'create',
+            oldValue: null,
+            newValue: `Deployment for device ${targetDeviceDocId} + partner ${deploymentPartnerId}`,
+            userId: req.user!.uid,
+            userEmail: req.user!.email,
+          });
+
+          const sourceId = db.collection('deviceQuestionnaireSources').doc().id;
+          batch.set(db.collection('deviceQuestionnaireSources').doc(sourceId), {
+            id: sourceId,
+            deviceId: targetDeviceDocId,
+            intakeJobId: (req.params.id as string),
+            stagedDeviceId: deviceDoc.id,
+            partnerId: deploymentPartnerId,
+            importedAt: now,
+            importedBy: req.user!.uid,
+            importedByEmail: req.user!.email,
+            fieldsImported: summary.fieldsWritten,
+            fieldsOverridden: summary.fieldsOverridden,
+          });
+        }
+      } else {
+        // Single-partner fallback: create one source link with submitter
+        const submitterId = resolveSubmitterId(job);
+        const sourceId = db.collection('deviceQuestionnaireSources').doc().id;
+        batch.set(db.collection('deviceQuestionnaireSources').doc(sourceId), {
+          id: sourceId,
+          deviceId: targetDeviceDocId,
+          intakeJobId: (req.params.id as string),
+          stagedDeviceId: deviceDoc.id,
+          partnerId: submitterId,
+          importedAt: now,
+          importedBy: req.user!.uid,
+          importedByEmail: req.user!.email,
+          fieldsImported: summary.fieldsWritten,
+          fieldsOverridden: summary.fieldsOverridden,
+        });
+      }
     }
 
-    // Update intake job status
     const finalStatus = rejectedDevices.length > 0 && approvedDevices.length > 0
       ? 'partially_approved'
       : approvedDevices.length > 0
@@ -1044,6 +1420,79 @@ router.get('/device-sources/:deviceId', async (req, res) => {
     res.json(sources);
   } catch (err) {
     res.status(500).json({ error: 'Failed to get device sources', detail: formatError(err) });
+  }
+});
+
+// ── DST-055: Get device partner deployments ──
+
+router.get('/device-deployments/:deviceId', async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const deploymentsSnap = await db.collection('devicePartnerDeployments')
+      .where('deviceId', '==', (req.params.deviceId as string))
+      .get();
+
+    const deployments = await Promise.all(
+      deploymentsSnap.docs.map(async (d) => {
+        const dep = d.data();
+        let partnerName: string | null = null;
+        let jobFileName: string | null = null;
+        try {
+          const partnerSnap = await db.collection('partners').doc(dep.partnerId).get();
+          if (partnerSnap.exists) partnerName = partnerSnap.data()!.displayName as string;
+        } catch { /* ignore */ }
+        if (dep.sourceIntakeJobId) {
+          try {
+            const jobSnap = await db.collection('questionnaireIntakeJobs').doc(dep.sourceIntakeJobId).get();
+            if (jobSnap.exists) jobFileName = jobSnap.data()!.fileName as string;
+          } catch { /* ignore */ }
+        }
+        return { ...dep, partnerName, jobFileName };
+      }),
+    );
+
+    res.json(deployments);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get device deployments', detail: formatError(err) });
+  }
+});
+
+// ── DST-055: Get partner deployments (devices deployed by a partner) ──
+
+router.get('/partner-deployments/:partnerId', async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const { certification_status, active } = req.query;
+
+    let query: FirebaseFirestore.Query = db.collection('devicePartnerDeployments')
+      .where('partnerId', '==', (req.params.partnerId as string));
+
+    if (certification_status) {
+      query = query.where('certificationStatus', '==', certification_status);
+    }
+
+    const deploymentsSnap = await query.get();
+    let deployments = deploymentsSnap.docs.map(d => d.data());
+
+    if (active !== undefined) {
+      const isActive = active === 'true';
+      deployments = deployments.filter(d => d.active === isActive);
+    }
+
+    const enriched = await Promise.all(
+      deployments.map(async (dep) => {
+        let deviceDisplayName: string | null = null;
+        try {
+          const deviceSnap = await db.collection('devices').doc(dep.deviceId).get();
+          if (deviceSnap.exists) deviceDisplayName = deviceSnap.data()!.displayName as string;
+        } catch { /* ignore */ }
+        return { ...dep, deviceDisplayName };
+      }),
+    );
+
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get partner deployments', detail: formatError(err) });
   }
 });
 

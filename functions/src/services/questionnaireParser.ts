@@ -1,15 +1,23 @@
 /**
- * DST-047: Questionnaire Parser Service
+ * DST-047 / DST-055: Questionnaire Parser Service
  *
  * Handles format detection, device column identification, platform type
- * detection, partner auto-detection, and raw Q/A pair extraction from
- * partner device questionnaire spreadsheets.
+ * detection, partner auto-detection, multi-partner signal detection,
+ * certs sheet parsing, and raw Q/A pair extraction from partner device
+ * questionnaire spreadsheets.
  */
 
 import * as XLSX from 'xlsx';
 import { log, formatError } from './logger.js';
 import { loadActiveAliases, resolvePartnerAlias } from './partnerAliasResolver.js';
-import type { QuestionnaireFormat, PlatformType, PartnerDetectionMethod } from '../types/index.js';
+import type {
+  QuestionnaireFormat,
+  PlatformType,
+  PartnerDetectionMethod,
+  IntakePartnerDetectionSource,
+  IntakePartnerMatchMethod,
+  StagedDeviceCertificationStatus,
+} from '../types/index.js';
 
 // ── Types ──
 
@@ -32,11 +40,51 @@ export interface PartnerDetectionResult {
   method: PartnerDetectionMethod;
 }
 
+export interface DetectedIntakePartner {
+  rawDetectedName: string;
+  partnerId: string | null;
+  detectionSource: IntakePartnerDetectionSource;
+  matchConfidence: number | null;
+  matchMethod: IntakePartnerMatchMethod | null;
+}
+
+export interface DetectedDevicePartnerLink {
+  deviceColumnIndex: number;
+  intakePartnerIndex: number;
+  countries: string[] | null;
+  certificationStatus: StagedDeviceCertificationStatus | null;
+  certificationAdkVersion: string | null;
+  partnerModelName: string | null;
+  detectionSource: IntakePartnerDetectionSource;
+}
+
+export interface CertsSheetEntry {
+  brandLabel: string;
+  deviceColumnIndex: number;
+  certificationStatus: StagedDeviceCertificationStatus | null;
+  certificationAdkVersion: string | null;
+}
+
+export interface ModelNameBrand {
+  deviceColumnIndex: number;
+  partnerModelName: string;
+  rawBrandName: string;
+}
+
+export interface MultiPartnerSignals {
+  isMultiPartner: boolean;
+  intakePartners: DetectedIntakePartner[];
+  devicePartnerLinks: DetectedDevicePartnerLink[];
+}
+
 export interface ParseResult {
   format: QuestionnaireFormat;
   devices: ParsedDevice[];
   qaPairsByDevice: Map<number, RawQAPair[]>;
-  partnerDetection: PartnerDetectionResult;
+  submitterDetection: PartnerDetectionResult;
+  isMultiPartner: boolean;
+  intakePartners: DetectedIntakePartner[];
+  devicePartnerLinks: DetectedDevicePartnerLink[];
 }
 
 const SAMPLE_HEADERS = ['sample response', 'sample', '(sample)'];
@@ -81,6 +129,9 @@ export function detectFormat(workbook: XLSX.WorkBook): QuestionnaireFormat {
       const r1b = cellValue(sheet, 0, 1);
       const r1c = cellValue(sheet, 0, 2);
       if (matchesHeader(r1a, 'No.') && matchesHeader(r1b, 'Category') && matchesHeader(r1c, 'Description')) {
+        if (hasCertsSheet(sheetNames)) {
+          return 'lg_stb_v1_2';
+        }
         return 'lg_stb_v1';
       }
     }
@@ -115,7 +166,8 @@ function getTargetSheet(workbook: XLSX.WorkBook, format: QuestionnaireFormat): X
     case 'gm_2024':
       return workbook.Sheets['3. Tech Questionnaire'] ?? null;
     case 'vodafone_combined':
-    case 'lg_stb_v1': {
+    case 'lg_stb_v1':
+    case 'lg_stb_v1_2': {
       const name = workbook.SheetNames.find(
         n => n.toLowerCase() === 'stb tech questionnaire',
       );
@@ -333,6 +385,250 @@ export function extractRawQAPairs(
   return pairs;
 }
 
+// ── Multi-Partner Detection (DST-055) ──
+
+const CERTS_SHEET_NAMES = ['certs and extensions', 'certs', 'certifications'];
+
+function hasCertsSheet(sheetNames: string[]): boolean {
+  return sheetNames.some(n => CERTS_SHEET_NAMES.includes(n.toLowerCase()));
+}
+
+function findCertsSheet(workbook: XLSX.WorkBook): XLSX.WorkSheet | null {
+  const name = workbook.SheetNames.find(
+    n => CERTS_SHEET_NAMES.includes(n.toLowerCase()),
+  );
+  return name ? (workbook.Sheets[name] ?? null) : null;
+}
+
+function parseCertStatus(text: string): StagedDeviceCertificationStatus | null {
+  const lower = text.toLowerCase().trim();
+  if (lower.includes('cert extended') || lower.includes('cert_extended')) return 'cert_extended';
+  if (lower.includes('not available')) return 'not_available';
+  if (lower.includes('pending')) return 'pending';
+  if (lower.includes('certified')) return 'certified';
+  if (lower.length > 0) return 'certified';
+  return null;
+}
+
+function extractAdkVersion(text: string): string | null {
+  const match = text.match(/\d+\.\d+(?:\.\d+)?/);
+  return match ? match[0] : null;
+}
+
+export function parseCertsSheet(
+  workbook: XLSX.WorkBook,
+  primaryDevices: ParsedDevice[],
+): CertsSheetEntry[] {
+  const sheet = findCertsSheet(workbook);
+  if (!sheet) return [];
+
+  const range = XLSX.utils.decode_range(sheet['!ref'] ?? 'A1');
+  const entries: CertsSheetEntry[] = [];
+
+  const headerMap = new Map<number, number>();
+  for (let c = 1; c <= range.e.c; c++) {
+    const header = cellValue(sheet, 0, c);
+    if (!header) continue;
+    const headerStr = String(header).trim().toLowerCase().replace(/\s+/g, ' ');
+    for (const device of primaryDevices) {
+      const deviceLabel = device.rawHeaderLabel.toLowerCase().replace(/\s+/g, ' ');
+      if (headerStr === deviceLabel) {
+        headerMap.set(c, device.columnIndex);
+        break;
+      }
+    }
+  }
+
+  for (let r = 1; r <= range.e.r; r++) {
+    const brandCell = cellValue(sheet, r, 0);
+    if (!brandCell) continue;
+    const brandLabel = String(brandCell).trim();
+    if (!brandLabel) continue;
+
+    for (const [certCol, deviceColIndex] of headerMap) {
+      const certCell = cellValue(sheet, r, certCol);
+      if (!certCell) continue;
+      const certText = String(certCell).trim();
+      if (!certText) continue;
+
+      entries.push({
+        brandLabel,
+        deviceColumnIndex: deviceColIndex,
+        certificationStatus: parseCertStatus(certText),
+        certificationAdkVersion: extractAdkVersion(certText),
+      });
+    }
+  }
+
+  return entries;
+}
+
+export function parseModelNameBrands(
+  sheet: XLSX.WorkSheet,
+  format: QuestionnaireFormat,
+  devices: ParsedDevice[],
+): ModelNameBrand[] {
+  const headerRow = getHeaderRowIndex(format);
+  const range = XLSX.utils.decode_range(sheet['!ref'] ?? 'A1');
+  const results: ModelNameBrand[] = [];
+
+  let modelNameRow = -1;
+  for (let r = headerRow + 1; r <= Math.min(headerRow + 20, range.e.r); r++) {
+    const q = cellValue(sheet, r, 2);
+    if (!q) continue;
+    const qText = String(q).toLowerCase().trim();
+    if (qText.includes('model name') || qText === '1.0' || qText.startsWith('model name')) {
+      modelNameRow = r;
+      break;
+    }
+  }
+  if (modelNameRow < 0) return results;
+
+  const brandRegex = /(.+?)\s*\((.+?)\)/;
+
+  for (const device of devices) {
+    const val = cellValue(sheet, modelNameRow, device.columnIndex);
+    if (!val) continue;
+    const text = String(val).trim();
+    const lines = text.split(/\n|\r\n?/);
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const match = trimmed.match(brandRegex);
+      if (match) {
+        results.push({
+          deviceColumnIndex: device.columnIndex,
+          partnerModelName: match[1].trim(),
+          rawBrandName: match[2].trim(),
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+export async function detectMultiPartnerSignals(
+  workbook: XLSX.WorkBook,
+  sheet: XLSX.WorkSheet,
+  format: QuestionnaireFormat,
+  devices: ParsedDevice[],
+  db: FirebaseFirestore.Firestore,
+): Promise<MultiPartnerSignals> {
+  const aliases = await loadActiveAliases(db);
+  const partnersSnap = await db.collection('partners').get();
+  const partners = partnersSnap.docs.map(d => ({
+    id: d.id,
+    displayName: d.data().displayName as string,
+  }));
+
+  const intakePartners: DetectedIntakePartner[] = [];
+  const devicePartnerLinks: DetectedDevicePartnerLink[] = [];
+  const partnerNameIndex = new Map<string, number>();
+
+  function getOrCreatePartner(
+    rawName: string,
+    detectionSource: IntakePartnerDetectionSource,
+  ): number {
+    const key = rawName.toLowerCase().trim();
+    const existing = partnerNameIndex.get(key);
+    if (existing !== undefined) return existing;
+
+    let partnerId: string | null = null;
+    let matchConfidence: number | null = null;
+    let matchMethod: IntakePartnerMatchMethod | null = null;
+
+    const aliasResult = resolvePartnerAlias(rawName, aliases, new Map());
+    if (aliasResult) {
+      partnerId = aliasResult.partnerId;
+      matchConfidence = 0.95;
+      matchMethod = 'alias';
+    } else {
+      const directMatch = partners.find(
+        p => p.displayName.toLowerCase() === rawName.toLowerCase(),
+      );
+      if (directMatch) {
+        partnerId = directMatch.id;
+        matchConfidence = 0.90;
+        matchMethod = 'alias';
+      }
+    }
+
+    const idx = intakePartners.length;
+    intakePartners.push({
+      rawDetectedName: rawName,
+      partnerId,
+      detectionSource,
+      matchConfidence,
+      matchMethod,
+    });
+    partnerNameIndex.set(key, idx);
+    return idx;
+  }
+
+  // Signal 1: Certs sheet
+  const certsEntries = parseCertsSheet(workbook, devices);
+  for (const entry of certsEntries) {
+    const idx = getOrCreatePartner(entry.brandLabel, 'certs_sheet');
+    devicePartnerLinks.push({
+      deviceColumnIndex: entry.deviceColumnIndex,
+      intakePartnerIndex: idx,
+      countries: null,
+      certificationStatus: entry.certificationStatus,
+      certificationAdkVersion: entry.certificationAdkVersion,
+      partnerModelName: null,
+      detectionSource: 'certs_sheet',
+    });
+  }
+
+  // Signal 2: Model name cell brand mentions
+  const modelBrands = parseModelNameBrands(sheet, format, devices);
+  for (const brand of modelBrands) {
+    const idx = getOrCreatePartner(brand.rawBrandName, 'model_name_cell');
+
+    const existingLink = devicePartnerLinks.find(
+      l => l.deviceColumnIndex === brand.deviceColumnIndex && l.intakePartnerIndex === idx,
+    );
+    if (existingLink) {
+      if (!existingLink.partnerModelName) {
+        existingLink.partnerModelName = brand.partnerModelName;
+      }
+    } else {
+      devicePartnerLinks.push({
+        deviceColumnIndex: brand.deviceColumnIndex,
+        intakePartnerIndex: idx,
+        countries: null,
+        certificationStatus: null,
+        certificationAdkVersion: null,
+        partnerModelName: brand.partnerModelName,
+        detectionSource: 'model_name_cell',
+      });
+    }
+  }
+
+  const uniqueBrands = new Set(intakePartners.map(p => p.rawDetectedName.toLowerCase().trim()));
+  const isMultiPartner = uniqueBrands.size >= 2;
+
+  // Update device counts per intake partner
+  for (const ip of intakePartners) {
+    const idx = intakePartners.indexOf(ip);
+    const deviceCols = new Set(
+      devicePartnerLinks.filter(l => l.intakePartnerIndex === idx).map(l => l.deviceColumnIndex),
+    );
+    ip.detectionSource = ip.detectionSource; // keep original
+    (ip as { deviceCount?: number }).deviceCount = deviceCols.size;
+  }
+
+  log.info('Multi-partner detection complete', {
+    isMultiPartner,
+    brandCount: intakePartners.length,
+    linkCount: devicePartnerLinks.length,
+  });
+
+  return { isMultiPartner, intakePartners, devicePartnerLinks };
+}
+
 // ── Full Parse Orchestration ──
 
 export async function parseQuestionnaire(
@@ -364,9 +660,35 @@ export async function parseQuestionnaire(
     qaPairsByDevice.set(device.columnIndex, pairs);
   }
 
-  const partnerDetection = await detectPartner(filename, sheet, format, db);
+  const submitterDetection = await detectPartner(filename, sheet, format, db);
 
-  return { format, devices, qaPairsByDevice, partnerDetection };
+  // DST-055: detect multi-partner signals
+  let isMultiPartner = false;
+  let intakePartners: DetectedIntakePartner[] = [];
+  let devicePartnerLinks: DetectedDevicePartnerLink[] = [];
+
+  if (format === 'lg_stb_v1_2' || hasCertsSheet(workbook.SheetNames)) {
+    try {
+      const signals = await detectMultiPartnerSignals(workbook, sheet, format, devices, db);
+      isMultiPartner = signals.isMultiPartner;
+      intakePartners = signals.intakePartners;
+      devicePartnerLinks = signals.devicePartnerLinks;
+    } catch (err) {
+      log.warn('Multi-partner detection failed, continuing as single-partner', {
+        error: formatError(err),
+      });
+    }
+  }
+
+  return {
+    format,
+    devices,
+    qaPairsByDevice,
+    submitterDetection,
+    isMultiPartner,
+    intakePartners,
+    devicePartnerLinks,
+  };
 }
 
 // ── Helpers ──

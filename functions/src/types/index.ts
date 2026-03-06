@@ -73,6 +73,13 @@ export type {
   DeviceQuestionnaireSource,
   QuestionnaireIntakeJobDetail,
   AppNotification,
+  IntakePartnerDetectionSource,
+  IntakePartnerMatchMethod,
+  IntakePartnerReviewStatus,
+  StagedDeviceCertificationStatus,
+  QuestionnaireIntakePartner,
+  QuestionnaireStagedDevicePartner,
+  DevicePartnerDeployment,
 } from '@dst/contracts';
 
 // ── Backend-only types below ──

@@ -72,11 +72,13 @@ function ConfidenceBadge({ value }: { value: number | null }) {
 function AssignPartnerStep({
   job,
   partner,
+  intakePartners,
   onConfirm,
   actionError,
 }: {
   job: QuestionnaireIntakeJob;
   partner: { id: string; displayName: string } | null;
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
   onConfirm: (partnerId: string, displayName: string) => void;
   actionError: string | null;
 }) {
@@ -132,28 +134,54 @@ function AssignPartnerStep({
         <p className="font-medium text-gray-700">
           File: <span className="font-normal">{job.fileName}</span>
         </p>
-        {job.partnerDetectionMethod && (
+        {job.submitterDetectionMethod && (
           <div className="mt-2 space-y-1 text-gray-600">
             <p className="font-medium text-gray-700">
               Detection signals found:
             </p>
             <ul className="ml-4 list-disc">
-              {job.partnerDetectionMethod === 'filename' && (
+              {job.submitterDetectionMethod === 'filename' && (
                 <li>Filename pattern detected</li>
               )}
-              {job.partnerDetectionMethod === 'content' && (
+              {job.submitterDetectionMethod === 'content' && (
                 <li>Partner name detected in content</li>
               )}
-              {job.partnerDetectionMethod === 'ai' &&
-                job.partnerConfidence != null && (
+              {job.submitterDetectionMethod === 'ai' &&
+                job.submitterConfidence != null && (
                   <li>
                     AI suggestion (confidence:{' '}
-                    {Math.round(job.partnerConfidence * 100)}%)
+                    {Math.round(job.submitterConfidence * 100)}%)
                   </li>
                 )}
-              {!job.partnerDetectionMethod && (
+              {!job.submitterDetectionMethod && (
                 <li>No recognizable partner pattern</li>
               )}
+            </ul>
+          </div>
+        )}
+        {job.isMultiPartner && intakePartners.length > 0 && (
+          <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+            <p className="text-sm font-medium text-indigo-800">
+              Multi-partner questionnaire — {intakePartners.length} operating brand(s) detected
+            </p>
+            <ul className="mt-2 space-y-1">
+              {intakePartners.map((ip) => (
+                <li key={ip.id} className="flex items-center gap-2 text-sm">
+                  <span className={`inline-block h-2 w-2 rounded-full ${
+                    ip.reviewStatus === 'confirmed' ? 'bg-emerald-500' :
+                    ip.reviewStatus === 'rejected' ? 'bg-red-500' : 'bg-amber-500'
+                  }`} />
+                  <span className="font-medium">{ip.rawDetectedName}</span>
+                  <span className="text-gray-500">via {ip.detectionSource.replace(/_/g, ' ')}</span>
+                  <span className="text-gray-400">· {ip.deviceCount} device(s)</span>
+                  {ip.partnerId && (
+                    <span className="text-emerald-600">✓ Matched</span>
+                  )}
+                  {!ip.partnerId && ip.reviewStatus === 'pending' && (
+                    <span className="text-amber-600">Unresolved</span>
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
         )}
@@ -163,7 +191,7 @@ function AssignPartnerStep({
         <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
           <Check className="h-5 w-5 text-emerald-600" />
           <span className="text-sm font-medium text-emerald-800">
-            Partner confirmed: {partner.displayName}
+            {job.isMultiPartner ? 'Submitter' : 'Partner'} confirmed: {partner.displayName}
           </span>
         </div>
       ) : (
@@ -669,10 +697,56 @@ function DeviceCard({
 
 // ── Step 2: Review Devices ──────────────────────────────────────────────────
 
+function DeployedByTable({ deployments, intakePartners }: {
+  deployments: import('../lib/types').QuestionnaireStagedDevicePartner[];
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
+}) {
+  if (deployments.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Deployed by</p>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
+            <th className="pb-1 pr-4 font-medium">Partner</th>
+            <th className="pb-1 pr-4 font-medium">Markets</th>
+            <th className="pb-1 font-medium">Cert Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {deployments.map((dep) => {
+            const ip = intakePartners.find(p => p.id === dep.intakePartnerId);
+            return (
+              <tr key={dep.id} className="border-b border-gray-50 last:border-0">
+                <td className="py-1.5 pr-4 font-medium text-gray-900">
+                  {ip?.rawDetectedName ?? 'Unknown'}
+                </td>
+                <td className="py-1.5 pr-4 text-gray-600">
+                  {dep.countries?.join(', ') ?? '—'}
+                </td>
+                <td className="py-1.5 text-gray-600">
+                  {dep.certificationStatus
+                    ? dep.certificationStatus.replace(/_/g, ' ')
+                    : '—'}
+                  {dep.certificationAdkVersion && (
+                    <span className="ml-1 text-gray-400">(ADK {dep.certificationAdkVersion})</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ReviewDevicesStep({
   devices,
   jobId,
   job,
+  intakePartners,
   onApproveDevice,
   onRejectDevice,
   onFieldUpdate,
@@ -684,6 +758,7 @@ function ReviewDevicesStep({
   devices: StagedDeviceWithFields[];
   jobId: string;
   job: QuestionnaireIntakeJob;
+  intakePartners: import('../lib/types').QuestionnaireIntakePartner[];
   onApproveDevice: (device: StagedDeviceWithFields, identity?: Record<string, string | null>) => void;
   onRejectDevice: (device: StagedDeviceWithFields, reason?: string) => void;
   onFieldUpdate: (
@@ -844,17 +919,24 @@ function ReviewDevicesStep({
 
       <div className="space-y-3">
         {sorted.map((d) => (
-          <DeviceCard
-            key={d.id}
-            device={d}
-            jobId={jobId}
-            expanded={expanded.has(d.id)}
-            onToggle={() => toggle(d.id)}
-            onApprove={onApproveDevice}
-            onReject={onRejectDevice}
-            onFieldUpdate={onFieldUpdate}
-            busy={busy}
-          />
+          <div key={d.id}>
+            <DeviceCard
+              device={d}
+              jobId={jobId}
+              expanded={expanded.has(d.id)}
+              onToggle={() => toggle(d.id)}
+              onApprove={onApproveDevice}
+              onReject={onRejectDevice}
+              onFieldUpdate={onFieldUpdate}
+              busy={busy}
+            />
+            {job.isMultiPartner && (d as unknown as { partnerDeployments?: import('../lib/types').QuestionnaireStagedDevicePartner[] }).partnerDeployments && (
+              <DeployedByTable
+                deployments={(d as unknown as { partnerDeployments: import('../lib/types').QuestionnaireStagedDevicePartner[] }).partnerDeployments}
+                intakePartners={intakePartners}
+              />
+            )}
+          </div>
         ))}
       </div>
 
@@ -1257,6 +1339,7 @@ export default function QuestionnaireReviewPage() {
     id: string;
     displayName: string;
   } | null>(null);
+  const [intakePartners, setIntakePartners] = useState<import('../lib/types').QuestionnaireIntakePartner[]>([]);
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -1292,9 +1375,10 @@ export default function QuestionnaireReviewPage() {
       const data = await api.questionnaireIntake.getReview(id);
       setJob(data.job);
       setDevices(data.devices);
-      setPartner(data.partner);
+      setPartner(data.submitterPartner);
+      setIntakePartners(data.intakePartners ?? []);
 
-      if (data.partner) {
+      if (data.submitterPartner) {
         setStep(2);
       } else {
         setStep(1);
@@ -1318,14 +1402,14 @@ export default function QuestionnaireReviewPage() {
       setActionError(null);
       setBusy(true);
       try {
-        await api.questionnaireIntake.updateJob(id, { partnerId });
+        await api.questionnaireIntake.updateJob(id, { submitterPartnerId: partnerId });
         setPartner({ id: partnerId, displayName });
         setJob((prev) =>
           prev
             ? {
                 ...prev,
-                partnerId,
-                partnerDetectionMethod: 'admin' as const,
+                submitterPartnerId: partnerId,
+                submitterDetectionMethod: 'admin' as const,
               }
             : prev,
         );
@@ -1627,6 +1711,7 @@ export default function QuestionnaireReviewPage() {
           <AssignPartnerStep
             job={job}
             partner={partner}
+            intakePartners={intakePartners}
             onConfirm={handleConfirmPartner}
             actionError={actionError}
           />
@@ -1637,6 +1722,7 @@ export default function QuestionnaireReviewPage() {
             devices={devices}
             jobId={id!}
             job={job}
+            intakePartners={intakePartners}
             onApproveDevice={handleApproveDevice}
             onRejectDevice={handleRejectDevice}
             onFieldUpdate={handleFieldUpdate}

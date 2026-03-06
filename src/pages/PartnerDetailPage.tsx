@@ -102,6 +102,7 @@ export default function PartnerDetailPage() {
   const [savingKey, setSavingKey] = useState(false);
   const [deactivateConfirm, setDeactivateConfirm] = useState<PartnerKey | null>(null);
   const [toggling, setToggling] = useState(false);
+  const [partnerDeployments, setPartnerDeployments] = useState<(import('../lib/types').DevicePartnerDeployment & { deviceDisplayName?: string })[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -124,6 +125,10 @@ export default function PartnerDetailPage() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+
+    api.questionnaireIntake.getPartnerDeployments(id)
+      .then(setPartnerDeployments)
+      .catch(() => {});
   }, [id]);
 
   const totalDevices = devices.length;
@@ -431,6 +436,46 @@ export default function PartnerDetailPage() {
           emptyDescription="No devices registered for this partner yet."
         />
       </section>
+
+      {/* Partner Deployments (DST-055) */}
+      {partnerDeployments.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center gap-2">
+            <Monitor className="h-5 w-5 text-gray-400" />
+            <h2 className="text-lg font-semibold text-gray-900">Deployed Devices</h2>
+            <span className="text-sm text-gray-500">({partnerDeployments.length})</span>
+          </div>
+          <DataTable<typeof partnerDeployments[number]>
+            columns={[
+              { header: 'Device', accessor: 'deviceDisplayName', sortable: true,
+                render: (row) => (
+                  <button
+                    className="font-medium text-indigo-600 hover:underline"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/devices/${row.deviceId}`); }}
+                  >
+                    {row.deviceDisplayName ?? row.deviceId}
+                  </button>
+                )},
+              { header: 'Markets', accessor: 'countries',
+                render: (row) => row.countries?.length ? row.countries.join(', ') : '—' },
+              { header: 'Cert Status', accessor: 'certificationStatus',
+                render: (row) => row.certificationStatus ? row.certificationStatus.replace(/_/g, ' ') : '—' },
+              { header: 'ADK', accessor: 'certificationAdkVersion',
+                render: (row) => row.certificationAdkVersion ?? '—' },
+              { header: 'Active', accessor: 'active',
+                render: (row) => row.active ? (
+                  <Badge variant="success">Active</Badge>
+                ) : (
+                  <Badge variant="default">Inactive</Badge>
+                )},
+            ]}
+            data={partnerDeployments}
+            onRowClick={(row) => navigate(`/devices/${row.deviceId}`)}
+            emptyTitle="No deployed devices"
+            emptyDescription="No deployed device records for this partner."
+          />
+        </section>
+      )}
 
       {/* Edit Partner Modal */}
       <Modal
