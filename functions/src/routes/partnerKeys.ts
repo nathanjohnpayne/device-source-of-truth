@@ -318,11 +318,30 @@ router.get('/', async (req, res) => {
     const db = admin.firestore();
     const partnerId = req.query.partnerId as string | undefined;
     const search = req.query.search as string | undefined;
+    const exactKey = req.query.exactKey as string | undefined;
     const activeOnly = req.query.activeOnly === 'true';
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 500);
 
-    req.log?.debug('Listing partner keys', { partnerId, search, page, pageSize });
+    req.log?.debug('Listing partner keys', { partnerId, search, exactKey, page, pageSize });
+
+    // Fast path: exact key lookup via indexed Firestore query
+    if (exactKey) {
+      const exactSnap = await db.collection('partnerKeys').where('key', '==', exactKey).limit(1).get();
+      if (exactSnap.empty) {
+        res.json({ data: [], total: 0, page: 1, pageSize, totalPages: 0 });
+        return;
+      }
+      const doc = exactSnap.docs[0];
+      const keyData = { id: doc.id, ...doc.data() } as Record<string, unknown> & { id: string; partnerId: string; key: string };
+      let partnerDisplayName: string | null = null;
+      if (keyData.partnerId) {
+        const pDoc = await db.collection('partners').doc(keyData.partnerId).get();
+        if (pDoc.exists) partnerDisplayName = pDoc.data()!.displayName;
+      }
+      res.json({ data: [{ ...keyData, partnerDisplayName }], total: 1, page: 1, pageSize, totalPages: 1 });
+      return;
+    }
 
     let query: admin.firestore.Query = db.collection('partnerKeys');
     if (partnerId) {
@@ -563,9 +582,33 @@ router.post('/', requireRole('admin'), async (req, res) => {
       req.log?.info('Auto-linked pending devices to new partner key', { key, linkedCount });
     }
 
+    // Auto-dismiss matching open new_partner_key alerts
+    let dismissedAlertIds: string[] = [];
+    const alertSnap = await db
+      .collection('alerts')
+      .where('type', '==', 'new_partner_key')
+      .where('partnerKey', '==', key)
+      .where('status', '==', 'open')
+      .get();
+    if (!alertSnap.empty) {
+      const alertBatch = db.batch();
+      const now2 = new Date().toISOString();
+      for (const alertDoc of alertSnap.docs) {
+        alertBatch.update(alertDoc.ref, {
+          status: 'dismissed',
+          dismissedBy: req.user!.email,
+          dismissReason: 'Key Created',
+          dismissedAt: now2,
+        });
+        dismissedAlertIds.push(alertDoc.id);
+      }
+      await alertBatch.commit();
+      req.log?.info('Auto-dismissed new_partner_key alerts', { key, alertIds: dismissedAlertIds });
+    }
+
     const created = await docRef.get();
-    req.log?.info('Partner key created', { partnerKeyId: docRef.id, key, partnerId, linkedDevices: linkedCount });
-    res.status(201).json({ id: docRef.id, ...created.data(), linkedDevices: linkedCount });
+    req.log?.info('Partner key created', { partnerKeyId: docRef.id, key, partnerId, linkedDevices: linkedCount, dismissedAlerts: dismissedAlertIds.length });
+    res.status(201).json({ id: docRef.id, ...created.data(), linkedDevices: linkedCount, dismissedAlertIds });
   } catch (err) {
     req.log?.error('Failed to create partner key', formatError(err));
     res.status(500).json({ error: 'Failed to create partner key', detail: String(err) });

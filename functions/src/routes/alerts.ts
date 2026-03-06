@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     const type = req.query.type as string | undefined;
     const status = req.query.status as string | undefined;
     const page = parseInt(req.query.page as string) || 1;
-    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 200);
+    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 2000);
 
     req.log?.debug('Listing alerts', { type, status, page, pageSize });
 
