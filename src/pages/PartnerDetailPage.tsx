@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Pencil, ArrowLeft, Monitor, Key, Plus, Power, PowerOff } from 'lucide-react';
 import { api } from '../lib/api';
-import { getFreshnessState } from '../lib/format';
+import { formatNumber, getFreshnessState } from '../lib/format';
 import { useAuth } from '../hooks/useAuth';
 import DataTable, { type Column } from '../components/shared/DataTable';
 import Badge from '../components/shared/Badge';
@@ -41,7 +41,7 @@ const deviceColumns: Column<DeviceWithRelations>[] = [
     accessor: 'activeDeviceCount',
     sortable: true,
     cellProps: (row) => ({
-      'aria-label': `Active devices: ${(row.activeDeviceCount ?? 0).toLocaleString()}, ${getFreshnessState((row as DeviceRow).lastTelemetryAt).replace('_', ' ')} data`,
+      'aria-label': `Active devices: ${formatNumber(row.activeDeviceCount ?? 0)}, ${getFreshnessState((row as DeviceRow).lastTelemetryAt).replace('_', ' ')} data`,
     }),
     render: (row) => (
       <FreshnessMicroPanel

@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+
+const hasRg = (() => {
+  try {
+    execFileSync('rg', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 const baselinePath = 'config/ui-consistency-baseline.json';
 const writeBaseline = process.argv.includes('--write-baseline');
@@ -38,22 +47,17 @@ const checks = [
   },
 ];
 
-function runRg(pattern) {
+function runSearch(pattern) {
   try {
-    return execFileSync(
-      'rg',
-      [
-        '-n',
-        '--no-heading',
-        '--glob',
-        '*.ts',
-        '--glob',
-        '*.tsx',
-        '--glob',
-        '*.css',
-        pattern,
-        'src',
-      ],
+    if (hasRg) {
+      return execFileSync(
+        'rg',
+        ['-n', '--no-heading', '--glob', '*.ts', '--glob', '*.tsx', '--glob', '*.css', pattern, 'src'],
+        { encoding: 'utf8' },
+      ).trim();
+    }
+    return execSync(
+      `grep -rn --include='*.ts' --include='*.tsx' --include='*.css' -E '${pattern}' src`,
       { encoding: 'utf8' },
     ).trim();
   } catch (error) {
@@ -65,7 +69,7 @@ function runRg(pattern) {
 }
 
 function collectCounts(check) {
-  const output = runRg(check.pattern);
+  const output = runSearch(check.pattern);
   if (!output) return {};
 
   const counts = {};
