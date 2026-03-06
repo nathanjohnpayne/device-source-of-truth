@@ -72,7 +72,8 @@ Firebase Hosting (static SPA)
 │       └── src/index.ts          ← Canonical shared types & Zod schemas (~1250 lines)
 │
 ├── public/
-│   └── favicon.svg               ← SVG favicon (device-cloud icon, indigo fill)
+│   ├── favicon.svg               ← SVG favicon (device-cloud icon, indigo fill)
+│   └── og-image.png             ← Open Graph social preview image (2400×1260 PNG)
 ├── specs/                        ← Product specs and feature stories
 ├── firebase.json                 ← Hosting rewrites + functions + firestore config
 ├── firestore.rules               ← Firestore security rules (24 collections)
