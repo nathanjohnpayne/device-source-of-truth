@@ -5,15 +5,18 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-/** Writes public/version.json at build time so the poller can detect stale clients. */
+/** Writes public/version.json and injects __APP_VERSION_HASH__ at build time. */
 function versionPlugin(): Plugin {
+  const hash = Date.now().toString(36);
   return {
     name: 'version-json',
+    config() {
+      return { define: { __APP_VERSION_HASH__: JSON.stringify(hash) } };
+    },
     buildStart() {
-      const version = { hash: Date.now().toString(36) };
       writeFileSync(
         resolve(__dirname, 'public/version.json'),
-        JSON.stringify(version),
+        JSON.stringify({ hash }),
       );
     },
   };

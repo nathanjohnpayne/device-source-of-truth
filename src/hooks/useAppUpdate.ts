@@ -8,25 +8,38 @@ function readDismissedHash(): string | null {
   try { return localStorage.getItem(DISMISSED_HASH_KEY); } catch { return null; }
 }
 
+async function fetchHash(): Promise<string | null> {
+  try {
+    const res = await fetch(`/version.json?t=${Date.now()}`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.hash ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Detects a new app version via two independent paths:
  *   1. Service worker (Workbox) — fires when a new SW is waiting.
- *   2. Version polling — compares /version.json against the hash at boot time.
+ *   2. Version polling — compares /version.json against the build-time hash.
  *
- * Dismiss is tied to a specific deploy hash so the banner reappears on every
- * new deploy, but the user only needs to press Refresh once regardless of how
- * many deploys happened while they were away.
+ * The build hash is injected at compile time via Vite `define`, so it's
+ * available synchronously — no async fetch race with the SW callback.
  */
 export function useAppUpdate() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const bootHashRef = useRef<string | null>(null);
   const latestHashRef = useRef<string | null>(null);
   const dismissedHashRef = useRef<string | null>(readDismissedHash());
 
-  function evaluateUpdate(hash: string) {
-    latestHashRef.current = hash;
-    const isDifferentFromBoot = hash !== bootHashRef.current;
-    const isDismissed = hash === dismissedHashRef.current;
+  const bootHash = __APP_VERSION_HASH__;
+
+  function evaluateUpdate(serverHash: string) {
+    latestHashRef.current = serverHash;
+    const isDifferentFromBoot = serverHash !== bootHash;
+    const isDismissed = serverHash === dismissedHashRef.current;
     setUpdateAvailable(isDifferentFromBoot && !isDismissed);
   }
 
@@ -35,11 +48,13 @@ export function useAppUpdate() {
     updateServiceWorker,
   } = useRegisterSW({
     onNeedRefresh() {
-      if (latestHashRef.current) {
-        evaluateUpdate(latestHashRef.current);
-      } else {
-        setUpdateAvailable(true);
-      }
+      fetchHash().then((hash) => {
+        if (hash) {
+          evaluateUpdate(hash);
+        } else {
+          setUpdateAvailable(true);
+        }
+      });
     },
     onOfflineReady() {},
   });
@@ -47,39 +62,19 @@ export function useAppUpdate() {
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchHash(): Promise<string | null> {
-      try {
-        const res = await fetch(`/version.json?t=${Date.now()}`, {
-          cache: 'no-store',
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data?.hash ?? null;
-      } catch {
-        return null;
-      }
-    }
-
-    async function init() {
-      const hash = await fetchHash();
-      if (!cancelled && hash) {
-        bootHashRef.current = hash;
-        const dismissed = dismissedHashRef.current;
-        if (dismissed && dismissed !== hash) {
-          localStorage.removeItem(DISMISSED_HASH_KEY);
-          dismissedHashRef.current = null;
-        }
-      }
+    const dismissed = dismissedHashRef.current;
+    if (dismissed && dismissed !== bootHash) {
+      localStorage.removeItem(DISMISSED_HASH_KEY);
+      dismissedHashRef.current = null;
     }
 
     async function poll() {
       const latest = await fetchHash();
-      if (!cancelled && latest && bootHashRef.current && latest !== bootHashRef.current) {
+      if (!cancelled && latest && latest !== bootHash) {
         evaluateUpdate(latest);
       }
     }
 
-    init();
     const id = setInterval(poll, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
