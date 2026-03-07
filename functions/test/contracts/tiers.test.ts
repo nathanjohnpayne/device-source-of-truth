@@ -118,6 +118,16 @@ describe('POST /api/tiers/simulate', () => {
     expect(res.body.eligibleCount + res.body.ineligibleCount)
       .toBe(res.body.eligible.length + res.body.ineligible.length);
   });
+
+  it('returns canonical device document ids for matched specs', async () => {
+    const res = await request(app)
+      .post('/api/tiers/simulate')
+      .send({ ramMin: 0 })
+      .expect(200);
+
+    expect(res.body.eligible).toContain('d1');
+    expect(res.body.eligible).not.toContain('acme-4k-001');
+  });
 });
 
 describe('PUT /api/tiers/:id', () => {
@@ -129,6 +139,58 @@ describe('PUT /api/tiers/:id', () => {
 
     expect(res.body.id).toBe('t1');
     expect(res.body.tierName).toBeDefined();
+  });
+
+  it('reassigns devices even when a legacy questionnaire spec stores the model number in deviceId', async () => {
+    await mockDb.collection('deviceSpecs').doc('d2').set({
+      deviceId: 'claro-brazil-hd-legacy',
+      hardware: {
+        ramAvailableGb: 2,
+        gpuMemoryAvailableMb: 512,
+        cpuClockRateGhz: 1.8,
+        cpuCores: '4',
+        softwareArchitecture: 'arm64',
+      },
+      mediaCodec: {
+        avcH264: 'Yes',
+        hevcH265: 'Yes',
+      },
+      updatedAt: '2026-02-25T00:00:00.000Z',
+    });
+
+    await request(app)
+      .put('/api/tiers/t1')
+      .send({ tierName: 'Tier 1 Updated', ramMin: 2048 })
+      .expect(200);
+
+    const updatedDevice = await mockDb.collection('devices').doc('d2').get();
+    expect(updatedDevice.data()?.tierId).toBe('t1');
+  });
+
+  it('does not rewrite canonical spec docs during tier reassignment', async () => {
+    await mockDb.collection('deviceSpecs').doc('d2').set({
+      deviceId: 'd2',
+      hardware: {
+        ramAvailableGb: 2,
+        gpuMemoryAvailableMb: 512,
+        cpuClockRateGhz: 1.8,
+        cpuCores: '4',
+        softwareArchitecture: 'arm64',
+      },
+      mediaCodec: {
+        avcH264: 'Yes',
+        hevcH265: 'Yes',
+      },
+      updatedAt: '2026-02-20T00:00:00.000Z',
+    });
+
+    await request(app)
+      .put('/api/tiers/t1')
+      .send({ tierName: 'Tier 1 Updated', ramMin: 2048 })
+      .expect(200);
+
+    const updatedSpec = await mockDb.collection('deviceSpecs').doc('d2').get();
+    expect(updatedSpec.data()?.updatedAt).toBe('2026-02-20T00:00:00.000Z');
   });
 
   it('returns 404 for missing tier', async () => {

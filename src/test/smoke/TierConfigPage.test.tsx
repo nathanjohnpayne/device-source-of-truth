@@ -7,6 +7,7 @@ vi.mock('../../lib/api', () => ({
   api: {
     tiers: {
       list: vi.fn(),
+      listAll: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -24,13 +25,7 @@ beforeEach(() => {
 
 describe('TierConfigPage smoke test', () => {
   it('renders without crashing with empty tier list', async () => {
-    (api.tiers.list as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [],
-      total: 0,
-      page: 1,
-      pageSize: 50,
-      totalPages: 0,
-    });
+    (api.tiers.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     render(
       <MemoryRouter>
@@ -44,13 +39,7 @@ describe('TierConfigPage smoke test', () => {
   });
 
   it('renders without crashing with tier data', async () => {
-    (api.tiers.list as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [minimalTier],
-      total: 1,
-      page: 1,
-      pageSize: 50,
-      totalPages: 1,
-    });
+    (api.tiers.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([minimalTier]);
 
     render(
       <MemoryRouter>
@@ -64,7 +53,7 @@ describe('TierConfigPage smoke test', () => {
   });
 
   it('shows error message on API failure', async () => {
-    (api.tiers.list as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
+    (api.tiers.listAll as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
 
     render(
       <MemoryRouter>

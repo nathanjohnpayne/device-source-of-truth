@@ -2,6 +2,7 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
+import { loadMergedDeviceSpecsForTiering } from '../services/deviceSpecStore.js';
 import { reassignAllDevices, previewTierAssignment, simulateEligibility } from '../services/tierEngine.js';
 import { formatError } from '../services/logger.js';
 import type { HardwareTier, DeviceSpec } from '../types/index.js';
@@ -188,8 +189,11 @@ router.post('/preview', requireRole('admin'), async (req, res) => {
 
     req.log?.info('Previewing tier assignment', { tierCount: tiers.length });
 
-    const specsSnap = await db.collection('deviceSpecs').get();
-    const specs = specsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as DeviceSpec);
+    const mergedSpecs = await loadMergedDeviceSpecsForTiering(db);
+    const specs = mergedSpecs.map((entry) => ({
+      id: entry.deviceDocId,
+      ...entry.mergedSpec,
+    }) as DeviceSpec);
     req.log?.debug('Loaded specs for preview', { specCount: specs.length });
 
     const result = previewTierAssignment(tiers, specs);
@@ -211,8 +215,11 @@ router.post('/simulate', requireRole('editor', 'admin'), async (req, res) => {
     const db = admin.firestore();
     req.log?.info('Running eligibility simulation', { requirements: req.body });
 
-    const specsSnap = await db.collection('deviceSpecs').get();
-    const specs = specsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as DeviceSpec);
+    const mergedSpecs = await loadMergedDeviceSpecsForTiering(db);
+    const specs = mergedSpecs.map((entry) => ({
+      id: entry.deviceDocId,
+      ...entry.mergedSpec,
+    }) as DeviceSpec);
     const result = simulateEligibility(req.body, specs);
 
     req.log?.info('Eligibility simulation complete', {

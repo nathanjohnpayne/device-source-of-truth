@@ -36,8 +36,8 @@ export default function DeviceCreatePage() {
 
   useEffect(() => {
     api.partnerKeys
-      .list({ pageSize: 1000 })
-      .then((res) => setPartnerKeys(res.data))
+      .listAll()
+      .then((res) => setPartnerKeys(res))
       .catch(() => {})
       .finally(() => setLoadingKeys(false));
   }, []);

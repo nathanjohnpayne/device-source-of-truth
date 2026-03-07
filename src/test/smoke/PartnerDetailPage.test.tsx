@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { emptyPaginated } from '../helpers/fixtures';
 
 vi.mock('../../lib/api', () => ({
   api: {
@@ -11,9 +10,11 @@ vi.mock('../../lib/api', () => ({
     },
     partnerKeys: {
       list: vi.fn(),
+      listAll: vi.fn(),
     },
     devices: {
       list: vi.fn(),
+      listAll: vi.fn(),
     },
     questionnaireIntake: {
       getPartnerDeployments: vi.fn().mockResolvedValue([]),
@@ -48,8 +49,8 @@ describe('PartnerDetailPage smoke test', () => {
       createdAt: '2026-01-01',
       updatedAt: '2026-01-01',
     });
-    (api.partnerKeys.list as ReturnType<typeof vi.fn>).mockResolvedValue(emptyPaginated());
-    (api.devices.list as ReturnType<typeof vi.fn>).mockResolvedValue(emptyPaginated());
+    (api.partnerKeys.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (api.devices.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     renderPage();
 
@@ -60,8 +61,8 @@ describe('PartnerDetailPage smoke test', () => {
 
   it('handles API error gracefully', async () => {
     (api.partners.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Not found'));
-    (api.partnerKeys.list as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
-    (api.devices.list as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
+    (api.partnerKeys.listAll as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
+    (api.devices.listAll as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
 
     renderPage();
 
@@ -79,8 +80,8 @@ describe('PartnerDetailPage smoke test', () => {
       createdAt: '2026-01-01',
       updatedAt: '2026-01-01',
     });
-    (api.partnerKeys.list as ReturnType<typeof vi.fn>).mockResolvedValue(emptyPaginated());
-    (api.devices.list as ReturnType<typeof vi.fn>).mockResolvedValue(emptyPaginated());
+    (api.partnerKeys.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (api.devices.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     renderPage();
 

@@ -454,8 +454,8 @@ export default function QuestionnaireDetailPage() {
     setShowPartnerModal(true);
     setSelectedPartnerId(job?.submitterPartnerId ?? '');
     try {
-      const res = await api.partners.list({ pageSize: 500 });
-      setPartners(res.data ?? []);
+      const res = await api.partners.listAll();
+      setPartners(res ?? []);
     } catch {
       setPartners([]);
     }

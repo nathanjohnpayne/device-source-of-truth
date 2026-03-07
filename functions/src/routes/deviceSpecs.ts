@@ -2,6 +2,7 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog } from '../services/audit.js';
+import { buildCanonicalDeviceSpecWrite, loadMergedDeviceSpecForDevice } from '../services/deviceSpecStore.js';
 import { calculateSpecCompleteness, repairFlatDottedSpec } from '../services/specCompleteness.js';
 import { assignTierToDevice } from '../services/tierEngine.js';
 import { formatError } from '../services/logger.js';
@@ -48,21 +49,19 @@ router.get('/:deviceId', async (req, res) => {
     const deviceId = req.params.deviceId as string;
     req.log?.debug('Getting device specs', { deviceId });
 
-    const [byDoc, byField] = await Promise.all([
-      db.collection('deviceSpecs').doc(deviceId).get(),
-      db.collection('deviceSpecs').where('deviceId', '==', deviceId).limit(1).get(),
-    ]);
-
-    const doc = byDoc.exists ? byDoc : (!byField.empty ? byField.docs[0] : null);
-
-    if (!doc) {
+    const loadedSpec = await loadMergedDeviceSpecForDevice(db, deviceId);
+    if (!loadedSpec) {
       req.log?.warn('No specs found for device', { deviceId });
       res.status(404).json({ error: 'No specs found for this device' });
       return;
     }
 
-    const specData = coerceDeviceSpecDoc({ id: doc.id, ...doc.data() });
-    req.log?.info('Device specs fetched', { deviceId, specDocId: doc.id, lookup: byDoc.exists ? 'byDocId' : 'byField' });
+    const specData = coerceDeviceSpecDoc({ id: deviceId, ...loadedSpec.mergedSpec });
+    req.log?.info('Device specs fetched', {
+      deviceId,
+      specDocIds: loadedSpec.docs.map((doc) => doc.id),
+      lookup: loadedSpec.lookup,
+    });
     res.json(specData);
   } catch (err) {
     req.log?.error('Failed to get device specs', formatError(err));
@@ -90,34 +89,37 @@ router.put('/:deviceId', requireRole('editor', 'admin'), async (req, res) => {
       return;
     }
 
-    const specData: Record<string, unknown> = {
-      deviceId,
+    const specSource: Record<string, unknown> = {
       updatedAt: new Date().toISOString(),
     };
 
     for (const key of SPEC_CATEGORIES) {
-      specData[key] = parsed.data[key as keyof typeof parsed.data] ?? {};
+      specSource[key] = parsed.data[key as keyof typeof parsed.data] ?? {};
     }
 
-    const [existingByDoc, existingByField] = await Promise.all([
-      db.collection('deviceSpecs').doc(deviceId).get(),
-      db.collection('deviceSpecs').where('deviceId', '==', deviceId).limit(1).get(),
-    ]);
+    const specData = buildCanonicalDeviceSpecWrite(deviceId, specSource);
+    const existingSpec = await loadMergedDeviceSpecForDevice(db, deviceId);
 
-    const existingDoc = existingByDoc.exists ? existingByDoc
-      : (!existingByField.empty ? existingByField.docs[0] : null);
+    const specId = deviceId;
+    await db.collection('deviceSpecs').doc(specId).set(specData);
 
-    let specId: string;
-    if (!existingDoc) {
-      const docRef = await db.collection('deviceSpecs').add(specData);
-      specId = docRef.id;
-      req.log?.info('Device specs created (new)', { deviceId, specId });
+    if (!existingSpec) {
+      req.log?.info('Device specs created (canonical)', { deviceId, specId });
     } else {
-      specId = existingDoc.id;
-      const oldData = existingDoc.data()!;
-      await db.collection('deviceSpecs').doc(specId).set(specData);
-      await diffAndLog('deviceSpec', specId, oldData, specData, req.user!.uid, req.user!.email);
-      req.log?.info('Device specs updated (existing)', { deviceId, specId, lookup: existingByDoc.exists ? 'byDocId' : 'byField' });
+      await diffAndLog('deviceSpec', specId, existingSpec.mergedSpec, specData, req.user!.uid, req.user!.email);
+
+      for (const doc of existingSpec.docs) {
+        if (doc.id !== specId) {
+          await db.collection('deviceSpecs').doc(doc.id).delete();
+        }
+      }
+
+      req.log?.info('Device specs updated (canonical)', {
+        deviceId,
+        specId,
+        lookup: existingSpec.lookup,
+        mergedDocIds: existingSpec.docs.map((doc) => doc.id),
+      });
     }
 
     const completeness = calculateSpecCompleteness(specData);

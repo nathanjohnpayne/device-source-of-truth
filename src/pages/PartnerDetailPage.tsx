@@ -110,13 +110,13 @@ export default function PartnerDetailPage() {
 
     Promise.all([
       api.partners.get(id),
-      api.partnerKeys.list({ partnerId: id, pageSize: 500 }),
-      api.devices.list({ partnerId: id, pageSize: 500 }),
+      api.partnerKeys.listAll({ partnerId: id }),
+      api.devices.listAll({ partnerId: id }),
     ])
       .then(([p, keys, devs]) => {
         setPartner(p);
-        setPartnerKeys(keys.data);
-        setDevices(devs.data);
+        setPartnerKeys(keys);
+        setDevices(devs);
         setFormData({
           displayName: p.displayName,
           regions: p.regions ?? [],

@@ -152,7 +152,7 @@ export const fixtures = {
     {
       id: 'ts1',
       partnerKey: 'acme-stb-na',
-      deviceId: 'd1',
+      deviceId: 'acme-4k-001',
       coreVersion: '7.3.1',
       uniqueDevices: 1200,
       eventCount: 45000,

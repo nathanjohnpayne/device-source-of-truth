@@ -6,10 +6,12 @@ vi.mock('../../lib/api', () => ({
   api: {
     tiers: {
       list: vi.fn(),
+      listAll: vi.fn(),
       simulate: vi.fn(),
     },
     devices: {
       list: vi.fn(),
+      listAll: vi.fn(),
     },
   },
 }));

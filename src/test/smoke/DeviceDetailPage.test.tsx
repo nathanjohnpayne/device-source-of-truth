@@ -106,4 +106,19 @@ describe('DeviceDetailPage smoke test', () => {
       expect(screen.getByText('No deployments')).toBeInTheDocument();
     });
   });
+
+  it('uses the resolved device document id for questionnaire follow-up requests', async () => {
+    (api.devices.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...minimalDeviceDetail,
+      id: 'd1',
+      deviceId: 'legacy-business-id',
+    });
+
+    renderWithRoute('legacy-business-id');
+
+    await waitFor(() => {
+      expect(api.questionnaireIntake.getDeviceSources).toHaveBeenCalledWith('d1');
+      expect(api.questionnaireIntake.getDeviceDeployments).toHaveBeenCalledWith('d1');
+    });
+  });
 });

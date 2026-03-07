@@ -6,6 +6,7 @@ vi.mock('../../lib/api', () => ({
   api: {
     partners: {
       list: vi.fn().mockResolvedValue({ data: [] }),
+      listAll: vi.fn().mockResolvedValue([]),
     },
     questionnaireIntake: {
       getReview: vi.fn(),

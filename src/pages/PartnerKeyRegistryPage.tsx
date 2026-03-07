@@ -1123,10 +1123,10 @@ function AliasesTab() {
     try {
       const [aliasRes, partnerRes] = await Promise.all([
         api.partnerAliases.list(),
-        api.partners.list(),
+        api.partners.listAll(),
       ]);
       setAliases(aliasRes.data);
-      const pList = (partnerRes as { data: Partner[] }).data?.map((p: Partner) => ({ id: p.id, displayName: p.displayName })) ?? [];
+      const pList = (partnerRes as Partner[]).map((p: Partner) => ({ id: p.id, displayName: p.displayName }));
       setPartners(pList);
     } catch {
       setError('Failed to load aliases');

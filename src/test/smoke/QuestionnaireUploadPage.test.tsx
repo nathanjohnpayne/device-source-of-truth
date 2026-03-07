@@ -6,6 +6,7 @@ vi.mock('../../lib/api', () => ({
   api: {
     partners: {
       list: vi.fn(),
+      listAll: vi.fn(),
     },
     questionnaireIntake: {
       upload: vi.fn(),
@@ -39,9 +40,9 @@ beforeEach(() => {
 
 describe('QuestionnaireUploadPage smoke test', () => {
   it('renders without crashing when partners load successfully', async () => {
-    (api.partners.list as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [{ id: 'p1', displayName: 'Acme' }],
-    });
+    (api.partners.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: 'p1', displayName: 'Acme' },
+    ]);
 
     renderPage();
 
@@ -52,7 +53,7 @@ describe('QuestionnaireUploadPage smoke test', () => {
   });
 
   it('renders without crashing when partners API fails', async () => {
-    (api.partners.list as ReturnType<typeof vi.fn>).mockRejectedValue(
+    (api.partners.listAll as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error('Network error'),
     );
 
@@ -64,9 +65,7 @@ describe('QuestionnaireUploadPage smoke test', () => {
   });
 
   it('renders without crashing with empty partner list', async () => {
-    (api.partners.list as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [],
-    });
+    (api.partners.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     renderPage();
 
@@ -77,9 +76,7 @@ describe('QuestionnaireUploadPage smoke test', () => {
   });
 
   it('upload button is disabled when no file is selected', async () => {
-    (api.partners.list as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [],
-    });
+    (api.partners.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     renderPage();
 
@@ -90,9 +87,7 @@ describe('QuestionnaireUploadPage smoke test', () => {
   });
 
   it('renders AI extraction checkbox', async () => {
-    (api.partners.list as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: [],
-    });
+    (api.partners.listAll as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     renderPage();
 

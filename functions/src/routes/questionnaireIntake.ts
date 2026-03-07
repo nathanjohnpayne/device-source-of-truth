@@ -7,6 +7,10 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { logAuditEntry } from '../services/audit.js';
+import {
+  buildCanonicalDeviceSpecWrite,
+  loadMergedDeviceSpecForDevice,
+} from '../services/deviceSpecStore.js';
 import { log, formatError } from '../services/logger.js';
 import { parseQuestionnaire } from '../services/questionnaireParser.js';
 import { enqueueExtractionTasks } from '../services/questionnaireExtractor.js';
@@ -1312,11 +1316,7 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
         writer.batch.set(db.collection('devices').doc(newDeviceId), newDeviceData);
         writer.opCount++;
 
-        const emptySpec: Record<string, unknown> = {
-          id: newDeviceId,
-          deviceId: newDeviceId,
-          updatedAt: now,
-        };
+        const emptySpec = buildCanonicalDeviceSpecWrite(newDeviceId, { updatedAt: now });
         await flushIfNeeded(db, writer);
         writer.batch.set(db.collection('deviceSpecs').doc(newDeviceId), emptySpec);
         writer.opCount++;
@@ -1379,13 +1379,43 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
         });
       }
 
-      if (Object.keys(specUpdates).length > 0) {
+      const existingSpec = await loadMergedDeviceSpecForDevice(db, targetDeviceDocId);
+      const canonicalSpecData = buildCanonicalDeviceSpecWrite(
+        targetDeviceDocId,
+        existingSpec?.mergedSpec ?? { updatedAt: now },
+      );
+      canonicalSpecData.updatedAt = now;
+
+      for (const [section, updates] of Object.entries(specUpdates)) {
+        const existingSection = canonicalSpecData[section];
+        canonicalSpecData[section] = {
+          ...((existingSection && typeof existingSection === 'object' && !Array.isArray(existingSection))
+            ? existingSection as Record<string, unknown>
+            : {}),
+          ...updates,
+        };
+      }
+
+      const needsCanonicalSpecWrite =
+        Object.keys(specUpdates).length > 0 ||
+        !!existingSpec?.docs.some((doc) => doc.id !== targetDeviceDocId) ||
+        existingSpec?.lookup === 'merged' ||
+        existingSpec?.lookup === 'byField';
+
+      if (needsCanonicalSpecWrite) {
         const specRef = db.collection('deviceSpecs').doc(targetDeviceDocId);
-        const mergeUpdates: Record<string, unknown> = { deviceId: targetDeviceDocId, updatedAt: now, ...specUpdates };
 
         await flushIfNeeded(db, writer);
-        writer.batch.set(specRef, mergeUpdates, { merge: true });
+        writer.batch.set(specRef, canonicalSpecData);
         writer.opCount++;
+
+        for (const doc of existingSpec?.docs ?? []) {
+          if (doc.id !== targetDeviceDocId) {
+            await flushIfNeeded(db, writer);
+            writer.batch.delete(db.collection('deviceSpecs').doc(doc.id));
+            writer.opCount++;
+          }
+        }
       }
 
       // DST-055: write deployment records and partner-scoped source links

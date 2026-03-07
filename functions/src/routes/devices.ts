@@ -2,12 +2,40 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog, logAuditEntry } from '../services/audit.js';
+import { loadMergedDeviceSpecForDevice } from '../services/deviceSpecStore.js';
 import { formatError } from '../services/logger.js';
 import { coerceDeviceDoc, coerceTelemetrySnapshotDoc, coerceDeviceSpecDoc } from '../services/coercion.js';
 import { CreateDeviceRequestSchema, UpdateDeviceRequestSchema } from '../types/index.js';
 import type { Device, DeviceWithRelations } from '../types/index.js';
 
 const router = Router();
+
+async function getTelemetrySnapshotsForDevice(
+  db: FirebaseFirestore.Firestore,
+  device: Device,
+): Promise<Array<Record<string, unknown>>> {
+  const lookupIds = [...new Set([device.deviceId, device.id].filter(Boolean))];
+  const snapshots = await Promise.all(
+    lookupIds.map((lookupId) =>
+      db.collection('telemetrySnapshots')
+        .where('deviceId', '==', lookupId)
+        .orderBy('snapshotDate', 'desc')
+        .limit(20)
+        .get(),
+    ),
+  );
+
+  const docs = new Map<string, Record<string, unknown>>();
+  for (const snap of snapshots) {
+    for (const doc of snap.docs) {
+      docs.set(doc.id, { id: doc.id, ...doc.data() });
+    }
+  }
+
+  return [...docs.values()]
+    .sort((a, b) => String(b.snapshotDate ?? '').localeCompare(String(a.snapshotDate ?? '')))
+    .slice(0, 20);
+}
 
 router.get('/', async (req, res) => {
   try {
@@ -147,29 +175,23 @@ router.get('/:id', async (req, res) => {
     const device = coerceDeviceDoc({ ...doc.data()!, id: doc.id }) as Device;
     req.log?.debug('Fetching device relations', { deviceId: device.deviceId, partnerKeyId: device.partnerKeyId, tierId: device.tierId });
 
-    const [pkResult, specByDocResult, specByFieldResult, tierResult, deployResult, telResult, auditResult] = await Promise.allSettled([
+    const [pkResult, specResult, tierResult, deployResult, telResult, auditResult] = await Promise.allSettled([
       device.partnerKeyId ? db.collection('partnerKeys').doc(device.partnerKeyId).get() : Promise.resolve(null),
-      db.collection('deviceSpecs').doc(device.id).get(),
-      db.collection('deviceSpecs').where('deviceId', '==', device.id).limit(1).get(),
+      loadMergedDeviceSpecForDevice(db, device.id),
       device.tierId ? db.collection('hardwareTiers').doc(device.tierId).get() : Promise.resolve(null),
       db.collection('deviceDeployments').where('deviceId', '==', device.id).get(),
-      db.collection('telemetrySnapshots').where('deviceId', '==', device.id).orderBy('snapshotDate', 'desc').limit(20).get(),
+      getTelemetrySnapshotsForDevice(db, device),
       db.collection('auditLog').where('entityType', '==', 'device').where('entityId', '==', device.id).orderBy('timestamp', 'desc').limit(50).get(),
     ]);
 
     const pkSnap = pkResult.status === 'fulfilled' ? pkResult.value : null;
-    const specByDoc = specByDocResult.status === 'fulfilled' ? specByDocResult.value : null;
-    const specByField = specByFieldResult.status === 'fulfilled' ? specByFieldResult.value : null;
+    const mergedSpec = specResult.status === 'fulfilled' ? specResult.value : null;
     const tierSnap = tierResult.status === 'fulfilled' ? tierResult.value : null;
     const deploySnap = deployResult.status === 'fulfilled' ? deployResult.value : null;
     const telSnap = telResult.status === 'fulfilled' ? telResult.value : null;
     const auditSnap = auditResult.status === 'fulfilled' ? auditResult.value : null;
 
-    const specDoc = (specByDoc && specByDoc.exists) ? specByDoc
-      : (specByField && !specByField.empty) ? specByField.docs[0]
-      : null;
-
-    for (const [label, result] of [['telemetry', telResult], ['audit', auditResult], ['deployments', deployResult], ['specByDoc', specByDocResult], ['specByField', specByFieldResult]] as const) {
+    for (const [label, result] of [['telemetry', telResult], ['audit', auditResult], ['deployments', deployResult], ['spec', specResult]] as const) {
       if (result.status === 'rejected') {
         req.log?.warn(`Failed to fetch ${label} for device`, { idParam, error: String(result.reason) });
       }
@@ -186,11 +208,11 @@ router.get('/:id', async (req, res) => {
 
     req.log?.info('Device detail fetched', {
       idParam,
-      hasSpec: !!specDoc,
-      specLookup: specDoc ? ((specByDoc && specByDoc.exists) ? 'byDocId' : 'byField') : 'none',
+      hasSpec: !!mergedSpec,
+      specLookup: mergedSpec?.lookup ?? 'none',
       hasTier: !!(tierSnap && tierSnap.exists),
       deploymentCount: deploySnap?.size ?? 0,
-      telemetrySnapshotCount: telSnap?.size ?? 0,
+      telemetrySnapshotCount: telSnap?.length ?? 0,
       auditEntryCount: auditSnap?.size ?? 0,
     });
 
@@ -198,12 +220,10 @@ router.get('/:id', async (req, res) => {
       ...device,
       partner,
       partnerKey: pkSnap && pkSnap.exists ? { id: pkSnap.id, ...pkSnap.data() } : null,
-      spec: specDoc ? coerceDeviceSpecDoc({ id: specDoc.id, ...specDoc.data() }) : null,
+      spec: mergedSpec ? coerceDeviceSpecDoc({ id: device.id, ...mergedSpec.mergedSpec }) : null,
       tier: tierSnap && tierSnap.exists ? { id: tierSnap.id, ...tierSnap.data() } : null,
       deployments: deploySnap ? deploySnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
-      telemetrySnapshots: telSnap ? telSnap.docs.map((d) =>
-        coerceTelemetrySnapshotDoc({ id: d.id, ...d.data() }),
-      ) : [],
+      telemetrySnapshots: telSnap ? telSnap.map((snapshot) => coerceTelemetrySnapshotDoc(snapshot)) : [],
       auditHistory: auditSnap ? auditSnap.docs.map((d) => ({ id: d.id, ...d.data() })) : [],
     });
   } catch (err) {

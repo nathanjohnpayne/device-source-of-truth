@@ -222,6 +222,30 @@ describe('POST /api/questionnaire-intake/:id/approve', () => {
     expect(Array.isArray(res.body.affectedDeviceIds)).toBe(true);
   });
 
+  it('merges pre-existing non-canonical specs into the canonical device spec document', async () => {
+    await mockDb.collection('questionnaireStagedDevices').doc('qsd1').update({
+      reviewStatus: 'approved',
+      matchedDeviceId: 'd1',
+      confirmedDisplayName: 'Acme Streamer 4K',
+      confirmedModelNumber: 'ACM-4K-001',
+    });
+
+    const res = await request(app)
+      .post('/api/questionnaire-intake/qj1/approve')
+      .expect(200);
+
+    expect(['approved', 'partially_approved']).toContain(res.body.status);
+
+    const canonicalSpec = await mockDb.collection('deviceSpecs').doc('d1').get();
+    expect(canonicalSpec.exists).toBe(true);
+    expect(canonicalSpec.data()?.deviceId).toBe('d1');
+    expect(canonicalSpec.data()?.general?.modelName).toBe('Streamer 4K');
+    expect(canonicalSpec.data()?.hardware?.socVendor).toBe('Broadcom');
+
+    const legacySpec = await mockDb.collection('deviceSpecs').doc('ds1').get();
+    expect(legacySpec.exists).toBe(false);
+  });
+
   it('returns 404 for nonexistent job', async () => {
     await request(app)
       .post('/api/questionnaire-intake/nonexistent/approve')

@@ -47,11 +47,11 @@ export default function DeviceListPage() {
 
   useEffect(() => {
     Promise.all([
-      api.partners.list({ pageSize: 500 }),
-      api.tiers.list({ pageSize: 100 }),
+      api.partners.listAll(),
+      api.tiers.listAll(),
     ]).then(([p, t]) => {
-      setPartners(p.data as PartnerWithStats[]);
-      setTiers(t.data);
+      setPartners(p as PartnerWithStats[]);
+      setTiers(t);
     });
   }, []);
 

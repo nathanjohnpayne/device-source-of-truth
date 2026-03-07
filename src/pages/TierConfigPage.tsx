@@ -71,8 +71,8 @@ export default function TierConfigPage() {
 
   const loadTiers = async () => {
     try {
-      const res = await api.tiers.list();
-      setTiers(res.data.sort((a, b) => a.tierRank - b.tierRank));
+      const res = await api.tiers.listAll();
+      setTiers(res.sort((a, b) => a.tierRank - b.tierRank));
     } catch {
       setError('Failed to load tier definitions.');
     } finally {

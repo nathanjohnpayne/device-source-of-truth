@@ -209,8 +209,8 @@ function IntakePartnerPanel({
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.partners.list({ pageSize: 500 });
-        setPartners((res.data ?? []) as PartnerWithStats[]);
+        const res = await api.partners.listAll();
+        setPartners((res ?? []) as PartnerWithStats[]);
       } catch { /* non-blocking */ }
       finally { setLoading(false); }
     })();
@@ -309,8 +309,8 @@ function AssignPartnerStep({
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.partners.list({ pageSize: 500 });
-        setPartners((res.data ?? []) as PartnerWithStats[]);
+        const res = await api.partners.listAll();
+        setPartners((res ?? []) as PartnerWithStats[]);
       } catch {
         /* non-blocking */
       } finally {

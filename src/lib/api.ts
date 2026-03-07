@@ -134,6 +134,29 @@ function qs(params?: QueryParams): string {
   return '?' + new URLSearchParams(entries.map(([k, v]) => [k, String(v)])).toString();
 }
 
+async function fetchAllPages<T>(
+  fetchPage: (page: number) => Promise<PaginatedResponse<T>>,
+): Promise<T[]> {
+  let page = 1;
+  let totalPages = 1;
+  const data: T[] = [];
+
+  while (page <= totalPages) {
+    const response = await fetchPage(page);
+    data.push(...response.data);
+    totalPages = Math.max(response.totalPages, 1);
+    page += 1;
+  }
+
+  return data;
+}
+
+function omitPagination(params?: QueryParams): QueryParams {
+  if (!params) return {};
+  const { page: _page, pageSize: _pageSize, ...rest } = params;
+  return rest;
+}
+
 function crudEndpoints<T>(base: string) {
   return {
     list: (params?: QueryParams) => apiFetch<PaginatedResponse<T>>(`${base}${qs(params)}`),
@@ -148,9 +171,27 @@ function crudEndpoints<T>(base: string) {
 }
 
 export const api = {
-  partners: crudEndpoints<Partner>('/partners'),
+  partners: {
+    ...crudEndpoints<Partner>('/partners'),
+    listAll: (params?: QueryParams) =>
+      fetchAllPages<Partner>((page) =>
+        apiFetch<PaginatedResponse<Partner>>(`/partners${qs({
+          ...omitPagination(params),
+          page,
+          pageSize: 200,
+        })}`),
+      ),
+  },
   partnerKeys: {
     ...crudEndpoints<PartnerKeyWithDisplay>('/partner-keys'),
+    listAll: (params?: QueryParams) =>
+      fetchAllPages<PartnerKeyWithDisplay>((page) =>
+        apiFetch<PaginatedResponse<PartnerKeyWithDisplay>>(`/partner-keys${qs({
+          ...omitPagination(params),
+          page,
+          pageSize: 500,
+        })}`),
+      ),
     importPreview: async (file: File) => {
       const csvData = await file.text();
       return apiFetch<PartnerKeyImportPreview>('/partner-keys/import/preview', {
@@ -172,6 +213,14 @@ export const api = {
   },
   devices: {
     list: (params?: QueryParams) => apiFetch<PaginatedResponse<DeviceWithRelations>>(`/devices${qs(params)}`),
+    listAll: (params?: QueryParams) =>
+      fetchAllPages<DeviceWithRelations>((page) =>
+        apiFetch<PaginatedResponse<DeviceWithRelations>>(`/devices${qs({
+          ...omitPagination(params),
+          page,
+          pageSize: 200,
+        })}`),
+      ),
     get: (id: string) => apiFetch<DeviceDetail>(`/devices/${id}`),
     create: (data: CreateDeviceRequest) =>
       apiFetch<DeviceWithRelations>('/devices', { method: 'POST', body: JSON.stringify(data) }),
@@ -190,6 +239,14 @@ export const api = {
   },
   tiers: {
     ...crudEndpoints<HardwareTier>('/tiers'),
+    listAll: (params?: QueryParams) =>
+      fetchAllPages<HardwareTier>((page) =>
+        apiFetch<PaginatedResponse<HardwareTier>>(`/tiers${qs({
+          ...omitPagination(params),
+          page,
+          pageSize: 200,
+        })}`),
+      ),
     preview: (tiers: HardwareTier[]) =>
       apiFetch<Record<string, { tierName: string; count: number; devices: string[] }>>(
         '/tiers/preview',

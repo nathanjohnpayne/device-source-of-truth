@@ -304,18 +304,18 @@ export default function TierBrowserPage() {
     (async () => {
       try {
         const [tiersRes, devicesRes] = await Promise.all([
-          api.tiers.list(),
-          api.devices.list({ pageSize: 9999 }),
+          api.tiers.listAll(),
+          api.devices.listAll(),
         ]);
 
         const devicesByTier = new Map<string, DeviceWithRelations[]>();
-        for (const d of devicesRes.data) {
+        for (const d of devicesRes) {
           const key = d.tierId ?? '__uncategorized';
           if (!devicesByTier.has(key)) devicesByTier.set(key, []);
           devicesByTier.get(key)!.push(d);
         }
 
-        const enriched: TierWithDevices[] = tiersRes.data
+        const enriched: TierWithDevices[] = tiersRes
           .sort((a, b) => a.tierRank - b.tierRank)
           .map((t) => {
             const devices = devicesByTier.get(t.id) ?? [];

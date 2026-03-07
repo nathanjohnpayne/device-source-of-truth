@@ -113,6 +113,12 @@ describe('GET /api/devices/:id', () => {
     }
   });
 
+  it('joins telemetry snapshots using the business device identifier', async () => {
+    const res = await request(app).get('/api/devices/d1').expect(200);
+    expect(res.body.telemetrySnapshots).toHaveLength(1);
+    expect(res.body.telemetrySnapshots[0].deviceId).toBe('acme-4k-001');
+  });
+
   it('returns 404 for missing device', async () => {
     const res = await request(app).get('/api/devices/nonexistent').expect(404);
     expect(res.body.error).toBeDefined();

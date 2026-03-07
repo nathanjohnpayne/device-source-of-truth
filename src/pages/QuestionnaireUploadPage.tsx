@@ -40,8 +40,8 @@ export default function QuestionnaireUploadPage() {
 
   const loadPartners = useCallback(async () => {
     try {
-      const res = await api.partners.list({ pageSize: 500 });
-      setPartners((res.data ?? []) as PartnerWithStats[]);
+      const res = await api.partners.listAll();
+      setPartners((res ?? []) as PartnerWithStats[]);
     } catch {
       // Non-blocking; partner dropdown will be empty
     } finally {

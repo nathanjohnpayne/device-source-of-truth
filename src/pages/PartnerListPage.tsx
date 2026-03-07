@@ -79,8 +79,8 @@ export default function PartnerListPage() {
 
   useEffect(() => {
     setLoading(true);
-    api.partners.list({ pageSize: 500 })
-      .then((res) => setPartners(res.data as PartnerWithStats[]))
+    api.partners.listAll()
+      .then((res) => setPartners(res as PartnerWithStats[]))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);

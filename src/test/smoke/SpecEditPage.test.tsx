@@ -140,6 +140,30 @@ describe('SpecEditPage questionnaire upload', () => {
     expect(mockUpload).not.toHaveBeenCalled();
   });
 
+  it('saves against the resolved device document id when opened by business id', async () => {
+    mockDevicesGet.mockResolvedValue({
+      ...minimalDeviceDetail,
+      id: 'd1',
+      deviceId: 'legacy-business-id',
+      spec: null,
+    });
+    mockSpecsSave.mockResolvedValue({});
+    mockDevicesUpdate.mockResolvedValue({});
+
+    renderPage('legacy-business-id');
+
+    await waitFor(() => {
+      expect(screen.getByText('STB Questionnaire')).toBeInTheDocument();
+    });
+
+    const saveButton = screen.getAllByRole('button', { name: /save/i })[0];
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockSpecsSave).toHaveBeenCalledWith('d1', expect.any(Object));
+    });
+  });
+
   it('omits partnerId when device has no partner', async () => {
     await renderAndWaitForLoad({ ...minimalDeviceDetail, partner: null, partnerKey: null });
 

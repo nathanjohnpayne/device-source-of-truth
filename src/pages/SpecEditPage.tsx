@@ -276,13 +276,14 @@ function SpecSection({
 }
 
 function SpecEditForm() {
-  const { id: deviceId } = useParams<{ id: string }>();
+  const { id: routeDeviceId } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [savePhase, setSavePhase] = useState<'idle' | 'saving' | 'uploading'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [deviceName, setDeviceName] = useState('');
+  const [resolvedDeviceId, setResolvedDeviceId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Record<string, Record<string, unknown>>>(buildEmptySpec());
   const [questionnaireUrl, setQuestionnaireUrl] = useState('');
   const [questionnaireFile, setQuestionnaireFile] = useState<File | null>(null);
@@ -303,12 +304,13 @@ function SpecEditForm() {
   }, [blocker.state]);
 
   useEffect(() => {
-    if (!deviceId) return;
-    trackEvent('spec_form_open', { device_id: deviceId });
+    if (!routeDeviceId) return;
 
     (async () => {
       try {
-        const device = await api.devices.get(deviceId);
+        const device = await api.devices.get(routeDeviceId);
+        setResolvedDeviceId(device.id);
+        trackEvent('spec_form_open', { device_id: device.id });
         setDeviceName(device.displayName);
         setQuestionnaireUrl(device.questionnaireUrl ?? '');
         setPartnerId(device.partner?.id ?? device.partnerKey?.partnerId ?? null);
@@ -336,7 +338,7 @@ function SpecEditForm() {
         setLoading(false);
       }
     })();
-  }, [deviceId]);
+  }, [routeDeviceId]);
 
   const handleFieldChange = useCallback(
     (section: SpecCategory, key: string, value: unknown) => {
@@ -388,21 +390,23 @@ function SpecEditForm() {
     };
   }, [formData]);
 
+  const targetDeviceId = resolvedDeviceId ?? routeDeviceId ?? '';
+
   const handleSave = async () => {
-    if (!deviceId) return;
+    if (!targetDeviceId) return;
     setSavePhase('saving');
     setError(null);
 
     try {
-      await api.deviceSpecs.save(deviceId, formData as SaveDeviceSpecRequest);
+      await api.deviceSpecs.save(targetDeviceId, formData as SaveDeviceSpecRequest);
 
       if (questionnaireUrl || questionnaireFile) {
-        await api.devices.update(deviceId, { questionnaireUrl: questionnaireUrl || null });
+        await api.devices.update(targetDeviceId, { questionnaireUrl: questionnaireUrl || null });
       }
 
       setIsDirty(false);
       initialData.current = JSON.stringify(formData);
-      trackEvent('spec_form_save', { device_id: deviceId, category: 'all' });
+      trackEvent('spec_form_save', { device_id: targetDeviceId, category: 'all' });
     } catch {
       setError('Failed to save specifications. Please try again.');
       setSavePhase('idle');
@@ -425,7 +429,7 @@ function SpecEditForm() {
         setSavePhase('idle');
       }
     } else {
-      navigate(`/devices/${deviceId}`);
+      navigate(`/devices/${targetDeviceId}`);
     }
   };
 
@@ -444,12 +448,12 @@ function SpecEditForm() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">STB Questionnaire</h1>
           <p className="mt-1 text-sm text-gray-500">
-            {deviceName} <span className="font-mono text-gray-400">({deviceId})</span>
+            {deviceName} <span className="font-mono text-gray-400">({targetDeviceId})</span>
           </p>
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => navigate(`/devices/${deviceId}`)}
+            onClick={() => navigate(`/devices/${targetDeviceId}`)}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             <X className="h-4 w-4" />
@@ -549,7 +553,7 @@ function SpecEditForm() {
 
       <div className="flex justify-end gap-3 border-t border-gray-200 pt-6">
         <button
-          onClick={() => navigate(`/devices/${deviceId}`)}
+          onClick={() => navigate(`/devices/${targetDeviceId}`)}
           className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           Cancel

@@ -91,8 +91,8 @@ export default function QuestionnaireQueuePage() {
 
   useEffect(() => {
     api.partners
-      .list({ pageSize: 500 })
-      .then((res) => setPartners(res.data))
+      .listAll()
+      .then((res) => setPartners(res))
       .catch(() => setPartners([]));
   }, []);
 

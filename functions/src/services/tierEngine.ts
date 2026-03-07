@@ -1,5 +1,9 @@
 import admin from 'firebase-admin';
 import type { DeviceSpec, HardwareTier } from '../types/index.js';
+import {
+  loadMergedDeviceSpecForDevice,
+  loadMergedDeviceSpecsForTiering,
+} from './deviceSpecStore.js';
 import { log } from './logger.js';
 
 const CODEC_FIELD_MAP: Record<string, string> = {
@@ -52,13 +56,13 @@ export async function assignTierToDevice(deviceId: string): Promise<string | nul
   log.info('Assigning tier to device', { deviceId });
 
   const db = admin.firestore();
-  const specSnap = await db.collection('deviceSpecs').where('deviceId', '==', deviceId).limit(1).get();
-  if (specSnap.empty) {
+  const loadedSpec = await loadMergedDeviceSpecForDevice(db, deviceId);
+  if (!loadedSpec) {
     log.warn('No specs found for tier assignment, skipping', { deviceId });
     return null;
   }
 
-  const spec = { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } as DeviceSpec;
+  const spec = { id: deviceId, ...loadedSpec.mergedSpec } as DeviceSpec;
   const tiersSnap = await db.collection('hardwareTiers').orderBy('tierRank', 'asc').get();
   const tiers = tiersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as HardwareTier);
 
@@ -109,21 +113,21 @@ export async function reassignAllDevices(): Promise<number> {
   log.info('Starting full device tier reassignment');
 
   const db = admin.firestore();
-  const specsSnap = await db.collection('deviceSpecs').get();
   let count = 0;
 
   const tiersSnap = await db.collection('hardwareTiers').orderBy('tierRank', 'asc').get();
   const tiers = tiersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as HardwareTier);
+  const specs = await loadMergedDeviceSpecsForTiering(db);
 
-  log.info('Reassignment context', { specCount: specsSnap.size, tierCount: tiers.length });
+  log.info('Reassignment context', { specCount: specs.length, tierCount: tiers.length });
 
   const tierAssignmentCounts: Record<string, number> = { unassigned: 0 };
   for (const tier of tiers) {
     tierAssignmentCounts[tier.tierName] = 0;
   }
 
-  for (const specDoc of specsSnap.docs) {
-    const spec = { id: specDoc.id, ...specDoc.data() } as DeviceSpec;
+  for (const specEntry of specs) {
+    const spec = { id: specEntry.deviceDocId, ...specEntry.mergedSpec } as DeviceSpec;
     let assignedTierId: string | null = null;
 
     for (const tier of tiers) {
@@ -134,7 +138,7 @@ export async function reassignAllDevices(): Promise<number> {
     }
 
     const now = new Date().toISOString();
-    await db.collection('devices').doc(spec.deviceId).update({
+    await db.collection('devices').doc(specEntry.deviceDocId).update({
       tierId: assignedTierId,
       tierAssignedAt: now,
       updatedAt: now,
@@ -142,7 +146,7 @@ export async function reassignAllDevices(): Promise<number> {
 
     if (assignedTierId) {
       await db.collection('deviceTierAssignments').add({
-        deviceId: spec.deviceId,
+        deviceId: specEntry.deviceDocId,
         tierId: assignedTierId,
         assignedAt: now,
         trigger: 'tier_definition_update' as const,

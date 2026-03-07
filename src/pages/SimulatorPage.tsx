@@ -89,16 +89,16 @@ export default function SimulatorPage() {
 
       const [simRes, devicesRes] = await Promise.all([
         api.tiers.simulate(params),
-        api.devices.list({ pageSize: 9999 }),
+        api.devices.listAll(),
       ]);
 
-      const allDevices = devicesRes.data;
+      const allDevices = devicesRes;
       const eligibleSet = new Set(simRes.eligible);
       const ineligibleSet = new Set(simRes.ineligible);
 
-      const eligible = allDevices.filter((d) => eligibleSet.has(d.deviceId));
+      const eligible = allDevices.filter((d) => eligibleSet.has(d.id));
       const ineligible: IneligibleDevice[] = allDevices
-        .filter((d) => ineligibleSet.has(d.deviceId))
+        .filter((d) => ineligibleSet.has(d.id))
         .map((d) => ({ ...d, shortfalls: [] }));
 
       setResult({

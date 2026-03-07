@@ -550,8 +550,8 @@ export default function AlertsPage() {
   useEffect(() => {
     if (!isAdmin) return;
     api.partners
-      .list({ pageSize: 500 })
-      .then((res) => setPartners(res.data))
+      .listAll()
+      .then((res) => setPartners(res))
       .catch(() => {});
   }, [isAdmin]);
 

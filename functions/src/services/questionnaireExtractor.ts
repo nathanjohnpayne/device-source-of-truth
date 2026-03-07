@@ -8,6 +8,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import admin from 'firebase-admin';
 import { getFunctions } from 'firebase-admin/functions';
+import { loadMergedDeviceSpecForDevice } from './deviceSpecStore.js';
 import { log, formatError } from './logger.js';
 import type {
   ConflictStatus,
@@ -670,12 +671,15 @@ export async function processDeviceExtraction(payload: ExtractionTaskPayload): P
     // Look up existing spec for conflict detection
     let existingSpec: DeviceSpec | null = null;
     if (deviceData.matchedDeviceId) {
-      const specSnap = await db.collection('deviceSpecs')
-        .where('deviceId', '==', deviceData.matchedDeviceId)
-        .limit(1)
-        .get();
-      if (!specSnap.empty) {
-        existingSpec = { id: specSnap.docs[0].id, ...specSnap.docs[0].data() } as DeviceSpec;
+      const mergedSpec = await loadMergedDeviceSpecForDevice(
+        db,
+        deviceData.matchedDeviceId as string,
+      );
+      if (mergedSpec) {
+        existingSpec = {
+          id: deviceData.matchedDeviceId,
+          ...mergedSpec.mergedSpec,
+        } as DeviceSpec;
       }
     }
 

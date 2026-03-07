@@ -235,10 +235,15 @@ export default function DeviceDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
     setLoading(true);
-    api.devices
-      .get(id)
-      .then((d) => {
+    setError(null);
+
+    (async () => {
+      try {
+        const d = await api.devices.get(id);
+        if (cancelled) return;
+
         setDevice(d);
         setEditForm({
           displayName: d.displayName,
@@ -246,22 +251,41 @@ export default function DeviceDetailPage() {
           certificationStatus: d.certificationStatus,
           certificationNotes: d.certificationNotes || '',
         });
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-    api.questionnaireIntake.getDeviceSources(id)
-      .then(setQuestionnaireSources)
-      .catch(() => {});
-    api.questionnaireIntake.getDeviceDeployments(id)
-      .then(setPartnerDeployments)
-      .catch(() => {});
+
+        const [sourcesResult, deploymentsResult] = await Promise.allSettled([
+          api.questionnaireIntake.getDeviceSources(d.id),
+          api.questionnaireIntake.getDeviceDeployments(d.id),
+        ]);
+
+        if (cancelled) return;
+
+        if (sourcesResult.status === 'fulfilled') {
+          setQuestionnaireSources(sourcesResult.value);
+        }
+        if (deploymentsResult.status === 'fulfilled') {
+          setPartnerDeployments(deploymentsResult.value);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load device');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const handleSave = async () => {
-    if (!id) return;
+    if (!device) return;
     setSaving(true);
     try {
-      const updated = await api.devices.update(id, {
+      const updated = await api.devices.update(device.id, {
         displayName: editForm.displayName,
         liveAdkVersion: editForm.liveAdkVersion || null,
         certificationStatus: editForm.certificationStatus as CertificationStatus,
@@ -376,7 +400,7 @@ export default function DeviceDetailPage() {
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </button>
               <button
-                onClick={() => navigate(`/devices/${id}/specs/edit`)}
+                onClick={() => navigate(`/devices/${device.id}/specs/edit`)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
               >
                 <FileText className="h-3.5 w-3.5" /> Edit Specs
@@ -526,7 +550,7 @@ export default function DeviceDetailPage() {
             action={
               isEditor ? (
                 <button
-                  onClick={() => navigate(`/devices/${id}/specs/edit`)}
+                  onClick={() => navigate(`/devices/${device.id}/specs/edit`)}
                   className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
                 >
                   <Plus className="h-4 w-4" /> Add Specs
