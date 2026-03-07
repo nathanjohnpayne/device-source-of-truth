@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { api } from '../lib/api';
 import { trackEvent } from '../lib/analytics';
+import { formatNumber } from '../lib/format';
 import Badge from '../components/shared/Badge';
 import FreshnessBadge from '../components/shared/FreshnessBadge';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
@@ -170,11 +171,11 @@ export default function DashboardPage() {
         <KpiCard
           icon={<Shield className="h-5 w-5" />}
           label="Certification Status"
-          value={`${(data.uncertifiedCount ?? 0).toLocaleString()} Uncertified`}
-          sub={`${(data.certifiedCount ?? 0).toLocaleString()} certified · ${(data.pendingCount ?? 0).toLocaleString()} pending`}
+          value={`${formatNumber(data.uncertifiedCount ?? 0)} Uncertified`}
+          sub={`${formatNumber(data.certifiedCount ?? 0)} certified · ${formatNumber(data.pendingCount ?? 0)} pending`}
           badge={
             (data.uncertifiedCount ?? 0) > 0
-              ? { text: `${(data.uncertifiedCount ?? 0).toLocaleString()} uncertified`, variant: 'warning' as const }
+              ? { text: `${formatNumber(data.uncertifiedCount ?? 0)} uncertified`, variant: 'warning' as const }
               : undefined
           }
         />

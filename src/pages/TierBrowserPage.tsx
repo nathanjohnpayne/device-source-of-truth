@@ -18,6 +18,7 @@ import { useAuth } from '../hooks/useAuth';
 import Badge from '../components/shared/Badge';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
+import { formatNumber } from '../lib/format';
 import type { HardwareTier, DeviceWithRelations } from '../lib/types';
 
 const CODEC_OPTIONS = [
@@ -475,11 +476,11 @@ export default function TierBrowserPage() {
                 <Link
                   key={d.id}
                   to={`/devices/${d.id}`}
-                  className="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-amber-100"
+                  className="flex items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-amber-100"
                 >
                   <span className="font-medium text-gray-900">{d.displayName}</span>
                   <span className="text-xs text-gray-500">
-                    {d.activeDeviceCount.toLocaleString()} active devices
+                    {formatNumber(d.activeDeviceCount)} active devices
                   </span>
                 </Link>
               ))}
