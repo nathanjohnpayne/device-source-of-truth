@@ -170,11 +170,11 @@ export default function DashboardPage() {
         <KpiCard
           icon={<Shield className="h-5 w-5" />}
           label="Certification Status"
-          value={`${data.uncertifiedCount ?? 0} Uncertified`}
-          sub={`${data.certifiedCount ?? 0} certified · ${data.pendingCount ?? 0} pending`}
+          value={`${(data.uncertifiedCount ?? 0).toLocaleString()} Uncertified`}
+          sub={`${(data.certifiedCount ?? 0).toLocaleString()} certified · ${(data.pendingCount ?? 0).toLocaleString()} pending`}
           badge={
             (data.uncertifiedCount ?? 0) > 0
-              ? { text: `${data.uncertifiedCount} uncertified`, variant: 'warning' as const }
+              ? { text: `${(data.uncertifiedCount ?? 0).toLocaleString()} uncertified`, variant: 'warning' as const }
               : undefined
           }
         />

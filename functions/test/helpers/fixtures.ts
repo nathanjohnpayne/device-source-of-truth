@@ -348,6 +348,18 @@ export const fixtures = {
 
   notifications: [],
   deviceQuestionnaireSources: [],
+
+  coreVersionMappings: [
+    {
+      id: 'cvm1',
+      coreVersion: '7.3.1',
+      friendlyVersion: 'ADK 7.3.1',
+      platform: 'ncp',
+      isActive: true,
+      createdAt: NOW,
+      updatedAt: NOW,
+    },
+  ],
 };
 
 export function seedAll(db: { seed: (name: string, docs: Array<{ id: string; [k: string]: unknown }>) => void }) {
