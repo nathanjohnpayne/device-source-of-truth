@@ -1,0 +1,15 @@
+---
+description: Features built from a plan must be delivered as a pull request
+alwaysApply: true
+---
+
+# Feature PR Workflow
+
+When a feature is implemented from a plan (i.e., after switching from Plan mode to Agent mode), always deliver the work as a pull request:
+
+1. Create a feature branch from the current base branch before making changes (e.g., `feature/short-description`).
+2. Commit all changes to the feature branch with a clear commit message.
+3. Push the branch and open a PR using `gh pr create` with a summary and test plan.
+4. Return the PR URL to the user.
+
+Do not commit directly to `main` or the current branch without opening a PR.
