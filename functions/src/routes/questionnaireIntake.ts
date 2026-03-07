@@ -1314,7 +1314,7 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
 
         const emptySpec: Record<string, unknown> = {
           id: newDeviceId,
-          deviceId: newDeviceData.deviceId,
+          deviceId: newDeviceId,
           updatedAt: now,
         };
         await flushIfNeeded(db, writer);
@@ -1381,7 +1381,7 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
 
       if (Object.keys(specUpdates).length > 0) {
         const specRef = db.collection('deviceSpecs').doc(targetDeviceDocId);
-        const mergeUpdates: Record<string, unknown> = { updatedAt: now, ...specUpdates };
+        const mergeUpdates: Record<string, unknown> = { deviceId: targetDeviceDocId, updatedAt: now, ...specUpdates };
 
         await flushIfNeeded(db, writer);
         writer.batch.set(specRef, mergeUpdates, { merge: true });

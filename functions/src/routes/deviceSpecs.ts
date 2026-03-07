@@ -48,21 +48,21 @@ router.get('/:deviceId', async (req, res) => {
     const deviceId = req.params.deviceId as string;
     req.log?.debug('Getting device specs', { deviceId });
 
-    const snap = await db
-      .collection('deviceSpecs')
-      .where('deviceId', '==', deviceId)
-      .limit(1)
-      .get();
+    const [byDoc, byField] = await Promise.all([
+      db.collection('deviceSpecs').doc(deviceId).get(),
+      db.collection('deviceSpecs').where('deviceId', '==', deviceId).limit(1).get(),
+    ]);
 
-    if (snap.empty) {
+    const doc = byDoc.exists ? byDoc : (!byField.empty ? byField.docs[0] : null);
+
+    if (!doc) {
       req.log?.warn('No specs found for device', { deviceId });
       res.status(404).json({ error: 'No specs found for this device' });
       return;
     }
 
-    const doc = snap.docs[0];
     const specData = coerceDeviceSpecDoc({ id: doc.id, ...doc.data() });
-    req.log?.info('Device specs fetched', { deviceId, specDocId: doc.id });
+    req.log?.info('Device specs fetched', { deviceId, specDocId: doc.id, lookup: byDoc.exists ? 'byDocId' : 'byField' });
     res.json(specData);
   } catch (err) {
     req.log?.error('Failed to get device specs', formatError(err));
@@ -99,24 +99,25 @@ router.put('/:deviceId', requireRole('editor', 'admin'), async (req, res) => {
       specData[key] = parsed.data[key as keyof typeof parsed.data] ?? {};
     }
 
-    const existingSnap = await db
-      .collection('deviceSpecs')
-      .where('deviceId', '==', deviceId)
-      .limit(1)
-      .get();
+    const [existingByDoc, existingByField] = await Promise.all([
+      db.collection('deviceSpecs').doc(deviceId).get(),
+      db.collection('deviceSpecs').where('deviceId', '==', deviceId).limit(1).get(),
+    ]);
+
+    const existingDoc = existingByDoc.exists ? existingByDoc
+      : (!existingByField.empty ? existingByField.docs[0] : null);
 
     let specId: string;
-    if (existingSnap.empty) {
+    if (!existingDoc) {
       const docRef = await db.collection('deviceSpecs').add(specData);
       specId = docRef.id;
       req.log?.info('Device specs created (new)', { deviceId, specId });
     } else {
-      const existingDoc = existingSnap.docs[0];
       specId = existingDoc.id;
-      const oldData = existingDoc.data();
+      const oldData = existingDoc.data()!;
       await db.collection('deviceSpecs').doc(specId).set(specData);
       await diffAndLog('deviceSpec', specId, oldData, specData, req.user!.uid, req.user!.email);
-      req.log?.info('Device specs updated (existing)', { deviceId, specId });
+      req.log?.info('Device specs updated (existing)', { deviceId, specId, lookup: existingByDoc.exists ? 'byDocId' : 'byField' });
     }
 
     const completeness = calculateSpecCompleteness(specData);
