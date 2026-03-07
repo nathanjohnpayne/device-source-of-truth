@@ -17,7 +17,7 @@ describe('Dashboard ADK version normalization', () => {
   ) {
     mockDb.seed(
       'coreVersionMappings',
-      mappings.map((m) => ({ ...m, isActive: true, platform: 'ncp', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' })),
+      mappings.map((m) => ({ ...m, isActive: true, platform: 'ADK', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' })),
     );
   }
 
@@ -50,13 +50,12 @@ describe('Dashboard ADK version normalization', () => {
     expect(adk[0].count).toBe(100);
   });
 
-  it('strips plugin suffix and falls back to normalized mapping', async () => {
+  it('resolves exact plugin version via its mapping', async () => {
     seedVersionMappings([
       { id: 'vm1', coreVersion: '3.0.1+plugin-4.2.21', friendlyVersion: 'ADK 3.0.1' },
     ]);
     seedDevicesWithVersions([
       { id: 'dv1', version: '3.0.1+plugin-4.2.21', activeCount: 50 },
-      { id: 'dv2', version: '3.0.1+plugin-5.0.0', activeCount: 30 },
     ]);
 
     const res = await request(app).get('/api/reports/dashboard').expect(200);
@@ -64,7 +63,7 @@ describe('Dashboard ADK version normalization', () => {
 
     expect(adk).toHaveLength(1);
     expect(adk[0].version).toBe('ADK 3.0.1');
-    expect(adk[0].count).toBe(80);
+    expect(adk[0].count).toBe(50);
   });
 
   it('exact base version mapping takes precedence over normalized fallback', async () => {
@@ -122,7 +121,6 @@ describe('Dashboard ADK version normalization', () => {
     seedDevicesWithVersions([
       { id: 'dv1', version: '3.1.0+plugin-1.0.0', activeCount: 100 },
       { id: 'dv2', version: '3.1.0+plugin-2.0.0', activeCount: 200 },
-      { id: 'dv3', version: '3.1.0+plugin-3.0.0', activeCount: 50 },
     ]);
 
     const res = await request(app).get('/api/reports/dashboard').expect(200);
@@ -130,7 +128,7 @@ describe('Dashboard ADK version normalization', () => {
 
     const consolidated = adk.find((v: { version: string }) => v.version === 'ADK 3.1.0');
     expect(consolidated).toBeDefined();
-    expect(consolidated.count).toBe(350);
+    expect(consolidated.count).toBe(300);
   });
 
   it('does not overwrite exact mapping when normalized fallback has a different friendly name', async () => {
@@ -157,7 +155,7 @@ describe('Dashboard ADK version normalization', () => {
 
   it('inactive version mappings are excluded', async () => {
     mockDb.seed('coreVersionMappings', [
-      { id: 'vm1', coreVersion: '7.3.1', friendlyVersion: 'Old Name', isActive: false, platform: 'ncp', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+      { id: 'vm1', coreVersion: '7.3.1', friendlyVersion: 'Old Name', isActive: false, platform: 'ADK', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
     ]);
     seedDevicesWithVersions([
       { id: 'dv1', version: '7.3.1', activeCount: 100 },

@@ -354,7 +354,7 @@ export const fixtures = {
       id: 'cvm1',
       coreVersion: '7.3.1',
       friendlyVersion: 'ADK 7.3.1',
-      platform: 'ncp',
+      platform: 'ADK',
       isActive: true,
       createdAt: NOW,
       updatedAt: NOW,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 let mockRole = 'admin';
@@ -55,14 +55,16 @@ function setRole(role: 'admin' | 'editor' | 'viewer') {
   mockIsEditor = role === 'admin' || role === 'editor';
 }
 
-function renderShell() {
-  return render(
-    <MemoryRouter initialEntries={['/']}>
-      <AppShell>
-        <div>page content</div>
-      </AppShell>
-    </MemoryRouter>,
-  );
+async function renderShell() {
+  await act(async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppShell>
+          <div>page content</div>
+        </AppShell>
+      </MemoryRouter>,
+    );
+  });
 }
 
 beforeEach(() => {
@@ -73,16 +75,16 @@ describe('Sidebar navigation visibility by role', () => {
   describe('admin role', () => {
     beforeEach(() => setRole('admin'));
 
-    it('shows all core navigation items', () => {
-      renderShell();
+    it('shows all core navigation items', async () => {
+      await renderShell();
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Devices')).toBeInTheDocument();
       expect(screen.getByText('Partners')).toBeInTheDocument();
       expect(screen.getByText('Hardware Tiers')).toBeInTheDocument();
     });
 
-    it('shows the Data Ingestion section with all items', () => {
-      renderShell();
+    it('shows the Data Ingestion section with all items', async () => {
+      await renderShell();
       expect(screen.getByText('Data Ingestion')).toBeInTheDocument();
       expect(screen.getByText('Intake Requests')).toBeInTheDocument();
       expect(screen.getByText('Telemetry Upload')).toBeInTheDocument();
@@ -90,15 +92,15 @@ describe('Sidebar navigation visibility by role', () => {
       expect(screen.getByText('Data Migration')).toBeInTheDocument();
     });
 
-    it('shows the Configuration section', () => {
-      renderShell();
+    it('shows the Configuration section', async () => {
+      await renderShell();
       expect(screen.getByText('Configuration')).toBeInTheDocument();
       expect(screen.getByText('Reference Data')).toBeInTheDocument();
       expect(screen.getByText('Partner Keys')).toBeInTheDocument();
     });
 
-    it('shows the Admin section', () => {
-      renderShell();
+    it('shows the Admin section', async () => {
+      await renderShell();
       expect(screen.getByText('Admin')).toBeInTheDocument();
       expect(screen.getByText('Users')).toBeInTheDocument();
       expect(screen.getByText('Alerts')).toBeInTheDocument();
@@ -108,8 +110,8 @@ describe('Sidebar navigation visibility by role', () => {
       expect(screen.getByText('Danger Zone')).toBeInTheDocument();
     });
 
-    it('shows the Reports section', () => {
-      renderShell();
+    it('shows the Reports section', async () => {
+      await renderShell();
       expect(screen.getByText('Reports')).toBeInTheDocument();
       expect(screen.getByText('Spec Coverage')).toBeInTheDocument();
     });
@@ -118,48 +120,48 @@ describe('Sidebar navigation visibility by role', () => {
   describe('viewer role', () => {
     beforeEach(() => setRole('viewer'));
 
-    it('shows core navigation items', () => {
-      renderShell();
+    it('shows core navigation items', async () => {
+      await renderShell();
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Devices')).toBeInTheDocument();
       expect(screen.getByText('Partners')).toBeInTheDocument();
       expect(screen.getByText('Hardware Tiers')).toBeInTheDocument();
     });
 
-    it('shows the Data Ingestion section heading (not section-level adminOnly)', () => {
-      renderShell();
+    it('shows the Data Ingestion section heading (not section-level adminOnly)', async () => {
+      await renderShell();
       expect(screen.getByText('Data Ingestion')).toBeInTheDocument();
     });
 
-    it('shows Questionnaires under Data Ingestion (no adminOnly flag)', () => {
-      renderShell();
+    it('shows Questionnaires under Data Ingestion (no adminOnly flag)', async () => {
+      await renderShell();
       expect(screen.getByText('Questionnaires')).toBeInTheDocument();
     });
 
-    it('hides admin-only items within Data Ingestion', () => {
-      renderShell();
+    it('hides admin-only items within Data Ingestion', async () => {
+      await renderShell();
       expect(screen.queryByText('Intake Requests')).not.toBeInTheDocument();
       expect(screen.queryByText('Telemetry Upload')).not.toBeInTheDocument();
       expect(screen.queryByText('Data Migration')).not.toBeInTheDocument();
     });
 
-    it('hides the Configuration section entirely (section-level adminOnly)', () => {
-      renderShell();
+    it('hides the Configuration section entirely (section-level adminOnly)', async () => {
+      await renderShell();
       expect(screen.queryByText('Configuration')).not.toBeInTheDocument();
       expect(screen.queryByText('Reference Data')).not.toBeInTheDocument();
       expect(screen.queryByText('Partner Keys')).not.toBeInTheDocument();
     });
 
-    it('hides the Admin section entirely', () => {
-      renderShell();
+    it('hides the Admin section entirely', async () => {
+      await renderShell();
       expect(screen.queryByText('Admin')).not.toBeInTheDocument();
       expect(screen.queryByText('Users')).not.toBeInTheDocument();
       expect(screen.queryByText('Alerts')).not.toBeInTheDocument();
       expect(screen.queryByText('Audit Log')).not.toBeInTheDocument();
     });
 
-    it('shows Reports section (not admin-restricted)', () => {
-      renderShell();
+    it('shows Reports section (not admin-restricted)', async () => {
+      await renderShell();
       expect(screen.getByText('Reports')).toBeInTheDocument();
       expect(screen.getByText('Spec Coverage')).toBeInTheDocument();
     });
@@ -168,20 +170,20 @@ describe('Sidebar navigation visibility by role', () => {
   describe('editor role', () => {
     beforeEach(() => setRole('editor'));
 
-    it('shows Questionnaires (available to editors)', () => {
-      renderShell();
+    it('shows Questionnaires (available to editors)', async () => {
+      await renderShell();
       expect(screen.getByText('Questionnaires')).toBeInTheDocument();
     });
 
-    it('hides admin-only items within Data Ingestion', () => {
-      renderShell();
+    it('hides admin-only items within Data Ingestion', async () => {
+      await renderShell();
       expect(screen.queryByText('Intake Requests')).not.toBeInTheDocument();
       expect(screen.queryByText('Telemetry Upload')).not.toBeInTheDocument();
       expect(screen.queryByText('Data Migration')).not.toBeInTheDocument();
     });
 
-    it('hides Configuration and Admin sections', () => {
-      renderShell();
+    it('hides Configuration and Admin sections', async () => {
+      await renderShell();
       expect(screen.queryByText('Configuration')).not.toBeInTheDocument();
       expect(screen.queryByText('Admin')).not.toBeInTheDocument();
     });
