@@ -196,12 +196,13 @@ export default function DeviceListPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              const headers = ['Device Name', 'Device ID', 'Partner', 'ADK Version', 'Tier', 'Active Devices', 'Spec %'];
+              const headers = ['Device Name', 'Device ID', 'Partner', 'ADK Version', 'SoC / Chipset', 'Tier', 'Active Devices', 'Spec %'];
               const rows = devices.map((d) => [
                 d.displayName,
                 d.deviceId,
                 d.partnerName ?? '',
                 d.liveAdkVersion ?? '',
+                d.chipset ?? '',
                 d.tierName ?? '',
                 String(d.activeDeviceCount),
                 `${d.specCompleteness}%`,

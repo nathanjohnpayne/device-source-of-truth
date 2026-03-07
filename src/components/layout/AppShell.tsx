@@ -72,7 +72,6 @@ const NAV_SECTIONS: NavSection[] = [
   },
   {
     heading: 'Data Ingestion',
-    adminOnly: true,
     items: [
       {
         label: 'Intake Requests',

@@ -99,6 +99,7 @@ router.get('/dashboard', async (req, res) => {
       });
 
     const versionMap = new Map<string, string>();
+    const normalizedFallbacks = new Map<string, string>();
     for (const doc of versionMappingsSnap.docs) {
       const data = doc.data();
       const core = data.coreVersion as string;
@@ -106,8 +107,11 @@ router.get('/dashboard', async (req, res) => {
       if (core && friendly) {
         versionMap.set(core, friendly);
         const normalized = core.replace(/\+plugin-[\d.]+$/, '');
-        if (normalized !== core) versionMap.set(normalized, friendly);
+        if (normalized !== core) normalizedFallbacks.set(normalized, friendly);
       }
+    }
+    for (const [key, value] of normalizedFallbacks) {
+      if (!versionMap.has(key)) versionMap.set(key, value);
     }
 
     const adkVersionCounts = new Map<string, number>();
