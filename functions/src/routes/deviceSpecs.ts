@@ -2,13 +2,45 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import { requireRole } from '../middleware/auth.js';
 import { diffAndLog } from '../services/audit.js';
-import { calculateSpecCompleteness } from '../services/specCompleteness.js';
+import { calculateSpecCompleteness, repairFlatDottedSpec } from '../services/specCompleteness.js';
 import { assignTierToDevice } from '../services/tierEngine.js';
 import { formatError } from '../services/logger.js';
 import { coerceDeviceSpecDoc } from '../services/coercion.js';
 import { SPEC_CATEGORIES, SaveDeviceSpecRequestSchema } from '../types/index.js';
 
 const router = Router();
+
+router.post('/repair', requireRole('admin'), async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const allSpecs = await db.collection('deviceSpecs').get();
+    let repaired = 0;
+
+    for (const doc of allSpecs.docs) {
+      const data = doc.data();
+      const { repaired: cleanSpec, hadRepairs } = repairFlatDottedSpec(data as Record<string, unknown>);
+      if (hadRepairs) {
+        await db.collection('deviceSpecs').doc(doc.id).set(cleanSpec);
+        const completeness = calculateSpecCompleteness(cleanSpec);
+        const deviceId = (cleanSpec.deviceId ?? cleanSpec.id) as string | undefined;
+        if (deviceId) {
+          await db.collection('devices').doc(deviceId).update({
+            specCompleteness: completeness,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+        repaired++;
+        req.log?.info('Repaired flat dotted spec', { docId: doc.id, deviceId, completeness });
+      }
+    }
+
+    req.log?.info('Spec repair complete', { total: allSpecs.size, repaired });
+    res.json({ total: allSpecs.size, repaired });
+  } catch (err) {
+    req.log?.error('Spec repair failed', formatError(err));
+    res.status(500).json({ error: 'Spec repair failed', detail: String(err) });
+  }
+});
 
 router.get('/:deviceId', async (req, res) => {
   try {

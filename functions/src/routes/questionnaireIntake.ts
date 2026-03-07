@@ -11,7 +11,7 @@ import { log, formatError } from '../services/logger.js';
 import { parseQuestionnaire } from '../services/questionnaireParser.js';
 import { enqueueExtractionTasks } from '../services/questionnaireExtractor.js';
 import { uploadQuestionnaireFile, getSignedDownloadUrl } from '../services/storage.js';
-import { calculateSpecCompleteness } from '../services/specCompleteness.js';
+import { calculateSpecCompleteness, repairFlatDottedSpec } from '../services/specCompleteness.js';
 import { assignTierToDevice } from '../services/tierEngine.js';
 import type { ExtractionStatus } from '../types/index.js';
 
@@ -1381,16 +1381,10 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
 
       if (Object.keys(specUpdates).length > 0) {
         const specRef = db.collection('deviceSpecs').doc(targetDeviceDocId);
-        const flatUpdates: Record<string, unknown> = { updatedAt: now };
-
-        for (const [section, fields] of Object.entries(specUpdates)) {
-          for (const [key, value] of Object.entries(fields)) {
-            flatUpdates[`${section}.${key}`] = value;
-          }
-        }
+        const mergeUpdates: Record<string, unknown> = { updatedAt: now, ...specUpdates };
 
         await flushIfNeeded(db, writer);
-        writer.batch.set(specRef, flatUpdates, { merge: true });
+        writer.batch.set(specRef, mergeUpdates, { merge: true });
         writer.opCount++;
       }
 
@@ -1491,13 +1485,18 @@ router.post('/:id/approve', requireRole('admin'), async (req, res) => {
     writer.opCount++;
     await finalCommit(writer);
 
-    // Post-commit: recalculate spec completeness and tier assignments
+    // Post-commit: repair any flat-dotted keys, recalculate spec completeness and tier assignments
     for (const deviceId of affectedDeviceIds) {
       try {
         const specSnap = await db.collection('deviceSpecs').doc(deviceId).get();
         if (specSnap.exists) {
           const specData = specSnap.data()!;
-          const completeness = calculateSpecCompleteness(specData as Record<string, unknown>);
+          const { repaired, hadRepairs } = repairFlatDottedSpec(specData as Record<string, unknown>);
+          if (hadRepairs) {
+            await db.collection('deviceSpecs').doc(deviceId).set(repaired);
+            req.log?.info('Repaired flat dotted keys in deviceSpec', { deviceId });
+          }
+          const completeness = calculateSpecCompleteness(repaired as Record<string, unknown>);
           await db.collection('devices').doc(deviceId).update({
             specCompleteness: completeness,
             updatedAt: now,
