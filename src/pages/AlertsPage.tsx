@@ -14,7 +14,7 @@ import type {
   Partner,
   DeviceType,
 } from '../lib/types';
-import { formatDate } from '../lib/format';
+import { formatDate, formatNumber } from '../lib/format';
 
 const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   unregistered_device: 'Unregistered Device',
@@ -363,7 +363,7 @@ function RegisterDeviceModal({
               </p>
               <p className="text-sm text-gray-600">
                 <span className="font-medium">Unique Devices:</span>{' '}
-                {(alert.uniqueDeviceCount ?? 0).toLocaleString()}
+                {formatNumber(alert.uniqueDeviceCount ?? 0)}
               </p>
               <p className="text-sm text-gray-600">
                 <span className="font-medium">First Seen:</span> {formatDate(alert.firstSeen)}

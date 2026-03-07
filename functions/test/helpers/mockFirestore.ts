@@ -7,6 +7,20 @@ export const DOCUMENT_ID_SENTINEL = '__docId__';
 
 type DocData = Record<string, unknown>;
 
+function deepMerge(target: DocData, source: DocData): DocData {
+  const result = { ...target };
+  for (const key of Object.keys(source)) {
+    const sv = source[key];
+    const tv = result[key];
+    if (sv && typeof sv === 'object' && !Array.isArray(sv) && tv && typeof tv === 'object' && !Array.isArray(tv)) {
+      result[key] = deepMerge(tv as DocData, sv as DocData);
+    } else {
+      result[key] = sv;
+    }
+  }
+  return result;
+}
+
 export class MockDocRef {
   constructor(
     private store: Map<string, Map<string, DocData>>,
@@ -38,7 +52,7 @@ export class MockDocRef {
     }
     if (_options?.merge) {
       const existing = coll.get(this.id) ?? {};
-      coll.set(this.id, { ...existing, ...data });
+      coll.set(this.id, deepMerge(existing, data));
     } else {
       coll.set(this.id, { ...data });
     }

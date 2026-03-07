@@ -323,17 +323,17 @@ describe('POST /api/questionnaire-intake/:id/approve — spec doc upsert', () =>
     const specSnap = await mockDb.collection('deviceSpecs').doc('d1').get();
     expect(specSnap.exists).toBe(true);
     const specData = specSnap.data()!;
-    expect(specData['hardware.socVendor']).toBe('Broadcom');
+    expect((specData.hardware as Record<string, unknown>)?.socVendor).toBe('Broadcom');
     expect(specData.updatedAt).toBeDefined();
   });
 
   it('preserves existing spec fields when merging new fields', async () => {
-    // Pre-populate spec with an existing field
+    // Pre-populate spec with an existing nested field
     await mockDb.collection('deviceSpecs').doc('d1').set({
       id: 'd1',
       deviceId: 'acme-4k-001',
       updatedAt: '2026-01-01T00:00:00.000Z',
-      'hardware.cpuCores': '4',
+      hardware: { cpuCores: '4' },
     });
 
     await mockDb.collection('questionnaireStagedDevices').doc('qsd1').update({
@@ -347,7 +347,8 @@ describe('POST /api/questionnaire-intake/:id/approve — spec doc upsert', () =>
 
     const specSnap = await mockDb.collection('deviceSpecs').doc('d1').get();
     const specData = specSnap.data()!;
-    expect(specData['hardware.socVendor']).toBe('Broadcom');
-    expect(specData['hardware.cpuCores']).toBe('4');
+    const hw = specData.hardware as Record<string, unknown>;
+    expect(hw?.socVendor).toBe('Broadcom');
+    expect(hw?.cpuCores).toBe('4');
   });
 });
