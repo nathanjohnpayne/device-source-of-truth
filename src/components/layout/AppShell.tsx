@@ -22,7 +22,6 @@ import {
   ChevronRight,
   Trash2,
   GitBranch,
-  Check,
   Menu,
   X,
   Users,
@@ -40,15 +39,12 @@ interface NavItem {
   icon: ReactNode;
   badge?: string;
   adminOnly?: boolean;
-  stepNumber?: number;
 }
 
 interface NavSection {
   heading?: string;
-  headingIcon?: ReactNode;
   adminOnly?: boolean;
   items: NavItem[];
-  isSetupGroup?: boolean;
 }
 
 const NAV_SECTIONS: NavSection[] = [
@@ -75,36 +71,7 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    heading: 'Setup Imports',
-    headingIcon: <Upload className="h-3.5 w-3.5" />,
-    adminOnly: true,
-    isSetupGroup: true,
-    items: [
-      {
-        label: 'Reference Data',
-        path: '/admin/reference-data',
-        icon: <ListChecks className="h-5 w-5" />,
-        adminOnly: true,
-        stepNumber: 1,
-      },
-      {
-        label: 'Partner Keys',
-        path: '/admin/partner-keys',
-        icon: <Key className="h-5 w-5" />,
-        adminOnly: true,
-        stepNumber: 2,
-      },
-      {
-        label: 'Data Migration',
-        path: '/admin/migration',
-        icon: <Database className="h-5 w-5" />,
-        adminOnly: true,
-        stepNumber: 3,
-      },
-    ],
-  },
-  {
-    heading: 'Ongoing Imports',
+    heading: 'Data Ingestion',
     adminOnly: true,
     items: [
       {
@@ -123,6 +90,30 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Questionnaires',
         path: '/admin/questionnaires',
         icon: <FileSpreadsheet className="h-5 w-5" />,
+      },
+      {
+        label: 'Data Migration',
+        path: '/admin/migration',
+        icon: <Database className="h-5 w-5" />,
+        adminOnly: true,
+      },
+    ],
+  },
+  {
+    heading: 'Configuration',
+    adminOnly: true,
+    items: [
+      {
+        label: 'Reference Data',
+        path: '/admin/reference-data',
+        icon: <ListChecks className="h-5 w-5" />,
+        adminOnly: true,
+      },
+      {
+        label: 'Partner Keys',
+        path: '/admin/partner-keys',
+        icon: <Key className="h-5 w-5" />,
+        adminOnly: true,
       },
     ],
   },
@@ -198,25 +189,6 @@ function Breadcrumbs() {
   );
 }
 
-function SetupStepBadge({ stepNumber, completed, active }: { stepNumber: number; completed: boolean; active: boolean }) {
-  if (completed) {
-    return (
-      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500">
-        <Check className="h-3 w-3 text-white" />
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-        active ? 'bg-indigo-400 text-white' : 'bg-slate-700 text-slate-300'
-      }`}
-    >
-      {stepNumber}
-    </span>
-  );
-}
-
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const location = useLocation();
   const { isAdmin } = useAuth();
@@ -226,16 +198,6 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
-
-  const stepCompleted = (stepNumber: number): boolean => {
-    if (prereqs.loading) return false;
-    switch (stepNumber) {
-      case 1: return prereqs.fieldOptionsSeeded;
-      case 2: return prereqs.partnerKeysLoaded;
-      case 3: return prereqs.devicesRegistered;
-      default: return false;
-    }
-  };
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -279,8 +241,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
           return (
             <div key={si} className={si > 0 ? 'mt-6' : ''}>
               {section.heading && (
-                <h3 className="mb-2 flex items-center gap-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  {section.headingIcon}
+                <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   {section.heading}
                 </h3>
               )}
@@ -292,21 +253,13 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                     <li key={item.path}>
                       <Link
                         to={item.path}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors border-l-4 ${
                           active
-                            ? 'bg-indigo-600 text-white'
-                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                            ? 'border-white bg-indigo-600 text-white'
+                            : 'border-transparent text-slate-300 hover:bg-slate-800 hover:text-white'
                         }`}
                       >
-                        {section.isSetupGroup && item.stepNumber ? (
-                          <SetupStepBadge
-                            stepNumber={item.stepNumber}
-                            completed={stepCompleted(item.stepNumber)}
-                            active={active}
-                          />
-                        ) : (
-                          item.icon
-                        )}
+                        {item.icon}
                         <span className="flex-1">{item.label}</span>
                         {item.label === 'Devices' && !prereqs.loading && (
                           <span

@@ -71,7 +71,7 @@ function KpiCard({
         {badge && <Badge variant={badge.variant}>{badge.text}</Badge>}
       </div>
       <div className="mt-3">
-        <p className="text-2xl font-bold text-gray-900">
+        <p className="text-3xl font-bold text-gray-900">
           {typeof value === 'number' ? value.toLocaleString() : value}
         </p>
         <p className="mt-0.5 text-sm text-gray-500">{label}</p>
@@ -131,7 +131,7 @@ export default function DashboardPage() {
     : data.top20Devices?.slice(0, 10);
 
   const adkChartData = data.adkVersions?.slice(0, 10).map((v) => ({
-    name: v.version,
+    name: v.version.replace(/\+plugin-/g, ' (plugin ') + (v.version.includes('+plugin-') ? ')' : ''),
     devices: v.count,
   }));
 
@@ -159,8 +159,9 @@ export default function DashboardPage() {
         />
         <KpiCard
           icon={<BarChart3 className="h-5 w-5" />}
-          label="Spec Coverage (weighted)"
+          label="Spec Coverage"
           value={`${data.specCoverageWeighted ?? 0}%`}
+          sub="Weighted by active device population"
           badge={{
             text: `${data.specCoverageWeighted ?? 0}%`,
             variant: specCoverageVariant(data.specCoverageWeighted ?? 0),
@@ -169,8 +170,13 @@ export default function DashboardPage() {
         <KpiCard
           icon={<Shield className="h-5 w-5" />}
           label="Certification Status"
-          value={data.certifiedCount ?? 0}
-          sub={`${data.pendingCount ?? 0} pending · ${data.uncertifiedCount ?? 0} uncertified`}
+          value={`${data.uncertifiedCount ?? 0} Uncertified`}
+          sub={`${data.certifiedCount ?? 0} certified · ${data.pendingCount ?? 0} pending`}
+          badge={
+            (data.uncertifiedCount ?? 0) > 0
+              ? { text: `${data.uncertifiedCount} uncertified`, variant: 'warning' as const }
+              : undefined
+          }
         />
         <KpiCard
           icon={<Bell className="h-5 w-5" />}
@@ -244,7 +250,7 @@ export default function DashboardPage() {
                       {d.tierName ? (
                         <Badge variant="info">{d.tierName}</Badge>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-xs text-gray-400">Unassigned</span>
                       )}
                     </td>
                   </tr>

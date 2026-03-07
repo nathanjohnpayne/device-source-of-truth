@@ -794,6 +794,7 @@ export interface DeviceWithRelations extends Device {
   partnerName?: string;
   partnerKeyName?: string;
   tierName?: string;
+  chipset?: string | null;
 }
 
 export interface DeviceDetail extends Device {
@@ -1086,6 +1087,7 @@ export const DeviceWithRelationsSchema = DeviceSchema.extend({
   partnerName: z.string().optional(),
   partnerKeyName: z.string().optional(),
   tierName: z.string().optional(),
+  chipset: z.string().nullable().optional(),
 });
 
 export const DeviceSpecSchema = z.object({

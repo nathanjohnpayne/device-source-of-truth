@@ -11,13 +11,14 @@ router.get('/dashboard', async (req, res) => {
     const db = admin.firestore();
     req.log?.debug('Generating dashboard report');
 
-    const [devicesSnap, alertsSnap, keysSnap, partnersSnap, tiersSnap, latestUploadSnap] = await Promise.all([
+    const [devicesSnap, alertsSnap, keysSnap, partnersSnap, tiersSnap, latestUploadSnap, versionMappingsSnap] = await Promise.all([
       db.collection('devices').get(),
       db.collection('alerts').where('status', '==', 'open').get(),
       db.collection('partnerKeys').get(),
       db.collection('partners').get(),
       db.collection('hardwareTiers').get(),
       db.collection('uploadHistory').orderBy('uploadedAt', 'desc').limit(1).get(),
+      db.collection('coreVersionMappings').where('isActive', '==', true).get(),
     ]);
 
     req.log?.debug('Dashboard data loaded', {
@@ -97,9 +98,24 @@ router.get('/dashboard', async (req, res) => {
         };
       });
 
+    const versionMap = new Map<string, string>();
+    for (const doc of versionMappingsSnap.docs) {
+      const data = doc.data();
+      const core = data.coreVersion as string;
+      const friendly = data.friendlyVersion as string;
+      if (core && friendly) {
+        versionMap.set(core, friendly);
+        const normalized = core.replace(/\+plugin-[\d.]+$/, '');
+        if (normalized !== core) versionMap.set(normalized, friendly);
+      }
+    }
+
     const adkVersionCounts = new Map<string, number>();
     for (const d of devices) {
-      const ver = d.liveAdkVersion ?? 'unknown';
+      const raw = d.liveAdkVersion ?? 'unknown';
+      const ver = versionMap.get(raw)
+        ?? versionMap.get(raw.replace(/\+plugin-[\d.]+$/, ''))
+        ?? raw;
       adkVersionCounts.set(ver, (adkVersionCounts.get(ver) ?? 0) + d.activeDeviceCount);
     }
     const adkVersions = [...adkVersionCounts.entries()]

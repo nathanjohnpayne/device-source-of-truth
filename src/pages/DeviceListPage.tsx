@@ -150,6 +150,16 @@ export default function DeviceListPage() {
     },
     { header: 'ADK Version', accessor: 'liveAdkVersion' },
     {
+      header: 'SoC / Chipset',
+      accessor: 'chipset',
+      render: (row) =>
+        row.chipset ? (
+          <span className="text-sm text-gray-700">{row.chipset}</span>
+        ) : (
+          <span className="text-gray-400">—</span>
+        ),
+    },
+    {
       header: 'Tier',
       accessor: 'tierName',
       sortable: true,

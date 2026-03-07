@@ -10,6 +10,7 @@ import {
   HardDrive,
   MonitorSmartphone,
   Search,
+  AlertTriangle,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { api } from '../lib/api';
@@ -451,6 +452,41 @@ export default function TierBrowserPage() {
           </div>
         </div>
       )}
+
+      {(() => {
+        const uncatTier = tiers.find((t) => t.id === '__uncategorized');
+        if (!uncatTier || uncatTier.devices.length === 0) return null;
+        const topUncat = [...uncatTier.devices]
+          .sort((a, b) => b.activeDeviceCount - a.activeDeviceCount)
+          .slice(0, 10);
+        return (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <h2 className="text-sm font-semibold text-amber-900">
+                Devices Missing Tier Classification
+              </h2>
+              <span className="text-xs text-amber-700">
+                {uncatTier.devices.length} device{uncatTier.devices.length !== 1 ? 's' : ''} unclassified
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {topUncat.map((d) => (
+                <Link
+                  key={d.id}
+                  to={`/devices/${d.id}`}
+                  className="flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-amber-100"
+                >
+                  <span className="font-medium text-gray-900">{d.displayName}</span>
+                  <span className="text-xs text-gray-500">
+                    {d.activeDeviceCount.toLocaleString()} active devices
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-1 gap-4">
         {tiers.map((tier, i) => (

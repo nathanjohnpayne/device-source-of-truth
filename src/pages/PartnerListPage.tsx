@@ -20,6 +20,8 @@ function countryFlag(iso2: string): string {
   return String.fromCodePoint(cp1, cp2);
 }
 
+const MAX_VISIBLE_FLAGS = 3;
+
 const columns: Column<PartnerWithStats>[] = [
   { header: 'Display Name', accessor: 'displayName', sortable: true },
   {
@@ -36,19 +38,28 @@ const columns: Column<PartnerWithStats>[] = [
   {
     header: 'Countries',
     accessor: 'countriesIso2',
-    render: (row) => (
-      <div className="flex flex-wrap gap-1">
-        {(row.countriesIso2 ?? []).map((c) => (
-          <span key={c} className="text-sm">{countryFlag(c)} {c}</span>
-        ))}
-      </div>
-    ),
+    render: (row) => {
+      const countries = row.countriesIso2 ?? [];
+      const visible = countries.slice(0, MAX_VISIBLE_FLAGS);
+      const remaining = countries.length - MAX_VISIBLE_FLAGS;
+      const fullList = countries.map((c) => `${countryFlag(c)} ${c}`).join(', ');
+      return (
+        <div className="flex items-center gap-1" title={countries.length > MAX_VISIBLE_FLAGS ? fullList : undefined}>
+          {visible.map((c) => (
+            <span key={c} className="text-sm">{countryFlag(c)}</span>
+          ))}
+          {remaining > 0 && (
+            <span className="text-xs font-medium text-gray-500">+{remaining}</span>
+          )}
+        </div>
+      );
+    },
   },
   {
-    header: 'Partner Keys',
-    accessor: 'partnerKeyCount',
+    header: 'Active Devices',
+    accessor: 'activeDeviceCount',
     sortable: true,
-    render: (row) => (row.partnerKeyCount ?? 0).toLocaleString(),
+    render: (row) => (row.activeDeviceCount ?? 0).toLocaleString(),
   },
   {
     header: 'Devices',
@@ -57,10 +68,10 @@ const columns: Column<PartnerWithStats>[] = [
     render: (row) => (row.deviceCount ?? 0).toLocaleString(),
   },
   {
-    header: 'Active Devices',
-    accessor: 'activeDeviceCount',
+    header: 'Partner Keys',
+    accessor: 'partnerKeyCount',
     sortable: true,
-    render: (row) => (row.activeDeviceCount ?? 0).toLocaleString(),
+    render: (row) => (row.partnerKeyCount ?? 0).toLocaleString(),
   },
 ];
 

@@ -103,13 +103,13 @@ router.get('/', async (req, res) => {
     const paged = devices.slice((page - 1) * pageSize, page * pageSize);
 
     const keyIds = [...new Set(paged.map((d) => d.partnerKeyId).filter(Boolean))];
-    const keyMap: Record<string, { partnerId: string; key: string }> = {};
+    const keyMap: Record<string, { partnerId: string; key: string; chipset: string | null }> = {};
     for (let i = 0; i < keyIds.length; i += 30) {
       const batch = keyIds.slice(i, i + 30);
       const kSnap = await db.collection('partnerKeys').where(admin.firestore.FieldPath.documentId(), 'in', batch).get();
       for (const doc of kSnap.docs) {
         const data = doc.data();
-        keyMap[doc.id] = { partnerId: data.partnerId, key: data.key };
+        keyMap[doc.id] = { partnerId: data.partnerId, key: data.key, chipset: (data.chipset as string) ?? null };
       }
     }
 
@@ -138,6 +138,7 @@ router.get('/', async (req, res) => {
       partnerName: keyMap[d.partnerKeyId] ? partnerMap[keyMap[d.partnerKeyId].partnerId] : undefined,
       partnerKeyName: keyMap[d.partnerKeyId]?.key,
       tierName: d.tierId ? tierMap[d.tierId] : undefined,
+      chipset: keyMap[d.partnerKeyId]?.chipset ?? null,
     }));
 
     req.log?.info('Devices listed', { total, returned: results.length, page });
