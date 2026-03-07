@@ -411,18 +411,22 @@ router.get('/', async (req, res) => {
     let query: FirebaseFirestore.Query = db.collection('questionnaireIntakeJobs')
       .orderBy('uploadedAt', 'desc');
 
-    if (status) query = query.where('status', '==', status);
+    const TERMINAL_STATUSES = ['approved', 'partially_approved', 'rejected'];
+    if (status && status !== 'active') query = query.where('status', '==', status);
     if (uploaded_by) query = query.where('uploadedBy', '==', uploaded_by);
 
     const snap = await query.get();
     let allJobs = snap.docs.map(d => {
       const job = d.data();
-      // Normalize legacy jobs: surface partnerId as submitterPartnerId
       if (!job.submitterPartnerId && job.partnerId) {
         job.submitterPartnerId = job.partnerId;
       }
       return job;
     });
+
+    if (status === 'active') {
+      allJobs = allJobs.filter(j => !TERMINAL_STATUSES.includes(j.status as string));
+    }
 
     // Post-query partner filter covers both submitterPartnerId and legacy partnerId
     if (partner_id) {

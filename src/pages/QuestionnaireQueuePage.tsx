@@ -15,6 +15,7 @@ import type { Partner } from '../lib/types';
 const PAGE_SIZE = 20;
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'active', label: 'Active' },
   { value: '', label: 'All statuses' },
   { value: 'uploading', label: 'Uploading' },
   { value: 'parsing', label: 'Parsing' },
@@ -77,7 +78,7 @@ export default function QuestionnaireQueuePage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
