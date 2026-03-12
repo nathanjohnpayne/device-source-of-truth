@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+.firebase/
 functions/dist
 functions/node_modules
 functions/.contracts
