@@ -15,12 +15,12 @@
     "node": "22"
   },
   "dependencies": {
-    "@dst/contracts": "file:./.contracts",
     "@anthropic-ai/sdk": "^0.78.0",
+    "@dst/contracts": "file:./.contracts",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "firebase-admin": "^13.6.1",
-    "firebase-functions": "^7.0.6",
+    "firebase-functions": "^7.1.1",
     "papaparse": "^5.5.2",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
