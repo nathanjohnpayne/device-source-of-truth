@@ -292,7 +292,7 @@ Roles are stored in the `users` Firestore collection. A user doc is auto-provisi
 
 ## Build & Deploy
 
-Deploying requires the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`) to be installed and authenticated. Two auth flows exist:
+Deploying requires the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`), the 1Password desktop app or signed-in CLI session, `firebase-tools`, `gcloud`, and access to the `Private` vault. Two auth flows exist:
 
 ### Non-interactive deploy (recommended — no browser prompts)
 
@@ -305,7 +305,7 @@ npm run deploy:functions       # functions only
 op-firebase-deploy --only hosting,functions  # any combo
 ```
 
-`op-firebase-deploy` is a global script (`~/.local/bin/op-firebase-deploy`) that reads a per-project service account key from 1Password, writes it to a temp file, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up. No `firebase login`, `gcloud auth login`, or browser prompts required — the only interactive step is the 1Password biometric (Touch ID). The key never expires unless explicitly deleted. Works for any Firebase project.
+`op-firebase-deploy` is a global script (`~/.local/bin/op-firebase-deploy`) that reads a per-project service account key from 1Password, writes it to a temp file, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up. It checks `Private/Firebase Deploy - {project-id}` first, then falls back to `Private/GCP ADC`. No `firebase login`, `gcloud auth login`, or browser prompts required — the only interactive step is the 1Password biometric (Touch ID). The key never expires unless explicitly deleted. Works for any Firebase project.
 
 **First-time setup for any project:** Run `op-firebase-setup [project-id]` (global script at `~/.local/bin/op-firebase-setup`). This creates a `firebase-deployer` service account, grants deploy roles, generates a key, and stores it in 1Password. Run once per project.
 
@@ -348,6 +348,7 @@ Secret management flow:
 3. `functions/.env` is gitignored and only exists transiently during deploy.
 4. The canonical secret lives in **1Password** (Private vault → "DST Anthropic API Key").
 5. Never store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
+6. Future APIs or services should follow the same pattern: committed `*.tpl` file with `op://` references, gitignored resolved output, and `op inject` during deploy or runtime bootstrap.
 
 Deploy auth (managed via 1Password):
 1. `op-firebase-deploy` (global script at `~/.local/bin/`) reads a per-project service account key from 1Password and runs `firebase deploy --non-interactive`.

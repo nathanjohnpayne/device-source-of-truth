@@ -12,9 +12,10 @@
     "ui:consistency:baseline": "node scripts/ui-consistency-check.mjs --write-baseline",
     "preview": "vite preview",
     "pretest": "npm run build:contracts",
-    "test": "vitest run",
+    "test": "vitest run && node scripts/check-no-public-secrets.mjs",
     "test:watch": "vitest",
     "test:all": "npm test && cd functions && npm test",
+    "test:secrets": "node scripts/check-no-public-secrets.mjs",
     "deploy": "op-firebase-deploy",
     "deploy:hosting": "op-firebase-deploy --only hosting",
     "deploy:functions": "op-firebase-deploy --only functions"

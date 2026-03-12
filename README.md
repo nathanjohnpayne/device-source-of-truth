@@ -44,6 +44,9 @@ cd device-source-of-truth
 npm install
 cd functions && npm install && cd ..
 
+# Deploy maintainers: one-time 1Password/Firebase auth bootstrap
+op-firebase-setup device-source-of-truth
+
 # Configure environment
 cp .env.example .env
 # Fill in VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID, VITE_FIREBASE_MEASUREMENT_ID
@@ -65,16 +68,24 @@ The frontend runs at `http://localhost:5173`. By default it calls the production
 # Build frontend + backend
 npm run build && cd functions && npm run build && cd ..
 
-# Deploy everything to Firebase
-firebase deploy
+# Deploy everything to Firebase via 1Password auth
+npm run deploy
 
 # Deploy selectively
-firebase deploy --only hosting      # frontend
-firebase deploy --only functions    # backend API
-firebase deploy --only firestore    # security rules + indexes
+npm run deploy:hosting              # frontend
+npm run deploy:functions            # backend API
+op-firebase-deploy --only firestore # security rules + indexes
 ```
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including Firebase Console setup, seed data, custom domains, monitoring, and rollback procedures.
+
+## 1Password Deploy & Secret Flow
+
+- Deploy maintainers need `op`, `firebase-tools`, `gcloud`, and access to the `Private` vault in 1Password.
+- `op-firebase-setup device-source-of-truth` creates `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, grants deploy roles, and stores the JSON key in `Private/Firebase Deploy - device-source-of-truth`.
+- `npm run deploy`, `npm run deploy:hosting`, and `npm run deploy:functions` call `op-firebase-deploy`, which uses the per-project item first and falls back to `Private/GCP ADC` if needed.
+- Backend/provider secrets use committed `op://` references in [`functions/.env.tpl`](./functions/.env.tpl) and are resolved at deploy time with `op inject`.
+- Future APIs or services should follow the same pattern: commit only a template such as `.env.tpl`, `config.runtime.tpl`, or `functions/.env.tpl`, keep the resolved file gitignored, and materialize it with `op inject -i <template> -o <runtime-file> -f`.
 
 ## UI Consistency Guardrails
 
@@ -183,6 +194,8 @@ If a Firebase browser key is exposed:
 3. Update `.env`, redeploy hosting, verify the live app uses the new key, then delete the old key.
 
 If `ANTHROPIC_API_KEY` or a deployer service-account key is exposed, rotate it in 1Password immediately, redeploy, and explicitly delete the old provider/IAM key.
+
+`npm test` and `cd functions && npm test` both include tracked-file secret scans so committed API keys, OAuth tokens, and private keys fail the standard test workflow.
 
 ## Firebase Project
 
