@@ -330,6 +330,13 @@ npm run build                      # Frontend: tsc -b && vite build
 cd functions && npm run build      # Backend: tsc
 ```
 
+### Tests
+
+```bash
+npm test                           # frontend Vitest suite + tracked-file secret scan
+cd functions && npm test           # functions Vitest suite + tracked-file secret scan
+```
+
 ## Environment Variables
 
 Frontend (in `.env`, prefixed with `VITE_`):
