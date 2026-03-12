@@ -164,7 +164,7 @@ Roles are assigned via the `users` Firestore collection. The first admin must be
 | `VITE_FIREBASE_APP_ID` | Firebase Web App ID |
 | `VITE_FIREBASE_MEASUREMENT_ID` | Google Analytics 4 measurement ID |
 
-All three are prefixed with `VITE_` so Vite includes them in the client bundle. These values are safe to expose — Firebase security relies on Auth tokens and Firestore rules, not API key secrecy.
+All three are prefixed with `VITE_` so Vite includes them in the client bundle. They are not the auth boundary, but hardcoding real values in tracked source is still poor security posture: public exposure creates abuse/noise risk and triggers Google alerts. Keep them in local `.env` files and keep browser-key restrictions enabled in Google Cloud Credentials.
 
 **Backend** (in `functions/.env`, gitignored):
 
@@ -173,6 +173,16 @@ All three are prefixed with `VITE_` so Vite includes them in the client bundle. 
 | `ANTHROPIC_API_KEY` | Anthropic API key for AI disambiguation (DST-039, pre-production/testing) |
 
 The AI disambiguation feature falls back gracefully to rule-based validation if this key is missing or the API is unavailable.
+
+## Credential Hygiene & Rotation
+
+If a Firebase browser key is exposed:
+
+1. Remove it from tracked files and rewrite public git history if needed.
+2. Create a replacement key in Google Cloud Credentials with the same referrer/API restrictions.
+3. Update `.env`, redeploy hosting, verify the live app uses the new key, then delete the old key.
+
+If `ANTHROPIC_API_KEY` or a deployer service-account key is exposed, rotate it in 1Password immediately, redeploy, and explicitly delete the old provider/IAM key.
 
 ## Firebase Project
 

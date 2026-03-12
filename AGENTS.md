@@ -337,7 +337,7 @@ Frontend (in `.env`, prefixed with `VITE_`):
 - `VITE_FIREBASE_APP_ID` — Firebase Web App ID
 - `VITE_FIREBASE_MEASUREMENT_ID` — Google Analytics measurement ID
 
-These are safe to expose in the client bundle (Firebase security is handled by Auth + Firestore rules, not API key secrecy).
+These values do end up in the client bundle because the app runs in the browser, but they are not the auth boundary. Keep them out of tracked source anyway: public exposure still creates abuse/noise risk and triggers Google alerts. Store them in `.env`, keep browser-key restrictions enabled, and rotate if they leak.
 
 Backend secrets (managed via 1Password):
 - `ANTHROPIC_API_KEY` — Anthropic API key for AI disambiguation (DST-039) and questionnaire extraction (DST-047). Falls back gracefully if not set.
@@ -357,6 +357,11 @@ Deploy auth (managed via 1Password):
 5. Project ID is auto-detected from `.firebaserc` or passed as an argument.
 6. `.env.op` is a legacy fallback — `op-firebase-deploy` does not require it.
 7. Each project's `firebase-deployer` service account has deploy roles: `firebase.admin`, `cloudfunctions.admin`, `iam.serviceAccountUser`, `artifactregistry.writer`, `run.admin`. Keys never expire unless explicitly deleted. To set up a new project: `op-firebase-setup [project-id]`. To rotate a key: run `op-firebase-setup` again (generates a new key and updates 1Password; manually delete old keys via `gcloud iam service-accounts keys delete`).
+
+Rotation playbook:
+- Browser Firebase key: remove it from tracked files/history, create a replacement key in Google Cloud Credentials with the same referrer/API restrictions, update `.env`, redeploy hosting, verify the live app, then delete the old key.
+- Backend/provider secret: rotate it in 1Password, keep only `op://` references in `functions/.env.tpl`, redeploy functions, verify behavior, then revoke/delete the old secret.
+- Deployer service-account key: rerun `op-firebase-setup [project-id]`, confirm deploys work with the new key in 1Password, then delete the old IAM key.
 
 ## Things to Watch Out For
 
