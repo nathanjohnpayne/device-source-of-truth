@@ -1,15 +1,15 @@
-# AGENTS.md — AI Agent Onboarding Guide
+# AGENTS.md — Device Source of Truth (DST)
 
-This file is for AI coding assistants (Cursor, Copilot, Claude, etc.) working on the Device Source of Truth (DST) codebase. Read this before making changes.
+Platform-agnostic instructions for AI coding agents working on the DST codebase. Read this before making changes.
 
-## What This Project Is
+## 1. Repository Overview
 
+### What This Project Is
 DST is an internal Disney Streaming tool that consolidates NCP/ADK partner device data — hardware specs, partner relationships, deployment counts, ADK versions, and DRM compliance — into a single queryable system of record. It replaces data scattered across Datadog, Airtable, Google Drive, and spreadsheets.
 
 The product spec lives in `specs/Device Source of Truth (DST).md` (877 lines). Read it for full business context.
 
-## Architecture Overview
-
+### Architecture Overview
 ```
 React SPA (Vite + Tailwind)  →  Firebase Cloud Functions (Express REST API)  →  Firestore
      ↓                                    ↓
@@ -26,8 +26,7 @@ Firebase Hosting (static SPA)
 - AI: Anthropic Claude API (claude-sonnet-4-6) for import disambiguation and questionnaire field extraction
 - Auth: Firebase Auth with Google OAuth, domain-restricted to `@disney.com` and `@disneystreaming.com`
 
-## Directory Structure
-
+### Directory Structure
 ```
 /
 ├── src/                          ← React frontend
@@ -42,16 +41,16 @@ Firebase Hosting (static SPA)
 │   │   └── onboarding/           ← WelcomeModal (first-login wizard)
 │   ├── hooks/
 │   │   ├── useAuth.tsx           ← AuthProvider + useAuth() hook
-│   │   ├── useAppUpdate.ts      ← Dual-path update detection (SW + version polling)
-│   │   ├── useAIPassStatus.ts   ← AI pass status reducer for import disambiguation (DST-051)
-│   │   ├── useFieldOptions.tsx  ← Field options context provider for spec dropdowns
+│   │   ├── useAppUpdate.ts       ← Dual-path update detection (SW + version polling)
+│   │   ├── useAIPassStatus.ts    ← AI pass status reducer for import disambiguation (DST-051)
+│   │   ├── useFieldOptions.tsx   ← Field options context provider for spec dropdowns
 │   │   └── useImportPrerequisites.tsx ← Shared context for prerequisite checks (partners/keys exist)
 │   └── lib/
 │       ├── firebase.ts           ← Firebase client SDK init (Auth, Firestore, Analytics)
 │       ├── api.ts                ← Typed fetch wrapper for /api/* endpoints
 │       ├── analytics.ts          ← Typed GA4 event tracking (no-op in dev)
-│       ├── analyticsParams.ts   ← GA4 event parameter definitions
-│       ├── analyticsRoutes.ts   ← Route path → analytics page title mapping
+│       ├── analyticsParams.ts    ← GA4 event parameter definitions
+│       ├── analyticsRoutes.ts    ← Route path → analytics page title mapping
 │       ├── export.ts             ← CSV/PDF export utilities
 │       ├── format.ts             ← Shared formatting helpers (formatDate, formatDateTime, formatNumber, formatRelativeTime, getFreshnessState)
 │       ├── questionnaireFields.ts ← Questionnaire field key → DST spec field mappings
@@ -61,7 +60,7 @@ Firebase Hosting (static SPA)
 │   ├── src/
 │   │   ├── index.ts              ← Express app + extractDeviceTask Cloud Tasks function
 │   │   ├── middleware/auth.ts    ← Token verification, domain check, role guard
-│   │   ├── routes/               ← 18 Express routers (partners, devices, users, disambiguate, questionnaireIntake, versionMappings, partnerAliases, etc.)
+│   │   ├── routes/               ← 18 Express routers
 │   │   ├── services/             ← Business logic (audit, tierEngine, specCompleteness, intakeParser, aiDisambiguate, aiImportFramework, seedFieldOptions, questionnaireParser, questionnaireExtractor, partnerResolver, partnerAliasResolver, coercion, safeNumber, storage, logger)
 │   │   └── types/index.ts        ← Backend type definitions (mirrors src/lib/types.ts)
 │   ├── package.json              ← Separate deps (firebase-admin, express, xlsx, etc.)
@@ -72,35 +71,36 @@ Firebase Hosting (static SPA)
 │       └── src/index.ts          ← Canonical shared types & Zod schemas (~1250 lines)
 │
 ├── public/
-│   ├── favicon.svg               ← SVG favicon (device-cloud icon, indigo fill)
-│   └── og-image.png             ← Open Graph social preview image (2400×1260 PNG)
+│   ├── favicon.svg               ← SVG favicon
+│   └── og-image.png              ← Open Graph social preview image
 ├── specs/                        ← Product specs and feature stories
+├── tests/                        ← Standard placeholder (main suites in root and functions/)
+├── plans/                        ← Feature rollout and migration plans
+├── rules/                        ← Repository-level binding constraints
+├── docs/                         ← Extended documentation
+├── config/                       ← Application configuration files
+├── mappings/                     ← Data mapping files for partner/device data transformations
+├── scripts/
+│   ├── check-no-public-secrets.mjs  ← Secret scanning (runs as part of npm test)
+│   ├── ui-consistency-check.mjs     ← UI pattern consistency validation
+│   └── ci/                          ← CI enforcement scripts
 ├── firebase.json                 ← Hosting rewrites + functions + firestore config
-├── firestore.rules               ← Firestore security rules (27 collections)
-├── storage.rules                 ← Firebase Storage security rules (questionnaire files)
-├── firestore.indexes.json        ← Composite index definitions (currently empty)
+├── firestore.rules               ← Firestore security rules (28 collections)
+├── storage.rules                 ← Firebase Storage security rules
 ├── .env / .env.example           ← Firebase API keys (3 vars, all VITE_ prefixed)
 ├── .env.op                       ← 1Password references for deploy auth (op:// URIs, safe to commit)
 ├── functions/.env.tpl            ← 1Password secret references (op:// URIs, safe to commit)
 └── vite.config.ts                ← Vite + Tailwind + code-split config
 ```
 
-## Key Files to Read First
-
-1. **`packages/contracts/src/index.ts`** — The canonical source of truth for all shared data types and Zod schemas. Every Firestore entity, every API request/response shape, every spec category is defined here. `src/lib/types.ts` and `functions/src/types/index.ts` re-export from this package. Read this first.
-2. **`functions/src/index.ts`** — Express app structure and all route mounts.
-3. **`functions/src/middleware/auth.ts`** — How authentication and role-based access control works.
-4. **`src/App.tsx`** — All client-side routes and their auth guards (ProtectedRoute, EditorRoute, AdminRoute).
-5. **`src/hooks/useAuth.tsx`** — How the frontend resolves the current user and their role.
-
-## Data Model (Firestore Collections)
+### Data Model (Firestore Collections)
 
 | Collection | Purpose | Key Fields |
 |---|---|---|
 | `partners` | Canonical partner brands | displayName, regions[], countriesIso2[] |
 | `partnerKeys` | Datadog slugs → partner mapping | key (unique), partnerId, chipset, oem |
 | `devices` | One row per hardware model | deviceId (unique, Datadog join key), partnerKeyId, certificationStatus, activeDeviceCount, lastTelemetryAt, specCompleteness, tierId |
-| `deviceSpecs` | ~260 typed hardware spec fields | deviceId (1:1), 16 category sub-objects (general, hardware, firmwareUpdates, mediaCodec, frameRates, contentProtection, native, videoPlayback, uhdHdr, audioVideoOutput, other, appRuntime, audioCapabilities, accessibility, platformIntegration, performanceBenchmarks) |
+| `deviceSpecs` | ~260 typed hardware spec fields | deviceId (1:1), 16 category sub-objects |
 | `deviceDeployments` | Many-to-many: device × partner × country | deviceId, partnerKeyId, countryIso2, deploymentStatus |
 | `telemetrySnapshots` | Periodic Datadog field counts | partnerKey, deviceId, coreVersion, uniqueDevices, snapshotDate |
 | `hardwareTiers` | Tier definitions (Tier 1/2/3) | tierName, tierRank, ramMin, gpuMin, requiredCodecs[] |
@@ -108,7 +108,7 @@ Firebase Hosting (static SPA)
 | `auditLog` | Append-only change log | entityType, entityId, field, oldValue, newValue, userId |
 | `alerts` | Unregistered device/key alerts | type, partnerKey, deviceId, status, dismissReason |
 | `uploadHistory` | Telemetry upload log | uploadedBy, fileName, rowCount, successCount |
-| `users` | Role assignments (managed in-app by admins) | email, role (viewer/editor/admin), displayName, photoUrl, lastLogin, updatedAt, updatedBy |
+| `users` | Role assignments | email, role (viewer/editor/admin), displayName, photoUrl, lastLogin, updatedAt, updatedBy |
 | `config` | App-level settings | retentionDailyDays, retentionWeeklyYears |
 | `fieldOptions` | Controlled vocabulary dropdown options | dropdownKey, displayLabel, displayValue, sortOrder, isActive |
 | `partnerKeyImportBatches` | Partner key CSV import history | importedBy, fileName, keyCount, status |
@@ -116,9 +116,9 @@ Firebase Hosting (static SPA)
 | `intakeRequestPartners` | Intake request → partner links | intakeRequestId, partnerId, matchType |
 | `intakeImportHistory` | Intake CSV import history | importedBy, fileName, rowCount, status |
 | `questionnaireIntakeJobs` | Questionnaire file upload/parse/extraction jobs | fileName, fileStoragePath, submitterPartnerId, isMultiPartner, questionnaireFormat, status, aiExtractionMode, extractionStep, extractionCurrentDevice, devicesComplete, devicesFailed, tasksEnqueued, notificationSentAt |
-| `questionnaireStagedDevices` | Devices detected from a questionnaire file | intakeJobId, rawHeaderLabel, platformType, matchedDeviceId, reviewStatus, extractionStatus (pending/processing/complete/failed), extractionProcessingAt |
+| `questionnaireStagedDevices` | Devices detected from a questionnaire file | intakeJobId, rawHeaderLabel, platformType, matchedDeviceId, reviewStatus, extractionStatus |
 | `questionnaireStagedFields` | Individual Q/A pairs extracted per device | stagedDeviceId, dstFieldKey, rawQuestionText, extractedValue, conflictStatus, resolution |
-| `deviceQuestionnaireSources` | Links devices to the questionnaire jobs that populated their specs | deviceId, intakeJobId, partnerId, fieldsImported, fieldsOverridden |
+| `deviceQuestionnaireSources` | Links devices to questionnaire jobs that populated their specs | deviceId, intakeJobId, partnerId, fieldsImported, fieldsOverridden |
 | `questionnaireIntakePartners` | Detected operating brands per multi-partner intake job | intakeJobId, partnerId, rawDetectedName, detectionSource, matchConfidence, reviewStatus, deviceCount |
 | `questionnaireStagedDevicePartners` | Per-device partner deployment links within a staged intake | stagedDeviceId, intakePartnerId, countries, certificationStatus, certificationAdkVersion, partnerModelName, reviewStatus |
 | `devicePartnerDeployments` | Committed device × partner deployment records | deviceId, partnerId, countries, partnerModelName, certificationStatus, certificationAdkVersion, active, sourceIntakeJobId |
@@ -126,7 +126,19 @@ Firebase Hosting (static SPA)
 | `coreVersionMappings` | Core version → friendly version lookup | coreVersion, friendlyVersion, platform, isActive |
 | `partnerAliases` | Alternative partner names → canonical partner | alias, partnerId, resolutionType, contextRules, isActive |
 
-## API Routes
+---
+
+## 2. Agent Operating Rules
+
+### Key Files to Read First
+
+1. **`packages/contracts/src/index.ts`** — The canonical source of truth for all shared data types and Zod schemas. Every Firestore entity, every API request/response shape, every spec category is defined here. `src/lib/types.ts` and `functions/src/types/index.ts` re-export from this package. Read this first.
+2. **`functions/src/index.ts`** — Express app structure and all route mounts.
+3. **`functions/src/middleware/auth.ts`** — How authentication and role-based access control works.
+4. **`src/App.tsx`** — All client-side routes and their auth guards (ProtectedRoute, EditorRoute, AdminRoute).
+5. **`src/hooks/useAuth.tsx`** — How the frontend resolves the current user and their role.
+
+### API Routes
 
 All routes are prefixed with `/api` and require a valid Firebase Auth Bearer token. The `authenticate` middleware in `functions/src/middleware/auth.ts` runs on every request.
 
@@ -138,10 +150,10 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | PUT | /partners/:id | editor+ | Update partner |
 | DELETE | /partners/:id | admin | Delete partner |
 | GET | /partner-keys | any | List partner keys (`exactKey` param for single-key lookup) |
-| POST | /partner-keys | admin | Create partner key (auto-dismisses matching `new_partner_key` alerts) |
+| POST | /partner-keys | admin | Create partner key |
 | GET | /devices | any | List devices (paginated, filterable, searchable) |
 | POST | /devices | editor+ | Register new device |
-| GET | /devices/:id | any | Full device detail (joins specs, tier, deployments, telemetry) |
+| GET | /devices/:id | any | Full device detail |
 | PUT | /devices/:id | editor+ | Update device |
 | GET | /device-specs/:deviceId | any | Get specs for a device |
 | PUT | /device-specs/:deviceId | editor+ | Create/update specs (triggers tier recalculation) |
@@ -180,26 +192,26 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | GET | /intake/history | any | Intake import history |
 | GET | /intake/:id | any | Get intake request detail |
 | DELETE | /intake/rollback/:batchId | admin | Rollback an intake import |
-| POST | /import/disambiguate | admin | AI disambiguation pass on parsed import rows (DST-039, pre-production) |
-| POST | /import/disambiguate/resolve | admin | Apply admin answers to AI clarification questions (DST-039, pre-production) |
-| POST | /questionnaire-intake | editor+ | Upload questionnaire file (base64), create job, parse, optionally trigger AI extraction |
-| GET | /questionnaire-intake | any | List questionnaire intake jobs (paginated, filterable) |
+| POST | /import/disambiguate | admin | AI disambiguation pass on parsed import rows (DST-039) |
+| POST | /import/disambiguate/resolve | admin | Apply admin answers to AI clarification questions |
+| POST | /questionnaire-intake | editor+ | Upload questionnaire file, create job, parse, optionally trigger AI extraction |
+| GET | /questionnaire-intake | any | List questionnaire intake jobs |
 | GET | /questionnaire-intake/:id | any | Get intake job detail with staged device summaries |
-| POST | /questionnaire-intake/:id/trigger-extraction | editor+ | Manually trigger AI extraction on an intake job |
-| GET | /questionnaire-intake/:id/staged-devices | any | All staged devices with their extracted fields |
+| POST | /questionnaire-intake/:id/trigger-extraction | editor+ | Manually trigger AI extraction |
+| GET | /questionnaire-intake/:id/staged-devices | any | All staged devices with extracted fields |
 | GET | /questionnaire-intake/:id/download | any | Generate signed URL for source file download |
-| GET | /questionnaire-intake/:id/review | any | Full review state (devices + all fields with conflict info) |
+| GET | /questionnaire-intake/:id/review | any | Full review state |
 | PATCH | /questionnaire-intake/:id | admin | Update intake job (partner assignment) |
-| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId | admin | Update staged device (approve/reject, match, identity fields) |
-| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId/fields/:fieldId | admin | Update field resolution or override extracted value |
-| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId/resolve-all | admin | Bulk resolve all pending conflicts to use_new |
+| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId | admin | Update staged device |
+| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId/fields/:fieldId | admin | Update field resolution |
+| PATCH | /questionnaire-intake/:id/staged-devices/:deviceId/resolve-all | admin | Bulk resolve conflicts |
 | POST | /questionnaire-intake/:id/approve | admin | Commit approved devices to catalog (atomic transaction) |
 | POST | /questionnaire-intake/:id/reject | admin | Reject entire intake job |
 | POST | /questionnaire-intake/:id/retry-device/:deviceId | editor+ | Retry AI extraction for a single failed device (DST-052) |
 | GET | /questionnaire-intake/notifications/list | any | List in-app notifications |
 | PATCH | /questionnaire-intake/notifications/:id/read | any | Mark notification as read |
-| PATCH | /questionnaire-intake/:id/intake-partners/:intakePartnerId | admin | Update intake partner (assign partner, confirm/reject, merge duplicates) |
-| PUT | /questionnaire-intake/:id/staged-devices/:deviceId/deployments | admin | Replace partner deployment links for a staged device |
+| PATCH | /questionnaire-intake/:id/intake-partners/:intakePartnerId | admin | Update intake partner |
+| PUT | /questionnaire-intake/:id/staged-devices/:deviceId/deployments | admin | Replace partner deployment links |
 | GET | /questionnaire-intake/device-sources/:deviceId | any | Get questionnaire sources for a device |
 | GET | /questionnaire-intake/device-deployments/:deviceId | any | Get partner deployments for a committed device |
 | GET | /questionnaire-intake/partner-deployments/:partnerId | any | Get devices deployed by a partner |
@@ -227,7 +239,7 @@ All routes are prefixed with `/api` and require a valid Firebase Auth Bearer tok
 | PUT | /partner-aliases/:id/deactivate | admin | Deactivate a partner alias |
 | POST | /partner-aliases/seed | admin | Seed default partner aliases |
 
-## Role System
+### Role System
 
 Three roles, checked by `requireRole()` middleware on the backend and `useAuth()` on the frontend:
 
@@ -237,39 +249,49 @@ Three roles, checked by `requireRole()` middleware on the backend and `useAuth()
 | `editor` | Everything viewer can do + create/edit devices, specs, partners |
 | `admin` | Everything editor can do + manage tiers, upload telemetry, manage partner keys, import intake requests, run migrations, dismiss alerts, rollback imports, review/approve/reject questionnaire imports, manage user roles |
 
-Roles are stored in the `users` Firestore collection. A user doc is auto-provisioned with `role: 'viewer'` on first login via the `authenticate` middleware. Admins can change roles in-app via the User Management page (`/admin/users`). Guardrails prevent self-demotion (403) and last-admin removal (409, enforced via Firestore transaction). Role changes take effect on the affected user's next API request; the frontend reflects the change on their next page load.
+Roles are stored in the `users` Firestore collection. A user doc is auto-provisioned with `role: 'viewer'` on first login. Admins manage roles in-app via `/admin/users`. Guardrails prevent self-demotion (403) and last-admin removal (409, Firestore transaction). Role changes take effect on the affected user's next API request.
 
-## Frontend Conventions
+### Frontend Conventions
 
-- **Routing:** All routes defined in `src/App.tsx`. Pages are lazy-loaded via `React.lazy()` for code splitting.
-- **Auth guards:** `ProtectedRoute` (requires login), `EditorRoute` (requires editor+), `AdminRoute` (requires admin). These wrap route elements in `App.tsx`.
-- **State management:** No external state library. `useState` + `useEffect` for data fetching. Auth state via React Context (`AuthProvider`).
+- **Routing:** All routes defined in `src/App.tsx`. Pages are lazy-loaded via `React.lazy()`.
+- **Auth guards:** `ProtectedRoute` (requires login), `EditorRoute` (requires editor+), `AdminRoute` (requires admin).
+- **State management:** No external state library. `useState` + `useEffect` for data fetching. Auth state via React Context.
 - **API calls:** Always use `api.*` from `src/lib/api.ts`. It auto-attaches the Firebase Auth Bearer token.
 - **Styling:** Tailwind CSS utility classes only. No CSS modules, no styled-components.
 - **Icons:** `lucide-react` exclusively.
 - **Charts:** `recharts` for all data visualizations.
-- **Shared components:** `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip`, `ClarificationPanel`, `Logo`, `AIPassStatusPanel`, `ExtractionStatusPanel`, `PrerequisiteBanner`, `VersionInput`, `FreshnessBadge`, `FreshnessMicroPanel` in `src/components/shared/`. `LoadingSpinner` accepts an `inline` prop for use inside buttons without the default `p-12` wrapper. `Logo` renders the device-cloud SVG inline with `fill="currentColor"` for flexible coloring. `AIPassStatusPanel` shows import AI pass progress (DST-051). `ExtractionStatusPanel` shows questionnaire AI extraction progress with per-device retry (DST-052). `PrerequisiteBanner` warns when required data (partners/keys) is missing before import flows. `VersionInput` renders a core-version text input with friendly-version resolution. `FreshnessBadge` renders a color-coded dot + text badge for telemetry data freshness (DST-053); accepts `compact` prop for dot-only mode in table cells. `FreshnessMicroPanel` renders a structured hover card with freshness details for device table rows (150ms show / 100ms hide delay, keyboard accessible).
-- **Responsive shell:** `AppShell` is mobile-responsive. Below `lg:` the sidebar collapses off-screen and a hamburger menu in the topbar opens it as a slide-over overlay. Above `lg:` the sidebar is always visible.
-- **Update banner:** `UpdateBanner` in `src/components/UpdateBanner.tsx` detects new versions via service worker (Workbox/PWA) and version polling. It renders inside `AppShell`'s fixed header wrapper (above the topbar) so it reserves vertical space instead of overlapping navigation.
-- **Date formatting:** Use `formatDate()`, `formatDateTime()`, and `formatRelativeTime()` from `src/lib/format.ts` for all date/time display. Use `getFreshnessState()` from the same file for freshness classification. Do not use inline `toLocaleString()` or page-local formatters.
-- **Analytics:** Use `trackEvent()` from `src/lib/analytics.ts`. Events are no-ops in development mode.
+- **Date formatting:** Use `formatDate()`, `formatDateTime()`, `formatRelativeTime()` from `src/lib/format.ts`. Use `getFreshnessState()` for freshness classification. Do not use inline `toLocaleString()`.
+- **Analytics:** Use `trackEvent()` from `src/lib/analytics.ts` (no-op in dev).
 - **Exports:** Use `exportToCsv()` and `exportToPdf()` from `src/lib/export.ts`.
-- **Destructive actions:** Confirm buttons for delete, rollback, reject, or dismiss actions must use `bg-red-600 hover:bg-red-700` (not primary indigo).
-- **Button tokens:** Use `rounded-lg` (not `rounded-md`) and `bg-indigo-600 hover:bg-indigo-700` for primary buttons consistently.
+- **Destructive actions:** Confirm buttons must use `bg-red-600 hover:bg-red-700` (not primary indigo).
+- **Button tokens:** Use `rounded-lg` and `bg-indigo-600 hover:bg-indigo-700` for primary buttons.
+- **Responsive shell:** `AppShell` is mobile-responsive. Below `lg:` the sidebar collapses; a hamburger opens it as a slide-over.
+- **`LoadingSpinner`:** Without `inline`, wraps in `<div className="flex items-center justify-center p-12">` — for full-page states. Inside buttons, always pass `inline` prop to avoid button size inflation.
 
-## Backend Conventions
+#### Shared Components Reference
+- `DataTable`, `Badge`, `Modal`, `FilterPanel`, `EmptyState`, `LoadingSpinner`, `Tooltip` — general purpose
+- `ClarificationPanel`, `AIPassStatusPanel` — AI disambiguation import UI (DST-051)
+- `ExtractionStatusPanel` — questionnaire AI extraction with 4-step stepper and retry (DST-052)
+- `PrerequisiteBanner` — warns when required data (partners/keys) is missing before import flows
+- `VersionInput` — core-version text input with friendly-version resolution
+- `FreshnessBadge` — color-coded freshness dot + text; `compact` prop for dot-only in table cells (DST-053)
+- `FreshnessMicroPanel` — hover card with freshness details (150ms show / 100ms hide, keyboard accessible)
+- `Logo` — device-cloud SVG inline with `fill="currentColor"`
+- `UpdateBanner` — new-version detection via service worker + version polling; renders in AppShell header
+
+### Backend Conventions
 
 - **All routes** in `functions/src/routes/*.ts` export a default Express `Router`.
-- **Firestore access:** Always use `admin.firestore()` (server-side Admin SDK, bypasses security rules).
+- **Firestore access:** Always use `admin.firestore()` (Admin SDK, bypasses security rules).
 - **Audit logging:** Call `diffAndLog()` or `logAuditEntry()` from `functions/src/services/audit.ts` on every mutation.
-- **Tier recalculation:** After saving device specs, call `assignTierToDevice(deviceId)`. After saving tier definitions, call `reassignAllDevices()`.
-- **Spec completeness:** After saving specs, call `calculateSpecCompleteness()` and update the `specCompleteness` field on the device doc.
-- **ESM:** The backend uses ES modules. All imports must use `.js` extensions (e.g., `import { foo } from './bar.js'`).
+- **Tier recalculation:** After saving specs, call `assignTierToDevice(deviceId)`. After saving tier definitions, call `reassignAllDevices()`.
+- **Spec completeness:** After saving specs, call `calculateSpecCompleteness()` and update `specCompleteness` on the device doc.
+- **ESM:** Backend uses ES modules. All imports must use `.js` extensions.
 - **Error handling:** Wrap route handlers in try/catch, return `{ error, detail }` JSON with appropriate status codes.
 
-## Common Tasks
+### Common Tasks
 
-### Adding a new Firestore collection
+#### Adding a new Firestore collection
 1. Add the TypeScript interface to `packages/contracts/src/index.ts`
 2. Re-export the type in both `src/lib/types.ts` and `functions/src/types/index.ts`
 3. Add Firestore rules for the collection in `firestore.rules`
@@ -277,26 +299,119 @@ Roles are stored in the `users` Firestore collection. A user doc is auto-provisi
 5. Mount the router in `functions/src/index.ts`
 6. Add API client methods in `src/lib/api.ts`
 
-### Adding a new page
+#### Adding a new page
 1. Create the page component in `src/pages/`
 2. Add the route in `src/App.tsx` (with appropriate auth guard)
 3. Add a lazy import at the top of `App.tsx`
 4. Add a nav item in `src/components/layout/AppShell.tsx` if it should appear in the sidebar
-5. Track page views automatically (handled by `PageViewTracker` in App.tsx)
+5. Page views are tracked automatically by `PageViewTracker` in `App.tsx`
 
-### Adding a new API endpoint
+#### Adding a new API endpoint
 1. Add the route handler in the appropriate `functions/src/routes/*.ts` file
 2. Use `requireRole()` middleware if the endpoint requires specific permissions
 3. Add audit logging for mutations via `diffAndLog()` or `logAuditEntry()`
 4. Add the corresponding method in `src/lib/api.ts`
 
-## Build & Deploy
+### Important Behaviors to Know
 
-Deploying requires the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`), the 1Password desktop app or signed-in CLI session, `firebase-tools`, `gcloud`, and access to the `Private` vault. Two auth flows exist:
+1. **Two separate `package.json` files.** Root is for the frontend, `functions/package.json` is for the backend. Install deps in the right one.
+2. **Two separate `tsconfig` setups.** Frontend uses `tsconfig.app.json` (erasableSyntaxOnly). Backend uses `functions/tsconfig.json` (standard ESNext).
+3. **Types are defined in three places.** `packages/contracts/src/index.ts` is canonical. `src/lib/types.ts` and `functions/src/types/index.ts` re-export and add layer-specific types. Keep in sync.
+4. **Device specs have ~260 fields** across 16 categories. `DeviceSpec` nests sub-interfaces (e.g., `QuestionnaireHardware`). They are grouped objects, not flat.
+5. **The tier engine auto-runs** on spec save and tier definition save. Do not forget this side effect.
+6. **Firestore has no joins.** The backend manually fetches related collections. Watch for N+1 patterns.
+7. **Two Cloud Functions are exported.** `api` (all Express routes) and `extractDeviceTask` (Cloud Tasks handler for AI extraction). Both in `functions/src/index.ts`.
+8. **AI disambiguation (DST-039) is pre-production.** The Anthropic API key is resolved from 1Password at deploy time. If missing or timing out (5s), imports fall back to rule-based validation gracefully.
+9. **Questionnaire AI extraction runs via Cloud Tasks, not fire-and-forget.** Each device gets its own task (queue: `extractDeviceTask` in `us-central1`). Tasks are idempotent (CAS on `extractionStatus`), retry on rate limits/timeouts (3 attempts, 60–300s backoff, 300s function timeout, 1800s dispatch deadline). Never use fire-and-forget for extraction — always enqueue via `enqueueExtractionTasks()`.
+10. **Questionnaire extraction has real-time status UI (DST-052).** Backend writes `extractionStep`, `extractionCurrentDevice`, `devicesComplete`, `devicesFailed` to the job document. `ExtractionStatusPanel` renders a 4-step stepper, auto-collapses 2s after success, and shows failure banners with Restart/Retry. Failed devices can be retried individually.
+11. **The questionnaire review wizard has 4 steps.** Assign Partner(s) → Review Devices → Resolve Conflicts → Sign Off. For multi-partner jobs (DST-055), Step 1 shows interactive `IntakePartnerRow` components. Nothing is committed until the admin completes Step 4.
+12. **Notifications are admin-only.** `notifications` collection stores in-app notifications. `NotificationBell` polls every 30 seconds.
+13. **Partner resolution uses a shared chain (DST-046).** `partnerResolver` implements exact match → alias lookup → Jaro-Winkler fuzzy match (≥ 0.90).
+14. **User role management is in-app (DST-054).** `PATCH /api/users/:id/role` uses a Firestore transaction for admin demotions. Self-demotion returns 403; last-admin demotion returns 409.
+15. **Firestore batch chunking.** All batch writes use `createChunkedWriter`/`flushIfNeeded`/`finalCommit` helpers (450-op threshold).
+16. **Multi-partner questionnaire support (DST-055).** Three new Firestore collections: `questionnaireIntakePartners`, `questionnaireStagedDevicePartners`, `devicePartnerDeployments`. `isMultiPartner` flag controls UI flow. Approval handler writes deployment records with deterministic IDs (`${deviceId}_${partnerId}`) for idempotent upserts.
+17. **Actionable alerts pattern.** For single-key lookups use `exactKey` query param. Alert auto-dismiss is server-side. Partners are fetched in a non-blocking `useEffect` so partner fetch failures never block the alert list.
+18. **Telemetry freshness (DST-053).** `lastTelemetryAt` (ISO string) on each device doc. `FreshnessBadge` shows green/amber/red/gray (<48h / 2–7d / 7d+ / null). `getFreshnessState()` and `FreshnessState` type live in `src/lib/format.ts` (not in the component file) to satisfy `react-refresh/only-export-components`.
 
-### Non-interactive deploy (recommended — no browser prompts)
+---
 
-Uses Application Default Credentials stored in 1Password. Run via npm or the VS Code/Cursor command palette (`Tasks: Run Build Task` → **Deploy (1Password auth)**):
+## 3. Code Modification Rules
+
+### Credential Hygiene and Rotation
+
+Frontend (`.env`, prefixed with `VITE_`):
+- `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID` — keep in `.env` (gitignored), never in tracked source
+- Rotation: remove from tracked files/history, create replacement with same restrictions, update `.env`, redeploy hosting, verify, delete old key
+
+Backend secrets (1Password, via `functions/.env.tpl`):
+- `ANTHROPIC_API_KEY` — in 1Password (`Private/DST Anthropic API Key`); resolved via `op inject` at deploy time
+- Rotation: update in 1Password, redeploy functions, verify behavior, revoke old secret
+
+Deployer service account key:
+- Rerun `op-firebase-setup device-source-of-truth`, confirm deploys work, then delete old IAM key via `gcloud iam service-accounts keys delete`
+
+Do not store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
+
+### Security Rules
+
+`firestore.rules` and `storage.rules` control data access. Never relax rules without explicit review. Domain restriction (`@disney.com`, `@disneystreaming.com`) and role-based access are invariants.
+
+### Audit Logging Requirement
+
+Every mutation route must call `diffAndLog()` or `logAuditEntry()` from `functions/src/services/audit.ts`. The audit log is append-only. Never skip audit logging to simplify an implementation.
+
+### Tier Engine Side Effects
+
+After saving device specs, always call `assignTierToDevice(deviceId)`. After saving tier definitions, always call `reassignAllDevices()`. These are not optional — missing them causes stale tier assignments.
+
+### dist/ Is a Build Artifact
+
+Never edit files in `dist/` directly. Run `npm run build` to regenerate. The `check_dist_not_modified` CI script enforces this.
+
+---
+
+## 4. Documentation Rules
+
+- **`AGENTS.md`:** Update when adding new API routes, new Firestore collections, new frontend conventions, or new architectural behaviors.
+- **`DEPLOYMENT.md`:** Update when deploy process changes — new targets, environment variable changes, credential rotation steps.
+- **`README.md`:** Update when project description, live URL, or major features change.
+- **`packages/contracts/src/index.ts`:** Document type changes with inline JSDoc comments. This is the single source of truth for shared types.
+- **`rules/repo_rules.md`:** Update when directory structure changes or new invariants are needed.
+- **`.ai_context.md`:** Update when high-risk areas, external dependencies, or non-standard directories change.
+
+When adding a new Firestore collection, update the Data Model table in Section 1. When adding a new API route, update the API Routes table in Section 2.
+
+---
+
+## 5. Testing Requirements
+
+```bash
+npm test                           # frontend Vitest suite + tracked-file secret scan
+cd functions && npm test           # backend Vitest suite + tracked-file secret scan
+```
+
+**Tests must not be deleted to force a build to pass.**
+
+Both test suites include a `scripts/check-no-public-secrets.mjs` scan. A failing secret scan means credentials are present in tracked files.
+
+**When adding new behavior:**
+- Add tests for new services in `functions/src/services/`
+- Add tests for new API route logic
+- Add frontend tests for utility logic in `src/lib/`
+
+**Notes:**
+- The root `tests/` directory is a standard placeholder per the AI Agent Tooling Standard. Main test suites are configured via `vitest.config.ts` (frontend) and `functions/vitest.config.ts` (backend).
+- The `check_spec_test_alignment` CI script is advisory for this repo: `specs/` contains product docs and feature stories, not per-test spec files.
+
+---
+
+## 6. Deployment Process
+
+Deploying requires the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`), `firebase-tools`, `gcloud`, and access to the Private vault.
+
+### Non-Interactive Deploy (Recommended)
+
+Uses Application Default Credentials stored in 1Password. The only interactive step is the 1Password biometric (Touch ID).
 
 ```bash
 npm run deploy                 # full deploy
@@ -305,14 +420,11 @@ npm run deploy:functions       # functions only
 op-firebase-deploy --only hosting,functions  # any combo
 ```
 
-`op-firebase-deploy` is a global script (`~/.local/bin/op-firebase-deploy`) that reads a per-project service account key from 1Password, writes it to a temp file, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up. It checks `Private/Firebase Deploy - {project-id}` first, then falls back to `Private/GCP ADC`. No `firebase login`, `gcloud auth login`, or browser prompts required — the only interactive step is the 1Password biometric (Touch ID). The key never expires unless explicitly deleted. Works for any Firebase project.
+`op-firebase-deploy` reads a per-project service account key from 1Password, writes it to a temp file, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up.
 
-**First-time setup for any project:** Run `op-firebase-setup [project-id]` (global script at `~/.local/bin/op-firebase-setup`). This creates a `firebase-deployer` service account, grants deploy roles, generates a key, and stores it in 1Password. Run once per project.
+**First-time setup:** `op-firebase-setup device-source-of-truth`
 
-**1Password convention:** Item `Firebase Deploy - {project-id}` in the Private vault with:
-- `credential` — Service account key JSON for `firebase-deployer@{project-id}.iam.gserviceaccount.com`
-
-### Manual deploy (interactive — requires browser login)
+### Manual Deploy (Interactive)
 
 ```bash
 firebase login
@@ -323,73 +435,22 @@ npx firebase deploy --only firestore:rules
 npx firebase deploy --only storage
 ```
 
-### Build only (no deploy)
+### Build Only
 
 ```bash
 npm run build                      # Frontend: tsc -b && vite build
 cd functions && npm run build      # Backend: tsc
 ```
 
-### Tests
+### Environment Variables
 
-```bash
-npm test                           # frontend Vitest suite + tracked-file secret scan
-cd functions && npm test           # functions Vitest suite + tracked-file secret scan
-```
+Frontend `.env` (gitignored, prefixed with `VITE_`):
+- `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID`
 
-## Environment Variables
+Backend secrets (managed via 1Password, resolved at deploy time):
+1. `functions/.env.tpl` contains `op://` references (safe to commit)
+2. The `firebase.json` predeploy hook runs `op inject -i functions/.env.tpl -o functions/.env -f`
+3. `functions/.env` is gitignored, exists only transiently during deploy
+4. Canonical secrets live in 1Password — never store as plaintext
 
-Frontend (in `.env`, prefixed with `VITE_`):
-- `VITE_FIREBASE_API_KEY` — Firebase Web API key
-- `VITE_FIREBASE_APP_ID` — Firebase Web App ID
-- `VITE_FIREBASE_MEASUREMENT_ID` — Google Analytics measurement ID
-
-These values do end up in the client bundle because the app runs in the browser, but they are not the auth boundary. Keep them out of tracked source anyway: public exposure still creates abuse/noise risk and triggers Google alerts. Store them in `.env`, keep browser-key restrictions enabled, and rotate if they leak.
-
-Backend secrets (managed via 1Password):
-- `ANTHROPIC_API_KEY` — Anthropic API key for AI disambiguation (DST-039) and questionnaire extraction (DST-047). Falls back gracefully if not set.
-
-Secret management flow:
-1. `functions/.env.tpl` contains `op://` secret references (safe to commit — no actual secrets).
-2. The `firebase.json` functions predeploy hook runs `op inject -i functions/.env.tpl -o functions/.env -f` to resolve references at deploy time.
-3. `functions/.env` is gitignored and only exists transiently during deploy.
-4. The canonical secret lives in **1Password** (Private vault → "DST Anthropic API Key").
-5. Never store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
-6. Future APIs or services should follow the same pattern: committed `*.tpl` file with `op://` references, gitignored resolved output, and `op inject` during deploy or runtime bootstrap.
-
-Deploy auth (managed via 1Password):
-1. `op-firebase-deploy` (global script at `~/.local/bin/`) reads a per-project service account key from 1Password and runs `firebase deploy --non-interactive`.
-2. The key lives in **1Password** (Private vault → `Firebase Deploy - {project-id}` → `credential` field).
-3. The script writes the key to a temp file (umask 077), sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys, and deletes the temp file on exit.
-4. The only interactive step is the 1Password biometric prompt (Touch ID). No `firebase login`, `gcloud auth login`, or browser prompts are needed.
-5. Project ID is auto-detected from `.firebaserc` or passed as an argument.
-6. `.env.op` is a legacy fallback — `op-firebase-deploy` does not require it.
-7. Each project's `firebase-deployer` service account has deploy roles: `firebase.admin`, `cloudfunctions.admin`, `iam.serviceAccountUser`, `artifactregistry.writer`, `run.admin`. Keys never expire unless explicitly deleted. To set up a new project: `op-firebase-setup [project-id]`. To rotate a key: run `op-firebase-setup` again (generates a new key and updates 1Password; manually delete old keys via `gcloud iam service-accounts keys delete`).
-
-Rotation playbook:
-- Browser Firebase key: remove it from tracked files/history, create a replacement key in Google Cloud Credentials with the same referrer/API restrictions, update `.env`, redeploy hosting, verify the live app, then delete the old key.
-- Backend/provider secret: rotate it in 1Password, keep only `op://` references in `functions/.env.tpl`, redeploy functions, verify behavior, then revoke/delete the old secret.
-- Deployer service-account key: rerun `op-firebase-setup [project-id]`, confirm deploys work with the new key in 1Password, then delete the old IAM key.
-
-## Things to Watch Out For
-
-1. **Two separate `package.json` files.** Root is for the frontend, `functions/package.json` is for the backend. Install deps in the right one.
-2. **Two separate `tsconfig` setups.** Frontend uses `tsconfig.app.json` (erasableSyntaxOnly, no class property syntax in constructors). Backend uses `functions/tsconfig.json` (standard ESNext).
-3. **Types are defined in three places.** `packages/contracts/src/index.ts` is the canonical source for shared types. `src/lib/types.ts` and `functions/src/types/index.ts` re-export from `@dst/contracts` and add their own layer-specific types. Keep re-exports in sync when adding new contract types.
-4. **Device specs have ~260 fields** across 16 categories. The `DeviceSpec` interface nests sub-interfaces (e.g., `QuestionnaireHardware`, `QuestionnaireContentProtection`). These are NOT flat — they're grouped objects. Category names follow the `Questionnaire*` naming convention from the partner questionnaire format.
-5. **The tier engine auto-runs** on spec save and tier definition save. Don't forget this side effect when modifying those flows.
-6. **Firestore has no joins.** The backend manually fetches related collections. Watch for N+1 query patterns.
-7. **Two Cloud Functions are exported.** `api` handles all Express routes under `/api/*`. `extractDeviceTask` is a Cloud Tasks handler (`onTaskDispatched`) for per-device AI extraction. Both are in `functions/src/index.ts`.
-8. **AI disambiguation (DST-039) is pre-production/testing.** The Anthropic API key is resolved from 1Password at deploy time (see Environment Variables). If the key is missing or the API times out (5s), imports fall back to rule-based validation gracefully. The AI pass runs between CSV parsing and the validation preview.
-9. **Questionnaire intake (DST-047/048) uses Firebase Storage.** Uploaded questionnaire files are stored at `questionnaires/{jobId}/{filename}` via `admin.storage().bucket()`. The `storage.rules` file restricts reads to authenticated users; writes are admin-SDK only.
-10. **Questionnaire AI extraction runs via Cloud Tasks, not fire-and-forget.** Each device gets its own `extractDeviceTask` Cloud Task (queue: `extractDeviceTask` in `us-central1`). Tasks are idempotent (CAS on `extractionStatus`), retry on rate limits/timeouts (3 attempts, 60-300s backoff, 300s function timeout, 1800s dispatch deadline), and finalize the job via Firestore transaction when all devices reach a terminal state. Notifications are deduped via `notificationSentAt`. The GET `/:id` endpoint has self-healing recovery for devices stuck in `processing` > 15 minutes (using per-device `extractionProcessingAt`). Never use fire-and-forget patterns for extraction — always enqueue via `enqueueExtractionTasks()`.
-10a. **Questionnaire extraction has real-time status UI (DST-052).** The backend writes `extractionStep` (1=Reading spreadsheet, 2=Extracting fields, 3=Validating values, 4=Done), `extractionCurrentDevice`, `devicesComplete`, and `devicesFailed` to the job document as extraction progresses. The frontend `ExtractionStatusPanel` component renders a 4-step stepper during extraction, auto-collapses 2s after success, and shows failure/partial-failure banners with Restart/Retry buttons. The active device card shows an indigo pulse animation. Failed devices can be retried individually via `POST /:id/retry-device/:deviceId` without re-processing successful ones.
-11. **The questionnaire review wizard has 4 steps.** Assign Partner(s) → Review Devices → Resolve Conflicts → Sign Off. For multi-partner jobs (DST-055), Step 1 shows interactive `IntakePartnerRow` components for each detected brand with Confirm/Reject controls; the submitter is optional. Nothing is committed to the catalog until the admin completes Step 4. The `POST /:id/approve` endpoint uses chunked Firestore batches (450-op limit) that write specs, create device records, write deployment records, log audit entries, and trigger tier/completeness recalculation.
-12. **Notifications are admin-only for now.** The `notifications` collection stores in-app notifications written by the backend when intake jobs reach `pending_review`. The `NotificationBell` component in `AppShell.tsx` polls every 30 seconds.
-13. **`LoadingSpinner` has two render modes.** Without `inline`, it wraps the icon in a `<div className="flex items-center justify-center p-12">` with 48px padding and an `h-8 w-8` icon — intended for full-page loading states. When rendering a spinner inside a `<button>`, always pass the `inline` prop: `<LoadingSpinner inline className="h-4 w-4" />`. Omitting `inline` causes the button to balloon during loading.
-14. **Partner resolution uses a shared chain (DST-046).** The `partnerResolver` service implements exact match → alias lookup → Jaro-Winkler fuzzy match (≥ 0.90). Both AllModels migration and partner key CSV import use this shared resolver. The `partnerAliasResolver` service manages alias CRUD and seeding.
-15. **User role management is in-app (DST-054).** Admins manage roles via `UserManagementPage` at `/admin/users`. The `PATCH /api/users/:id/role` route uses a Firestore transaction for admin demotions to prevent concurrent requests from removing all admins. Self-demotion returns 403; last-admin demotion returns 409. Every role change is audit-logged with `entityType: 'user'`. The `User` type includes `updatedAt` and `updatedBy` for provenance. The page uses an inline segmented role selector (not a dropdown) with per-button loading state.
-16. **Firestore batch chunking.** All batch writes that could exceed Firestore's 500-op limit use `createChunkedWriter`/`flushIfNeeded`/`finalCommit` helpers (450-op threshold) in `functions/src/routes/questionnaireIntake.ts`. This applies to the upload handler, legacy migration, multi-partner batch persistence, and the approve/commit handler.
-17. **Multi-partner questionnaire support (DST-055).** Questionnaires from umbrella organizations (e.g., Liberty Global) contain devices for multiple operating brands. The parser detects multi-partner signals via certs sheet parsing and model name brand mentions, resolving brands against the partner alias registry. Three new Firestore collections store the relationships: `questionnaireIntakePartners` (detected brands per job), `questionnaireStagedDevicePartners` (per-device deployment links during review), and `devicePartnerDeployments` (committed deployments). The `isMultiPartner` flag on the job controls UI flow: Step 1 shows interactive brand resolution instead of a single partner picker. The approval handler writes deployment records with deterministic IDs (`${deviceId}_${partnerId}`) for idempotent upserts. Legacy single-partner jobs are migrated to the submitter model on-read via `migrateJobToSubmitterModel()`. The list endpoint normalizes legacy `partnerId` to `submitterPartnerId` in responses. All mutation endpoints validate job-scope ownership (intake partner and staged device belong to the URL's `:id`). 12 Liberty Global alias seeds cover known brand variations.
-18. **Actionable alerts pattern.** The `AlertsPage` lets admins resolve alerts inline: "Register Device" for `unregistered_device` alerts, "Create Key" for `new_partner_key` alerts. Three patterns to follow: (a) For single-key lookups use `exactKey` query param (`api.partnerKeys.list({ exactKey })`) instead of fetching a paginated list and searching client-side — the backend uses an indexed Firestore query. (b) Alert auto-dismiss is server-side: POST `/partner-keys` auto-dismisses matching open `new_partner_key` alerts and returns `dismissedAlertIds` in the response; never rely on local alert state for dismiss. (c) Partners are fetched in a separate non-blocking `useEffect` (admin-only) so a `/partners` failure never blocks the alert list.
-19. **Telemetry freshness (DST-053).** `lastTelemetryAt` (ISO string) is written to each device doc during telemetry upload. The `FreshnessBadge` component shows a green/amber/red/gray dot (< 48h / 2–7d / 7d+ / null) on Dashboard, Partner detail, Device detail, and region cards. The badge label shows the actual data coverage window (e.g., "14-day window") derived from the most recent upload's `importTimeRange` field in `uploadHistory`. The dashboard API fetches the latest `uploadHistory` doc and returns `importTimeRange` alongside `lastTelemetryAt`; `FreshnessBadge` accepts an optional `importTimeRange` prop (e.g., `"14d"`, `"7d"`, `"24h"`) and parses it for the label and coverage date range. When no upload exists, it falls back to `ACTIVE_DEVICES_WINDOW_DAYS = 28` (hardcoded in contracts). The `FreshnessMicroPanel` provides a structured hover card in device table rows (still uses the hardcoded fallback). All devices in a single upload batch share the same timestamp — this is a known, documented limitation. The `getFreshnessState()` utility and `FreshnessState` type live in `src/lib/format.ts` (not in the component file) to satisfy `react-refresh/only-export-components`.
+See `DEPLOYMENT.md` for full deployment instructions, 1Password convention, and rotation playbooks.
