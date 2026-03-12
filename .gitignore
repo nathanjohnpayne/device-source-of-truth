@@ -20,6 +20,10 @@ functions/.contracts
 .env.local
 service-account-key.json
 import-output.json
+*.key
+service-account.json
+firebase-adminsdk*.json
+RIPCUT_GUIDE.md
 
 # Sample data files (binary)
 mappings/questionnairesamples/
