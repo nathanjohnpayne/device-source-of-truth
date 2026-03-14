@@ -1,5 +1,7 @@
 # Deployment Guide
 
+> This guide covers deploying the existing project. For **new project setup** (create Firebase project, `firebase init`, first-time credential setup), see `ai_agent_repo_template/DEPLOYMENT.md` in the sibling directory.
+
 This document covers everything needed to deploy the Device Source of Truth (DST) application from a fresh checkout to production, including prerequisite setup, environment configuration, CI/CD considerations, and operational runbooks.
 
 ---
@@ -30,21 +32,20 @@ This document covers everything needed to deploy the Device Source of Truth (DST
 | Node.js | 22.x | Cloud Functions runtime + frontend build |
 | npm | 10+ | Package management |
 | Firebase CLI | 13+ | Deploy to Firebase services |
+| 1Password CLI | latest | Non-interactive credential management (`op`) |
 | Git | 2.30+ | Version control |
 
 ### Install Firebase CLI
 
 ```bash
 npm install -g firebase-tools
-firebase login
 ```
 
-Verify you have access to the Firebase project:
+Do not run `firebase login`. Authentication is handled entirely through 1Password — see [First-Time Setup](#first-time-setup).
 
-```bash
-firebase projects:list
-# Should include "device-source-of-truth"
-```
+### Access Required
+
+Access to `Private/Firebase Deploy - device-source-of-truth` in 1Password. This item is created by `op-firebase-setup` and contains the service account key used for all deploys.
 
 ### Required Firebase Services
 
@@ -237,10 +238,12 @@ Always build both before deploying. The frontend build is independent of the bac
 
 ## Deploying to Firebase
 
+All deploys use `op-firebase-deploy` for non-interactive 1Password auth. Never run `firebase deploy` directly.
+
 ### Deploy Everything
 
 ```bash
-firebase deploy
+op-firebase-deploy device-source-of-truth
 ```
 
 This deploys all four services:
@@ -249,25 +252,33 @@ This deploys all four services:
 - **Firestore Rules** — applies `firestore.rules` to the database
 - **Firestore Indexes** — applies `firestore.indexes.json`
 
-### Selective Deployment
+The script reads `Private/Firebase Deploy - device-source-of-truth` from 1Password (Touch ID prompt), sets `GOOGLE_APPLICATION_CREDENTIALS`, and runs `firebase deploy --non-interactive`. No browser auth required.
 
-Deploy individual services when you only changed one part:
+### First-Time Setup
+
+Run once per machine to create the service account key and store it in 1Password:
+
+```bash
+op-firebase-setup device-source-of-truth
+```
+
+### Selective Deployment
 
 ```bash
 # Frontend only
-firebase deploy --only hosting
+op-firebase-deploy device-source-of-truth --only hosting
 
 # Backend only
-firebase deploy --only functions
+op-firebase-deploy device-source-of-truth --only functions
 
 # Security rules only
-firebase deploy --only firestore:rules
+op-firebase-deploy device-source-of-truth --only firestore:rules
 
 # Indexes only
-firebase deploy --only firestore:indexes
+op-firebase-deploy device-source-of-truth --only firestore:indexes
 
 # Hosting + Functions (skip rules)
-firebase deploy --only hosting,functions
+op-firebase-deploy device-source-of-truth --only hosting,functions
 ```
 
 ### Deployment Targets
@@ -508,7 +519,7 @@ Rules are versioned in Git. To roll back:
 Error: Missing permissions required for functions deploy.
 ```
 
-**Fix:** Ensure your Firebase account has the `Firebase Admin` or `Editor` role on the GCP project. Run `firebase login --reauth`.
+**Fix:** Ensure the `firebase-deployer` service account key in 1Password (`Private/Firebase Deploy - device-source-of-truth`) is valid. Re-run `op-firebase-setup device-source-of-truth` to regenerate it.
 
 ### Functions deploy fails with "Could not build the function due to a missing permission"
 

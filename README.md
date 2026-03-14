@@ -9,7 +9,7 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 | Frontend | React 19, TypeScript, Tailwind CSS 4, Vite 7 |
 | Backend | Firebase Cloud Functions (Express 5 REST API) |
 | AI | Anthropic Claude API (pre-production/testing — DST-039) |
-| Database | Cloud Firestore (18 collections, 90-field device spec schema) |
+| Database | Cloud Firestore (28 collections, ~260 typed device spec fields) |
 | Auth | Firebase Authentication (Google OAuth, domain-restricted) |
 | Analytics | Google Analytics 4 via Firebase (30+ typed events) |
 | Hosting | Firebase Hosting (CDN with API proxy) |
@@ -17,7 +17,7 @@ Internal Disney Streaming platform that consolidates NCP/ADK partner device data
 ## Features
 
 - **Partner & Device Registry** — manage partners, partner keys (Datadog slugs), and device models with full-text search and filtering
-- **Hardware Spec Ingestion** — 90 typed fields across 12 categories (SoC, memory, GPU, codecs, DRM, security, etc.) with completeness tracking
+- **Hardware Spec Ingestion** — ~260 typed fields across 16 category groups (SoC, memory, GPU, codecs, DRM, security, questionnaire intake, and more) with completeness tracking
 - **Configurable Tier Scoring** — define hardware tiers with threshold rules; devices are auto-classified when specs or tiers change
 - **Tier Simulator** — what-if analysis tool to preview how feature requirements affect device eligibility
 - **Telemetry Upload** — ingest Datadog CSV exports with anomaly detection (unregistered devices/keys generate alerts)
@@ -83,7 +83,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including
 
 - Deploy maintainers need `op`, `firebase-tools`, `gcloud`, and access to the `Private` vault in 1Password.
 - `op-firebase-setup device-source-of-truth` creates `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, grants deploy roles, and stores the JSON key in `Private/Firebase Deploy - device-source-of-truth`.
-- `npm run deploy`, `npm run deploy:hosting`, and `npm run deploy:functions` call `op-firebase-deploy`, which uses the per-project item first and falls back to `Private/GCP ADC` if needed.
+- `npm run deploy`, `npm run deploy:hosting`, and `npm run deploy:functions` call `op-firebase-deploy`, which reads `Private/Firebase Deploy - device-source-of-truth` from 1Password and sets `GOOGLE_APPLICATION_CREDENTIALS`. No browser auth required.
 - Backend/provider secrets use committed `op://` references in [`functions/.env.tpl`](./functions/.env.tpl) and are resolved at deploy time with `op inject`.
 - Future APIs or services should follow the same pattern: commit only a template such as `.env.tpl`, `config.runtime.tpl`, or `functions/.env.tpl`, keep the resolved file gitignored, and materialize it with `op inject -i <template> -o <runtime-file> -f`.
 
@@ -109,7 +109,7 @@ Baseline file: [`config/ui-consistency-baseline.json`](./config/ui-consistency-b
 
 ```
 src/                          React frontend
-├── pages/                    21 route-level page components (lazy-loaded)
+├── pages/                    28 route-level page components (lazy-loaded)
 ├── components/               Shared UI (DataTable, Badge, Modal, FilterPanel, etc.)
 ├── hooks/
 │   ├── useAuth.tsx          Auth context provider + useAuth() hook
@@ -124,7 +124,7 @@ src/                          React frontend
 functions/src/                Firebase Cloud Functions backend
 ├── index.ts                  Express app + route mounting + request logging middleware
 ├── middleware/auth.ts        Token verification, domain check, role guard
-├── routes/                   14 Express routers (partners, devices, tiers, intake, disambiguate, etc.)
+├── routes/                   18 Express routers (partners, devices, tiers, intake, questionnaire review, admin config, etc.)
 ├── services/
 │   ├── logger.ts             Structured logging (Cloud Logging integration)
 │   ├── audit.ts              Append-only field-level change tracking
@@ -146,8 +146,8 @@ docs/                         Technical documentation
 | [AGENTS.md](./AGENTS.md) | AI agent onboarding guide — read this first if using Cursor, Copilot, or Claude |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Complete deployment guide from fresh checkout to production |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Deep technical architecture: data flow, security model, design decisions |
-| [docs/DATA_MODEL.md](./docs/DATA_MODEL.md) | Firestore schema reference for all 13 collections |
-| [docs/API_REFERENCE.md](./docs/API_REFERENCE.md) | Full REST API documentation with request/response examples |
+| [docs/DATA_MODEL.md](./docs/DATA_MODEL.md) | Core Firestore schema reference for the primary catalog, telemetry, and admin collections |
+| [docs/API_REFERENCE.md](./docs/API_REFERENCE.md) | Core REST API reference for the primary CRUD, upload, and reporting endpoints |
 | [docs/UI_CONSISTENCY.md](./docs/UI_CONSISTENCY.md) | UI drift guardrails and filter UX standardization matrix |
 | [specs/DST-TDI-002-UI-Drift-Remediation-PLAN.md](./specs/DST-TDI-002-UI-Drift-Remediation-PLAN.md) | UI/UX consistency remediation roadmap (Rev C) |
 | [specs/Device Source of Truth (DST).md](./specs/Device%20Source%20of%20Truth%20(DST).md) | Original product specification |

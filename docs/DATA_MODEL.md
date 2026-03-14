@@ -1,10 +1,12 @@
 # Data Model Reference
 
-Complete Firestore schema documentation for all 13 collections in the Device Source of Truth (DST) application.
+Core Firestore schema documentation for the primary catalog, telemetry, reporting, and admin collections in the Device Source of Truth (DST) application.
 
 ---
 
 ## Overview
+
+This document focuses on the core collections that drive the main DST workflows. The application currently defines additional supporting collections in [`firestore.rules`](../firestore.rules) for questionnaire intake, partner deployment review, notifications, and other operational flows.
 
 DST uses Cloud Firestore as its primary datastore. All documents are stored in top-level collections (no sub-collections). Relationships between entities are represented by ID reference fields — Firestore has no foreign keys or joins, so the application layer resolves references at query time.
 

@@ -1,6 +1,8 @@
 # API Reference
 
-Complete REST API documentation for the Device Source of Truth backend. All endpoints are served from a single Firebase Cloud Function and are prefixed with `/api`.
+Core REST API documentation for the Device Source of Truth backend. All endpoints are served from a single Firebase Cloud Function and are prefixed with `/api`.
+
+This reference currently covers the primary CRUD, upload, and reporting routes. Newer questionnaire-intake, field-options, user-admin, alias, and version-mapping endpoints are documented in [`AGENTS.md`](../AGENTS.md) and the backend route files until this reference is expanded.
 
 ---
 

@@ -424,15 +424,14 @@ op-firebase-deploy --only hosting,functions  # any combo
 
 **First-time setup:** `op-firebase-setup device-source-of-truth`
 
-### Manual Deploy (Interactive)
+### Manual Deploy
 
 ```bash
-firebase login
-npx firebase deploy
-npx firebase deploy --only hosting
-npx firebase deploy --only functions
-npx firebase deploy --only firestore:rules
-npx firebase deploy --only storage
+op-firebase-deploy device-source-of-truth
+op-firebase-deploy device-source-of-truth --only hosting
+op-firebase-deploy device-source-of-truth --only functions
+op-firebase-deploy device-source-of-truth --only firestore:rules
+op-firebase-deploy device-source-of-truth --only storage
 ```
 
 ### Build Only

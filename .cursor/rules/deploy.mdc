@@ -23,7 +23,6 @@ op-firebase-deploy --only hosting,functions  # any Firebase target combo
 - Writes the key to a temp file (`umask 077`), sets `GOOGLE_APPLICATION_CREDENTIALS`, runs `firebase deploy --non-interactive`, cleans up on exit
 - The only interactive step is the 1Password biometric prompt (Touch ID). No `firebase login`, `gcloud auth login`, or browser prompts needed
 - The service account key never expires unless explicitly deleted
-- Also supports `authorized_user` ADC tokens (auto-validates and self-heals if stale)
 
 ## First-time setup for a new project
 
