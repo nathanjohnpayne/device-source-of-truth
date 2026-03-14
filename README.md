@@ -85,6 +85,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including
 - `op-firebase-setup device-source-of-truth` creates `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, grants deploy roles, and stores the JSON key in `Private/Firebase Deploy - device-source-of-truth`.
 - `npm run deploy`, `npm run deploy:hosting`, and `npm run deploy:functions` call `op-firebase-deploy`, which reads `Private/Firebase Deploy - device-source-of-truth` from 1Password and sets `GOOGLE_APPLICATION_CREDENTIALS`. No browser auth required.
 - Backend/provider secrets use committed `op://` references in [`functions/.env.tpl`](./functions/.env.tpl) and are resolved at deploy time with `op inject`.
+- Questionnaire workbook parsing uses the official SheetJS Community Edition tarball in [`functions/package.json`](./functions/package.json) because the public npm `xlsx` package remains pinned to the older 0.18.5 release line.
 - Future APIs or services should follow the same pattern: commit only a template such as `.env.tpl`, `config.runtime.tpl`, or `functions/.env.tpl`, keep the resolved file gitignored, and materialize it with `op inject -i <template> -o <runtime-file> -f`.
 
 ## UI Consistency Guardrails
