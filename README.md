@@ -44,7 +44,18 @@ cd device-source-of-truth
 npm install
 cd functions && npm install && cd ..
 
-# Deploy maintainers: one-time 1Password/Firebase auth bootstrap
+# Install the canonical helper scripts once per machine
+mkdir -p ~/.local/bin
+cp ../ai_agent_repo_template/scripts/gcloud/gcloud ~/.local/bin/gcloud
+cp ../ai_agent_repo_template/scripts/firebase/op-firebase-deploy ~/.local/bin/
+cp ../ai_agent_repo_template/scripts/firebase/op-firebase-setup ~/.local/bin/
+chmod +x ~/.local/bin/gcloud ~/.local/bin/op-firebase-deploy ~/.local/bin/op-firebase-setup
+hash -r
+
+# Deploy maintainers: one-time machine auth bootstrap
+gcloud auth application-default login
+
+# One-time per project
 op-firebase-setup device-source-of-truth
 
 # Configure environment
@@ -68,7 +79,7 @@ The frontend runs at `http://localhost:5173`. By default it calls the production
 # Build frontend + backend
 npm run build && cd functions && npm run build && cd ..
 
-# Deploy everything to Firebase via 1Password auth
+# Deploy everything to Firebase via keyless impersonation
 npm run deploy
 
 # Deploy selectively
@@ -79,11 +90,12 @@ op-firebase-deploy --only firestore # security rules + indexes
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including Firebase Console setup, seed data, custom domains, monitoring, and rollback procedures.
 
-## 1Password Deploy & Secret Flow
+## Deploy Auth & Runtime Secret Flow
 
-- Deploy maintainers need `op`, `firebase-tools`, `gcloud`, and access to the `Private` vault in 1Password.
-- `op-firebase-setup device-source-of-truth` creates `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, grants deploy roles, and stores the JSON key in `Private/Firebase Deploy - device-source-of-truth`.
-- `npm run deploy`, `npm run deploy:hosting`, and `npm run deploy:functions` call `op-firebase-deploy`, which reads `Private/Firebase Deploy - device-source-of-truth` from 1Password and sets `GOOGLE_APPLICATION_CREDENTIALS`. No browser auth required.
+- Deploy maintainers need `firebase-tools`, `gcloud`, and the canonical helper scripts from `../ai_agent_repo_template/scripts/`.
+- `gcloud auth application-default login` bootstraps local ADC for the machine.
+- `op-firebase-setup device-source-of-truth` creates the deployer service account, grants deploy roles, and grants the current maintainer impersonation rights.
+- `npm run deploy`, `npm run deploy:hosting`, and `npm run deploy:functions` call `op-firebase-deploy`, which creates a temporary impersonated credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`.
 - Backend/provider secrets use committed `op://` references in [`functions/.env.tpl`](./functions/.env.tpl) and are resolved at deploy time with `op inject`.
 - Questionnaire workbook parsing uses the official SheetJS Community Edition tarball in [`functions/package.json`](./functions/package.json) because the public npm `xlsx` package remains pinned to the older 0.18.5 release line.
 - Future APIs or services should follow the same pattern: commit only a template such as `.env.tpl`, `config.runtime.tpl`, or `functions/.env.tpl`, keep the resolved file gitignored, and materialize it with `op inject -i <template> -o <runtime-file> -f`.
@@ -194,7 +206,7 @@ If a Firebase browser key is exposed:
 2. Create a replacement key in Google Cloud Credentials with the same referrer/API restrictions.
 3. Update `.env`, redeploy hosting, verify the live app uses the new key, then delete the old key.
 
-If `ANTHROPIC_API_KEY` or a deployer service-account key is exposed, rotate it in 1Password immediately, redeploy, and explicitly delete the old provider/IAM key.
+If `ANTHROPIC_API_KEY` is exposed, rotate it in 1Password immediately, redeploy functions, and revoke the old provider secret. If deploy auth stops working, rerun `gcloud auth application-default login` and `op-firebase-setup device-source-of-truth`.
 
 `npm test` and `cd functions && npm test` both include tracked-file secret scans so committed API keys, OAuth tokens, and private keys fail the standard test workflow.
 

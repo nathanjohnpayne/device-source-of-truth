@@ -38,7 +38,7 @@ The following tool config directories must contain only configuration — no ins
 ## Forbidden Patterns
 
 - **Never edit `dist/` directly.** It is a Vite build artifact. Always run `npm run build` to regenerate.
-- **Never commit secrets.** `.env`, `functions/.env`, and service account keys must never be committed. Use `op://` references in `functions/.env.tpl` and `.env.op`. The `npm test` suite includes a secret scan that fails on detected credentials.
+- **Never commit secrets.** `.env`, `functions/.env`, and service account keys must never be committed. Use `op://` references in `functions/.env.tpl` for runtime provider secrets. The `npm test` suite includes a secret scan that fails on detected credentials.
 - **Never relax Firestore or Storage security rules** without explicit review. Owner-scoped rules and domain-restricted auth are invariants.
 - **No instruction files in tool folders.** `.claude/`, `.cursor/`, and `.vscode/` must not contain plain `.md` or `.txt` instruction files. Cursor `.mdc` rule files and machine-generated `.plan.md` files in `.cursor/plans/` are permitted.
 - **No duplicate documentation.** If a concept is documented in `AGENTS.md` or a canonical root file, it must not be redefined in a conflicting location.

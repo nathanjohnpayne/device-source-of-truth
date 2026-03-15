@@ -88,7 +88,6 @@ Firebase Hosting (static SPA)
 ├── firestore.rules               ← Firestore security rules (28 collections)
 ├── storage.rules                 ← Firebase Storage security rules
 ├── .env / .env.example           ← Firebase API keys (3 vars, all VITE_ prefixed)
-├── .env.op                       ← 1Password references for deploy auth (op:// URIs, safe to commit)
 ├── functions/.env.tpl            ← 1Password secret references (op:// URIs, safe to commit)
 └── vite.config.ts                ← Vite + Tailwind + code-split config
 ```
@@ -347,8 +346,9 @@ Backend secrets (1Password, via `functions/.env.tpl`):
 - `ANTHROPIC_API_KEY` — in 1Password (`Private/DST Anthropic API Key`); resolved via `op inject` at deploy time
 - Rotation: update in 1Password, redeploy functions, verify behavior, revoke old secret
 
-Deployer service account key:
-- Rerun `op-firebase-setup device-source-of-truth`, confirm deploys work, then delete old IAM key via `gcloud iam service-accounts keys delete`
+Deploy auth maintenance:
+- If local ADC expires, rerun `gcloud auth application-default login`
+- If impersonation bindings or deploy IAM drift, rerun `op-firebase-setup device-source-of-truth`
 
 Do not store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
 
@@ -407,11 +407,11 @@ Both test suites include a `scripts/check-no-public-secrets.mjs` scan. A failing
 
 ## 6. Deployment Process
 
-Deploying requires the [1Password CLI](https://developer.1password.com/docs/cli/) (`op`), `firebase-tools`, `gcloud`, and access to the Private vault.
+Deploying requires `firebase-tools`, `gcloud`, the local `gcloud` wrapper, and access to 1Password only for backend secrets referenced by `functions/.env.tpl`.
 
 ### Non-Interactive Deploy (Recommended)
 
-Uses Application Default Credentials stored in 1Password. The only interactive step is the 1Password biometric (Touch ID).
+Uses local Application Default Credentials plus short-lived service account impersonation. The only interactive steps are refreshing ADC when it expires and resolving 1Password-backed backend secrets during function deploys.
 
 ```bash
 npm run deploy                 # full deploy
@@ -420,9 +420,9 @@ npm run deploy:functions       # functions only
 op-firebase-deploy --only hosting,functions  # any combo
 ```
 
-`op-firebase-deploy` reads a per-project service account key from 1Password, writes it to a temp file, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up.
+`op-firebase-deploy` creates a temporary impersonated credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up. The Firebase predeploy hook separately resolves `functions/.env.tpl` with `op inject` for backend secrets.
 
-**First-time setup:** `op-firebase-setup device-source-of-truth`
+**First-time setup:** `gcloud auth application-default login` then `op-firebase-setup device-source-of-truth`
 
 ### Manual Deploy
 
@@ -452,4 +452,4 @@ Backend secrets (managed via 1Password, resolved at deploy time):
 3. `functions/.env` is gitignored, exists only transiently during deploy
 4. Canonical secrets live in 1Password — never store as plaintext
 
-See `DEPLOYMENT.md` for full deployment instructions, 1Password convention, and rotation playbooks.
+See `DEPLOYMENT.md` for full deployment instructions, keyless deploy auth, and runtime-secret rotation playbooks.

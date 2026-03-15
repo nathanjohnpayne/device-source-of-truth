@@ -32,7 +32,8 @@ This document covers everything needed to deploy the Device Source of Truth (DST
 | Node.js | 22.x | Cloud Functions runtime + frontend build |
 | npm | 10+ | Package management |
 | Firebase CLI | 13+ | Deploy to Firebase services |
-| 1Password CLI | latest | Non-interactive credential management (`op`) |
+| Google Cloud SDK (`gcloud`) | latest | Local ADC bootstrap, impersonation setup, and Google API access |
+| 1Password CLI | latest | Runtime secret materialization for `functions/.env.tpl` |
 | Git | 2.30+ | Version control |
 
 ### Install Firebase CLI
@@ -41,11 +42,11 @@ This document covers everything needed to deploy the Device Source of Truth (DST
 npm install -g firebase-tools
 ```
 
-Do not run `firebase login`. Authentication is handled entirely through 1Password — see [First-Time Setup](#first-time-setup).
+Do not run `firebase login`. Authentication is handled through local ADC plus service account impersonation — see [First-Time Setup](#first-time-setup).
 
 ### Access Required
 
-Access to `Private/Firebase Deploy - device-source-of-truth` in 1Password. This item is created by `op-firebase-setup` and contains the service account key used for all deploys.
+Permission to impersonate `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`. If you are deploying functions, you also need access to the Anthropic secret referenced by `functions/.env.tpl`.
 
 ### Required Firebase Services
 
@@ -238,7 +239,7 @@ Always build both before deploying. The frontend build is independent of the bac
 
 ## Deploying to Firebase
 
-All deploys use `op-firebase-deploy` for non-interactive 1Password auth. Never run `firebase deploy` directly.
+All deploys use `op-firebase-deploy` for non-interactive service account impersonation. Never run `firebase deploy` directly.
 
 ### Deploy Everything
 
@@ -252,13 +253,14 @@ This deploys all four services:
 - **Firestore Rules** — applies `firestore.rules` to the database
 - **Firestore Indexes** — applies `firestore.indexes.json`
 
-The script reads `Private/Firebase Deploy - device-source-of-truth` from 1Password (Touch ID prompt), sets `GOOGLE_APPLICATION_CREDENTIALS`, and runs `firebase deploy --non-interactive`. No browser auth required.
+The script creates a temporary `impersonated_service_account` credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, sets `GOOGLE_APPLICATION_CREDENTIALS`, and runs `firebase deploy --non-interactive`. If functions are part of the deploy, the predeploy hook also resolves `functions/.env.tpl` with `op inject`.
 
 ### First-Time Setup
 
-Run once per machine to create the service account key and store it in 1Password:
+Run once per machine to bootstrap local ADC and configure impersonation:
 
 ```bash
+gcloud auth application-default login
 op-firebase-setup device-source-of-truth
 ```
 
@@ -519,7 +521,7 @@ Rules are versioned in Git. To roll back:
 Error: Missing permissions required for functions deploy.
 ```
 
-**Fix:** Ensure the `firebase-deployer` service account key in 1Password (`Private/Firebase Deploy - device-source-of-truth`) is valid. Re-run `op-firebase-setup device-source-of-truth` to regenerate it.
+**Fix:** Ensure local ADC is valid and impersonation setup is current. Re-run `gcloud auth application-default login` and `op-firebase-setup device-source-of-truth`.
 
 ### Functions deploy fails with "Could not build the function due to a missing permission"
 
