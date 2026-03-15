@@ -347,6 +347,7 @@ Backend secrets (1Password, via `functions/.env.tpl`):
 - Rotation: update in 1Password, redeploy functions, verify behavior, revoke old secret
 
 Deploy auth maintenance:
+- The 1Password-first deploy-auth model is a deliberate repository invariant. Do not switch this repo back to ADC-first, routine browser-login, `firebase login`, or long-lived deploy-key auth without explicit human approval.
 - Routine deploy auth should use the shared `Private/GCP ADC` source credential through the 1Password CLI. If that credential itself needs rotation, refresh it once and update the item.
 - If impersonation bindings or deploy IAM drift, rerun `op-firebase-setup device-source-of-truth`
 

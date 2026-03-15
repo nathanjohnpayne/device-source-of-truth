@@ -94,6 +94,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including
 
 - Deploy maintainers need `firebase-tools`, `gcloud`, and the canonical helper scripts from `../ai_agent_repo_template/scripts/`.
 - The normal maintainer flow reads the shared `Private/GCP ADC` source credential through the 1Password CLI, so routine deploy work does not need browser login once that item exists.
+- The 1Password-first deploy-auth model is intentional for this repo. Do not switch it back to ADC-first or deploy-key-based guidance unless a human explicitly requests that change.
 - `op-firebase-setup device-source-of-truth` creates the deployer service account, grants deploy roles, and grants the current maintainer impersonation rights.
 - `npm run deploy`, `npm run deploy:hosting`, and `npm run deploy:functions` call `op-firebase-deploy`, which creates a temporary impersonated credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`.
 - Backend/provider secrets use committed `op://` references in [`functions/.env.tpl`](./functions/.env.tpl) and are resolved at deploy time with `op inject`.

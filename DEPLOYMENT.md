@@ -44,6 +44,8 @@ npm install -g firebase-tools
 
 Do not run `firebase login`. Authentication is handled through a shared 1Password-backed GCP ADC source credential plus service account impersonation — see [First-Time Setup](#first-time-setup).
 
+This 1Password-first source-credential model is a deliberate project decision. Do not replace it with ADC-first day-to-day docs, routine browser-login steps, or long-lived deploy keys unless a human explicitly asks for that change.
+
 ### Access Required
 
 Permission to impersonate `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`. If you are deploying functions, you also need access to the Anthropic secret referenced by `functions/.env.tpl`.
