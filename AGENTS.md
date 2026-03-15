@@ -347,7 +347,7 @@ Backend secrets (1Password, via `functions/.env.tpl`):
 - Rotation: update in 1Password, redeploy functions, verify behavior, revoke old secret
 
 Deploy auth maintenance:
-- If local ADC expires, rerun `gcloud auth application-default login`
+- Routine deploy auth should use the shared `Private/GCP ADC` source credential through the 1Password CLI. If that credential itself needs rotation, refresh it once and update the item.
 - If impersonation bindings or deploy IAM drift, rerun `op-firebase-setup device-source-of-truth`
 
 Do not store API keys as plaintext in source files. Always use `op://` references in `.env.tpl`.
@@ -407,11 +407,11 @@ Both test suites include a `scripts/check-no-public-secrets.mjs` scan. A failing
 
 ## 6. Deployment Process
 
-Deploying requires `firebase-tools`, `gcloud`, the local `gcloud` wrapper, and access to 1Password only for backend secrets referenced by `functions/.env.tpl`.
+Deploying requires `firebase-tools`, `gcloud`, the local `gcloud` wrapper, and access to 1Password both for the shared `Private/GCP ADC` source credential and for backend secrets referenced by `functions/.env.tpl`.
 
 ### Non-Interactive Deploy (Recommended)
 
-Uses local Application Default Credentials plus short-lived service account impersonation. The only interactive steps are refreshing ADC when it expires and resolving 1Password-backed backend secrets during function deploys.
+Uses a shared 1Password-backed GCP ADC source credential plus short-lived service account impersonation. The only routine interactive steps are 1Password unlock/Touch ID and resolving 1Password-backed backend secrets during function deploys.
 
 ```bash
 npm run deploy                 # full deploy
@@ -422,7 +422,7 @@ op-firebase-deploy --only hosting,functions  # any combo
 
 `op-firebase-deploy` creates a temporary impersonated credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up. The Firebase predeploy hook separately resolves `functions/.env.tpl` with `op inject` for backend secrets.
 
-**First-time setup:** `gcloud auth application-default login` then `op-firebase-setup device-source-of-truth`
+**First-time setup:** make sure 1Password CLI can read `Private/GCP ADC`, then run `op-firebase-setup device-source-of-truth`
 
 ### Manual Deploy
 

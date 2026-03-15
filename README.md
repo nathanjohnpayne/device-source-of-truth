@@ -52,8 +52,8 @@ cp ../ai_agent_repo_template/scripts/firebase/op-firebase-setup ~/.local/bin/
 chmod +x ~/.local/bin/gcloud ~/.local/bin/op-firebase-deploy ~/.local/bin/op-firebase-setup
 hash -r
 
-# Deploy maintainers: one-time machine auth bootstrap
-gcloud auth application-default login
+# Deploy maintainers: one-time machine setup
+# Make sure 1Password CLI can read Private/GCP ADC -> credential
 
 # One-time per project
 op-firebase-setup device-source-of-truth
@@ -93,7 +93,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including
 ## Deploy Auth & Runtime Secret Flow
 
 - Deploy maintainers need `firebase-tools`, `gcloud`, and the canonical helper scripts from `../ai_agent_repo_template/scripts/`.
-- `gcloud auth application-default login` bootstraps local ADC for the machine.
+- The normal maintainer flow reads the shared `Private/GCP ADC` source credential through the 1Password CLI, so routine deploy work does not need browser login once that item exists.
 - `op-firebase-setup device-source-of-truth` creates the deployer service account, grants deploy roles, and grants the current maintainer impersonation rights.
 - `npm run deploy`, `npm run deploy:hosting`, and `npm run deploy:functions` call `op-firebase-deploy`, which creates a temporary impersonated credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`.
 - Backend/provider secrets use committed `op://` references in [`functions/.env.tpl`](./functions/.env.tpl) and are resolved at deploy time with `op inject`.
@@ -206,7 +206,7 @@ If a Firebase browser key is exposed:
 2. Create a replacement key in Google Cloud Credentials with the same referrer/API restrictions.
 3. Update `.env`, redeploy hosting, verify the live app uses the new key, then delete the old key.
 
-If `ANTHROPIC_API_KEY` is exposed, rotate it in 1Password immediately, redeploy functions, and revoke the old provider secret. If deploy auth stops working, rerun `gcloud auth application-default login` and `op-firebase-setup device-source-of-truth`.
+If `ANTHROPIC_API_KEY` is exposed, rotate it in 1Password immediately, redeploy functions, and revoke the old provider secret. If deploy auth stops working, first verify the shared `Private/GCP ADC` item is current and readable, then rerun `op-firebase-setup device-source-of-truth` if impersonation bindings drifted.
 
 `npm test` and `cd functions && npm test` both include tracked-file secret scans so committed API keys, OAuth tokens, and private keys fail the standard test workflow.
 

@@ -32,8 +32,8 @@ This document covers everything needed to deploy the Device Source of Truth (DST
 | Node.js | 22.x | Cloud Functions runtime + frontend build |
 | npm | 10+ | Package management |
 | Firebase CLI | 13+ | Deploy to Firebase services |
-| Google Cloud SDK (`gcloud`) | latest | Local ADC bootstrap, impersonation setup, and Google API access |
-| 1Password CLI | latest | Runtime secret materialization for `functions/.env.tpl` |
+| Google Cloud SDK (`gcloud`) | latest | 1Password-backed source credential bootstrap, impersonation setup, and Google API access |
+| 1Password CLI | latest | Shared GCP source credential access plus runtime secret materialization for `functions/.env.tpl` |
 | Git | 2.30+ | Version control |
 
 ### Install Firebase CLI
@@ -42,7 +42,7 @@ This document covers everything needed to deploy the Device Source of Truth (DST
 npm install -g firebase-tools
 ```
 
-Do not run `firebase login`. Authentication is handled through local ADC plus service account impersonation — see [First-Time Setup](#first-time-setup).
+Do not run `firebase login`. Authentication is handled through a shared 1Password-backed GCP ADC source credential plus service account impersonation — see [First-Time Setup](#first-time-setup).
 
 ### Access Required
 
@@ -257,12 +257,13 @@ The script creates a temporary `impersonated_service_account` credential for `fi
 
 ### First-Time Setup
 
-Run once per machine to bootstrap local ADC and configure impersonation:
+Run once per machine to configure impersonation:
 
 ```bash
-gcloud auth application-default login
 op-firebase-setup device-source-of-truth
 ```
+
+If `op://Private/GCP ADC/credential` does not exist yet, seed it once by running `gcloud auth application-default login`, then copy the resulting `~/.config/gcloud/application_default_credentials.json` into the 1Password item `Private/GCP ADC`, field `credential`.
 
 ### Selective Deployment
 
@@ -521,7 +522,7 @@ Rules are versioned in Git. To roll back:
 Error: Missing permissions required for functions deploy.
 ```
 
-**Fix:** Ensure local ADC is valid and impersonation setup is current. Re-run `gcloud auth application-default login` and `op-firebase-setup device-source-of-truth`.
+**Fix:** Ensure the shared `Private/GCP ADC` source credential is current and impersonation setup is current. Refresh the source credential once if needed, then rerun `op-firebase-setup device-source-of-truth`.
 
 ### Functions deploy fails with "Could not build the function due to a missing permission"
 
