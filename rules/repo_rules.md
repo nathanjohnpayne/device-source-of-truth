@@ -56,5 +56,6 @@ The following checks are implemented in `scripts/ci/` and must pass before any c
 4. `check_dist_not_modified` — Verifies dist/ files were not directly modified
 5. `check_spec_test_alignment` — Verifies every file in specs/ has a corresponding test file in tests/ (advisory for this repo — specs are product docs, not per-test spec files)
 6. `check_duplicate_docs` — Verifies no documentation topic is duplicated between root files and tool folders
+7. `check_review_policy_exists` — Verifies .github/review-policy.yml and REVIEW_POLICY.md both exist
 
 Additionally, `npm test` and `cd functions && npm test` include secret scans that must pass on every commit.
