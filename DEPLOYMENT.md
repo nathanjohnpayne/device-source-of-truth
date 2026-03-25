@@ -643,14 +643,14 @@ There is no built-in rollback for Cloud Functions. To roll back:
 
 1. Check out the previous commit: `git checkout <commit-hash>`
 2. Rebuild: `cd functions && npm run build`
-3. Redeploy: `firebase deploy --only functions`
+3. Redeploy: `op-firebase-deploy device-source-of-truth --only functions`
 
 ### Firestore Rules Rollback
 
 Rules are versioned in Git. To roll back:
 
 1. Check out the previous `firestore.rules`
-2. Deploy: `firebase deploy --only firestore:rules`
+2. Deploy: `op-firebase-deploy device-source-of-truth --only firestore:rules`
 
 ---
 
@@ -670,7 +670,7 @@ Error: Missing permissions required for functions deploy.
 Build failed with status: FAILURE. Could not build the function due to a missing permission on the build service account.
 ```
 
-**Fix:** This is the most common deployment issue. 2nd gen Cloud Functions use the default compute service account as the build SA, and it needs explicit IAM roles. Run the `gcloud` commands in the [Cloud Functions Build Service Account](#cloud-functions-build-service-account-critical) section, wait 1-2 minutes for IAM propagation, then retry `firebase deploy --only functions`.
+**Fix:** This is the most common deployment issue. 2nd gen Cloud Functions use the default compute service account as the build SA, and it needs explicit IAM roles. Run the `gcloud` commands in the [Cloud Functions Build Service Account](#cloud-functions-build-service-account-critical) section, wait 1-2 minutes for IAM propagation, then retry `op-firebase-deploy device-source-of-truth --only functions`.
 
 ### Functions deploy fails with "Build failed" (other)
 
