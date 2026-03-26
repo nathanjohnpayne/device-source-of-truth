@@ -20,6 +20,7 @@ functions/.contracts
 .env
 .env.*
 .env.local
+!*.tpl
 service-account-key.json
 import-output.json
 *.key
