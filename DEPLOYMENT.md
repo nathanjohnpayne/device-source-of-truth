@@ -176,7 +176,7 @@ This 1Password-first source-credential model is a deliberate project decision. D
 
 ### Access Required
 
-Permission to impersonate `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`. If you are deploying functions, you also need access to the Anthropic secret referenced by `functions/.env.tpl`.
+Access to the project SA key in `op://Firebase/device-source-of-truth — Firebase Deployer SA Key` (preferred for CI/headless) or the shared 1Password source credential `op://Private/c2v6emkwppjzjjaq2bdqk3wnlm/credential`, or another explicit `GOOGLE_APPLICATION_CREDENTIALS` file. Permission to impersonate `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com` (skipped when using the project SA key directly). If you are deploying functions, you also need access to the Anthropic secret referenced by `functions/.env.tpl`.
 
 ### Required Firebase Services
 
@@ -560,7 +560,7 @@ This deploys all four services:
 - **Firestore Rules** — applies `firestore.rules` to the database
 - **Firestore Indexes** — applies `firestore.indexes.json`
 
-The script creates a temporary `impersonated_service_account` credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, sets `GOOGLE_APPLICATION_CREDENTIALS`, and runs `firebase deploy --non-interactive`. If functions are part of the deploy, the predeploy hook also resolves `functions/.env.tpl` with `op inject`.
+The script reads source credentials from `GOOGLE_APPLICATION_CREDENTIALS`, then the project SA key from `op://Firebase/device-source-of-truth — Firebase Deployer SA Key`, then `op://Private/c2v6emkwppjzjjaq2bdqk3wnlm/credential`, then `~/.config/gcloud/application_default_credentials.json`. If the source credential is a `service_account` key matching the target deployer SA, it uses direct auth (no impersonation, faster). Otherwise it creates a temporary `impersonated_service_account` credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, sets `GOOGLE_APPLICATION_CREDENTIALS`, and runs `firebase deploy --non-interactive`. If functions are part of the deploy, the predeploy hook also resolves `functions/.env.tpl` with `op inject`.
 
 ### First-Time Setup
 
@@ -570,7 +570,7 @@ Run once per machine to configure impersonation:
 op-firebase-setup device-source-of-truth
 ```
 
-If `op://Private/GCP ADC/credential` does not exist yet, seed it once by running `gcloud auth application-default login`, then copy the resulting `~/.config/gcloud/application_default_credentials.json` into the 1Password item `Private/GCP ADC`, field `credential`.
+If `op://Private/c2v6emkwppjzjjaq2bdqk3wnlm/credential` does not exist yet, seed it once by running `gcloud auth application-default login`, then copy the resulting `~/.config/gcloud/application_default_credentials.json` into the 1Password item `Private/GCP ADC`, field `credential`.
 
 ### Selective Deployment
 
@@ -819,6 +819,32 @@ Rules are versioned in Git. To roll back:
 1. Check out the previous `firestore.rules`
 2. Deploy: `op-firebase-deploy device-source-of-truth --only firestore:rules`
 
+### CI/CD & Headless Deploy
+
+For headless environments (Claude Code cloud tasks, GitHub Actions, etc.) where
+1Password biometric auth is unavailable, use the project SA key directly:
+
+```bash
+# Pull the SA key from 1Password (one-time, requires biometric)
+op document get "device-source-of-truth — Firebase Deployer SA Key" \
+  --vault Firebase --out-file ~/firebase-keys/device-source-of-truth-sa-key.json
+
+# Deploy with the SA key
+GOOGLE_APPLICATION_CREDENTIALS=~/firebase-keys/device-source-of-truth-sa-key.json op-firebase-deploy device-source-of-truth
+```
+
+The SA key (`op://Firebase/device-source-of-truth — Firebase Deployer SA Key`, item ID `ruiswfa5hwpwbkfz5vy462woky`) is a `service_account` credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`. When `op-firebase-deploy` detects that the source credential already matches the target deployer SA, it skips impersonation and uses direct auth (faster).
+
+For Claude Code cloud scheduled tasks:
+1. Retrieve the key: `op document get "device-source-of-truth — Firebase Deployer SA Key" --vault Firebase`
+2. Copy the JSON contents
+3. In the task's cloud environment, add: `FIREBASE_SA_KEY=<paste JSON>`
+4. Add a setup script:
+   ```bash
+   echo "$FIREBASE_SA_KEY" > /tmp/sa-key.json
+   export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json
+   ```
+
 ---
 
 ## Troubleshooting
@@ -829,7 +855,7 @@ Rules are versioned in Git. To roll back:
 Error: Missing permissions required for functions deploy.
 ```
 
-**Fix:** Ensure the shared `Private/GCP ADC` source credential is current and impersonation setup is current. Refresh the source credential once if needed, then rerun `op-firebase-setup device-source-of-truth`.
+**Fix:** For headless environments, verify the project SA key in `op://Firebase/device-source-of-truth — Firebase Deployer SA Key` is accessible via `GOOGLE_APPLICATION_CREDENTIALS`. For interactive environments, ensure the shared `Private/GCP ADC` source credential is current and impersonation setup is current. Refresh the source credential once if needed, then rerun `op-firebase-setup device-source-of-truth`.
 
 ### Functions deploy fails with "Could not build the function due to a missing permission"
 
