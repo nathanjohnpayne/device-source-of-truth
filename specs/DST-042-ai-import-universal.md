@@ -1,3 +1,9 @@
+---
+spec_id: DST-042-ai-import-universal
+tested: false
+reason: "implementation pending"
+---
+
 # DST-042 — AI Import: Universal Coverage, Field-Type Optimization & Opt-In Control
 
 | Field | Value |

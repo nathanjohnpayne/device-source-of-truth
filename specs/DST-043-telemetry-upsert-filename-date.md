@@ -1,3 +1,7 @@
+---
+spec_id: DST-043-telemetry-upsert-filename-date
+---
+
 # DST-043 — Telemetry Upload: Upsert Device Counts & Parse Snapshot Date from Filename
 
 | Field | Value |

@@ -1,3 +1,7 @@
+---
+spec_id: DST-052-questionnaire-ai-extraction-status
+---
+
 # DST-052 — Questionnaire AI Extraction: Real-Time Status & Recovery
 
 | Field | Value |

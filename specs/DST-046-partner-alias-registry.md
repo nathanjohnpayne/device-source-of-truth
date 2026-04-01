@@ -1,3 +1,7 @@
+---
+spec_id: DST-046-partner-alias-registry
+---
+
 # DST-046 — Partner Alias Registry
 
 | Field | Value |

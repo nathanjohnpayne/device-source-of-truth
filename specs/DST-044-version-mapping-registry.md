@@ -1,3 +1,7 @@
+---
+spec_id: DST-044-version-mapping-registry
+---
+
 # DST-044 — Core Version Mapping Registry & Friendly Version Display
 
 | Field | Value |

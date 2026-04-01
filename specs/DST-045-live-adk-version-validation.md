@@ -1,3 +1,7 @@
+---
+spec_id: DST-045-live-adk-version-validation
+---
+
 # DST-045 — `liveAdkVersion` Validation Against Known Friendly Versions
 
 | Field | Value |

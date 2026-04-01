@@ -1,3 +1,9 @@
+---
+spec_id: DST-049-import-navigation-guardrails
+tested: false
+reason: "implementation pending"
+---
+
 # DST-047 — Import Section: Dependency-Aware Navigation & Setup Guardrails
 
 | Field | Value |

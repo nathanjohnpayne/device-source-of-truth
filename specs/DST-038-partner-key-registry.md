@@ -1,3 +1,7 @@
+---
+spec_id: DST-038-partner-key-registry
+---
+
 # DST-038 — Partner Key Registry: Datadog Manifest Key Mapping
 
 | Field | Value |

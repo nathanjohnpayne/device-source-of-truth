@@ -1,3 +1,9 @@
+---
+spec_id: DST-050-questionnaire-ai-cost-disclosure
+tested: false
+reason: "implementation pending"
+---
+
 # DST-050 — Questionnaire AI Extraction: Cost Disclosure
 
 | Field | Value |

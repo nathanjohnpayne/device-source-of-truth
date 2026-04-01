@@ -1,3 +1,9 @@
+---
+spec_id: DST-040-ai-import-opt-in
+tested: false
+reason: "implementation pending"
+---
+
 # DST-040 — AI Import Opt-In & Cost Disclosure
 
 | Field | Value |

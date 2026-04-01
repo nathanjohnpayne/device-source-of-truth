@@ -1,3 +1,7 @@
+---
+spec_id: DST-047-questionnaire-intake-ai-extraction
+---
+
 # DST-047 — Questionnaire Intake & AI Extraction Pipeline
 
 | Field | Value |

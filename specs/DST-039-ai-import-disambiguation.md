@@ -1,3 +1,9 @@
+---
+spec_id: DST-039-ai-import-disambiguation
+tested: false
+reason: "implementation pending"
+---
+
 # DST-039 — AI-Assisted Import Disambiguation
 
 | Field | Value |

@@ -1,3 +1,9 @@
+---
+spec_id: DST-055-multi-partner-questionnaire-support
+tested: false
+reason: "implementation pending"
+---
+
 # DST-055 — Multi-Partner Questionnaire Support
 
 | Field | Value |

@@ -1,3 +1,9 @@
+---
+spec_id: DST-051-ai-process-status
+tested: false
+reason: "implementation pending"
+---
+
 # DST-051 — AI Process Real-Time Status & Recovery
 
 | Field | Value |

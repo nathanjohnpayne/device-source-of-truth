@@ -1,3 +1,7 @@
+---
+spec_id: DST-044-amendment-version-registry
+---
+
 # DST-044 (Amendment) — Version Registry: Missing Labels & Plugin Suffix Stripping
 
 | Field | Value |

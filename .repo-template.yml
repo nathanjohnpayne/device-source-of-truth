@@ -1,0 +1,19 @@
+extra_top_level_dirs: [public, config, mappings, packages]
+test_globs:
+  - "tests/**/*.test.*"
+  - "functions/test/**/*.test.*"
+  - "src/test/**/*.test.*"
+generated_dirs: [dist]
+spec_test_map:
+  DST-038-partner-key-registry: "functions/test/contracts/partnerKeys.test.ts"
+  DST-043-telemetry-upsert-filename-date: "functions/test/contracts/telemetry.test.ts"
+  DST-044-amendment-version-registry: "functions/test/contracts/adkVersionNormalization.test.ts"
+  DST-044-version-mapping-registry: "functions/test/contracts/adkVersionNormalization.test.ts"
+  DST-045-live-adk-version-validation: "functions/test/contracts/adkVersionNormalization.test.ts"
+  DST-046-partner-alias-registry: "functions/test/contracts/partners.test.ts"
+  DST-047-questionnaire-intake-ai-extraction:
+    - "functions/test/contracts/questionnaireIntake.test.ts"
+    - "functions/test/questionnaireParser.test.ts"
+  DST-048-questionnaire-admin-review-sign-off: "src/test/smoke/QuestionnaireReviewPage.test.tsx"
+  DST-052-questionnaire-ai-extraction-status: "src/test/smoke/QuestionnaireDetailPage.test.tsx"
+  DST-054-user-role-management: "functions/test/contracts/users.test.ts"

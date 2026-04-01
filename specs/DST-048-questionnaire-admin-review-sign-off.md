@@ -1,3 +1,7 @@
+---
+spec_id: DST-048-questionnaire-admin-review-sign-off
+---
+
 # DST-048 — Questionnaire Admin Review, Conflict Resolution & Import Sign-Off
 
 | Field | Value |

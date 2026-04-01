@@ -1,3 +1,9 @@
+---
+spec_id: DST-053-active-devices-freshness-badge
+tested: false
+reason: "implementation pending"
+---
+
 # DST-053 — Active Devices Freshness Badge
 
 **Feature area:** Device Source of Truth (DST)  

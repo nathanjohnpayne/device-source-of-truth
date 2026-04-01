@@ -1,3 +1,9 @@
+---
+spec_id: DST-037-airtable-intake-import
+tested: false
+reason: "implementation pending"
+---
+
 # DST-037 — Airtable Intake Request Import
 
 | Field | Value |

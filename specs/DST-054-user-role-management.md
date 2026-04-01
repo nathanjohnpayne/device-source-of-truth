@@ -1,3 +1,7 @@
+---
+spec_id: DST-054-user-role-management
+---
+
 # DST-054 — In-App User Role Management
 
 | Field | Value |

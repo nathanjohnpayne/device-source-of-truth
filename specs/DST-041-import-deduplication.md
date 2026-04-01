@@ -1,3 +1,9 @@
+---
+spec_id: DST-041-import-deduplication
+tested: false
+reason: "implementation pending"
+---
+
 # DST-041 — Import Deduplication
 
 | Field | Value |
