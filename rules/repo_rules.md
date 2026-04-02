@@ -37,6 +37,7 @@ The following tool config directories must contain only configuration — no ins
 
 ## Forbidden Patterns
 
+- **Never push directly to `main`.** All changes must go through a pull request—even single-line fixes, documentation updates, and deploy config changes. The only exception is if the human explicitly authorizes a direct push in chat as a break-glass override.
 - **Never edit `dist/` directly.** It is a Vite build artifact. Always run `npm run build` to regenerate.
 - **Never commit secrets.** `.env`, `functions/.env`, and service account keys must never be committed. Use `op://` references in `functions/.env.tpl` for runtime provider secrets. The `npm test` suite includes a secret scan that fails on detected credentials.
 - **Never relax Firestore or Storage security rules** without explicit review. Owner-scoped rules and domain-restricted auth are invariants.
