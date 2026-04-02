@@ -372,20 +372,26 @@ jobs:
                 });
               }
             } else if (hasDisagreementLabel) {
-              // Auto-clear label when disagreement resolves
-              await github.rest.issues.removeLabel({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                name: 'needs-human-review',
-              });
+              // Auto-clear label when disagreement resolves.
+              // Wrap in try/catch to handle 404 when two review events race and both
+              // attempt to remove the label concurrently.
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  name: 'needs-human-review',
+                });
 
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                body: '**Disagreement resolved.** All agent reviewers now agree. Removing `needs-human-review` label.',
-              });
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  body: '**Disagreement resolved.** All agent reviewers now agree. Removing `needs-human-review` label.',
+                });
+              } catch (e) {
+                if (e.status !== 404) throw e;
+              }
             }
 
   # ──────────────────────────────────────────────
