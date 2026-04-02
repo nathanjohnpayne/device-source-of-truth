@@ -279,8 +279,8 @@ gh secret set CLAUDE_PAT --repo {owner}/{repo} --body "$(op read 'op://Private/p
 gh secret set CURSOR_PAT --repo {owner}/{repo} --body "$(op read 'op://Private/bslrih4spwxgookzfy6zedz5g4/token')"
 gh secret set CODEX_PAT --repo {owner}/{repo} --body "$(op read 'op://Private/o6ekjxjjl5gq6rmcneomrjahpu/token')"
 gh secret set REVIEWER_ASSIGNMENT_TOKEN --repo {owner}/{repo} --body "$(op read 'op://Private/sm5kopwk6t6p3xmu2igesndzhe/token')"
-gh secret set ANTHROPIC_API_KEY --repo {owner}/{repo} --body "$(op read 'op://Private/Anthropic API Key/credential')"
-gh secret set OPENAI_API_KEY --repo {owner}/{repo} --body "$(op read 'op://Private/OpenAI API Key/credential')"
+gh secret set ANTHROPIC_API_KEY --repo {owner}/{repo} --body "$(op read 'op://Private/ab5g2w45zqrvpeatqjdaoc3ocu/credential')"  # Claude API Key (device-source-of-truth) — repo-specific key
+gh secret set OPENAI_API_KEY --repo {owner}/{repo} --body "$(op read 'op://Private/ooj5vq25ynj5n56mqm7xrmumsq/credential')"  # ChatGPT API Key (Test/Dev) — generate a project-specific key for long-term use
 ```
 
 ### 4. Configure branch protection
