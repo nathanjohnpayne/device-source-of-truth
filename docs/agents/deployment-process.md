@@ -15,6 +15,10 @@ op-firebase-deploy --only hosting,functions  # any combo
 
 `op-firebase-deploy` creates a temporary impersonated credential for `firebase-deployer@device-source-of-truth.iam.gserviceaccount.com`, sets `GOOGLE_APPLICATION_CREDENTIALS`, deploys via `firebase deploy --non-interactive`, and cleans up. The Firebase predeploy hook separately resolves `functions/.env.tpl` with `op inject` for backend secrets.
 
+- If credential preflight was run at session start (`scripts/op-preflight.sh --mode all`),
+  deploy credentials are already cached in `GOOGLE_APPLICATION_CREDENTIALS`. No additional
+  biometric prompt is needed for deployment.
+
 If an `op` command fails with a sign-in or biometric error during deploy, follow the pause-and-prompt procedure in [operating-rules.md](operating-rules.md#1password-cli-authentication-failures). Do not retry or work around the failure without the human present.
 
 **First-time setup:** make sure 1Password CLI can read `Private/GCP ADC`, then run `op-firebase-setup device-source-of-truth`
