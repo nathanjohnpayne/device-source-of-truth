@@ -46,3 +46,6 @@ mappings/questionnairesamples/
 # Claude Code local settings
 .claude/settings.local.json
 .claude/launch.json
+
+# Build artifacts (auto-generated; regenerated on every local build)
+public/version.json
