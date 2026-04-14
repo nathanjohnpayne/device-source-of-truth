@@ -1,4 +1,7 @@
 ---
+spec_id: DST-TDI-001-Contract-Hardening-Plan
+tested: false
+reason: "planning document; implementation is validated by existing contract tests under functions/test/contracts/"
 tags:
   - device-source-of-truth
   - plan
