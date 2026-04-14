@@ -49,3 +49,18 @@ mappings/questionnairesamples/
 
 # Build artifacts (auto-generated; regenerated on every local build)
 public/version.json
+
+# AI / agents (local state and runtime artifacts)
+.claude/worktrees/
+.cursor/cache/
+.cursor/state/
+.cursor/plans/
+
+# Testing
+coverage/
+playwright-report/
+test-results/
+
+# Misc
+tmp/
+.cache/
