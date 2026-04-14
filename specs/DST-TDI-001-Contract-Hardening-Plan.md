@@ -10,7 +10,13 @@ tags:
 ---
 # Contract Hardening Plan: Shared DTOs, Strict Device Validation, and Numeric Coercion
 
+> **Historical note.** This file is the original planning artifact for
+> DST-TDI-001 and is preserved here for reference. The work it describes has
+> already landed on `main`; treat implementation tasks below as a record of
+> the plan at the time it was written, not as open work items.
+
 ## Summary
+
 This workstream will harden the live API contract surface for devices, device specs, partner keys, telemetry history, reports, and audit data without pulling legacy import routes into scope.
 
 The implementation will do four things in one coordinated pass:
