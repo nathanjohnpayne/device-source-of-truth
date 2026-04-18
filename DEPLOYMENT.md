@@ -1,6 +1,6 @@
 # Deployment Guide
 
-> This guide covers deploying the existing project. For **new project setup** (create Firebase project, `firebase init`, first-time credential setup), see `ai_agent_repo_template/DEPLOYMENT.md` in the sibling directory.
+> This guide covers deploying the existing project. For **new project setup** (create Firebase project, `firebase init`, first-time credential setup), see `mergepath/DEPLOYMENT.md` in the sibling directory.
 
 This document covers everything needed to deploy the Device Source of Truth (DST) application from a fresh checkout to production, including prerequisite setup, environment configuration, CI/CD considerations, and operational runbooks.
 
@@ -46,13 +46,13 @@ gh auth login
 
 ```bash
 # Clone the template repo if not already present
-git clone https://github.com/nathanjohnpayne/ai_agent_repo_template.git ~/Documents/GitHub/ai_agent_repo_template
+git clone https://github.com/nathanjohnpayne/mergepath.git ~/Documents/GitHub/mergepath
 
 # Install canonical helper scripts
 mkdir -p ~/.local/bin
-cp ~/Documents/GitHub/ai_agent_repo_template/scripts/gcloud/gcloud ~/.local/bin/
-cp ~/Documents/GitHub/ai_agent_repo_template/scripts/firebase/op-firebase-deploy ~/.local/bin/
-cp ~/Documents/GitHub/ai_agent_repo_template/scripts/firebase/op-firebase-setup ~/.local/bin/
+cp ~/Documents/GitHub/mergepath/scripts/gcloud/gcloud ~/.local/bin/
+cp ~/Documents/GitHub/mergepath/scripts/firebase/op-firebase-deploy ~/.local/bin/
+cp ~/Documents/GitHub/mergepath/scripts/firebase/op-firebase-setup ~/.local/bin/
 chmod +x ~/.local/bin/gcloud ~/.local/bin/op-firebase-deploy ~/.local/bin/op-firebase-setup
 
 # Ensure PATH includes ~/.local/bin
