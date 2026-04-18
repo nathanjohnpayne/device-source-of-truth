@@ -46,9 +46,9 @@ cd functions && npm install && cd ..
 
 # Install the canonical helper scripts once per machine
 mkdir -p ~/.local/bin
-cp ../ai_agent_repo_template/scripts/gcloud/gcloud ~/.local/bin/gcloud
-cp ../ai_agent_repo_template/scripts/firebase/op-firebase-deploy ~/.local/bin/
-cp ../ai_agent_repo_template/scripts/firebase/op-firebase-setup ~/.local/bin/
+cp ../mergepath/scripts/gcloud/gcloud ~/.local/bin/gcloud
+cp ../mergepath/scripts/firebase/op-firebase-deploy ~/.local/bin/
+cp ../mergepath/scripts/firebase/op-firebase-setup ~/.local/bin/
 chmod +x ~/.local/bin/gcloud ~/.local/bin/op-firebase-deploy ~/.local/bin/op-firebase-setup
 hash -r
 
@@ -92,7 +92,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete deployment guide including
 
 ## Deploy Auth & Runtime Secret Flow
 
-- Deploy maintainers need `firebase-tools`, `gcloud`, and the canonical helper scripts from `../ai_agent_repo_template/scripts/`.
+- Deploy maintainers need `firebase-tools`, `gcloud`, and the canonical helper scripts from `../mergepath/scripts/`.
 - The normal maintainer flow reads the shared `Private/GCP ADC` source credential through the 1Password CLI, so routine deploy work does not need browser login once that item exists.
 - The 1Password-first deploy-auth model is intentional for this repo. Do not switch it back to ADC-first or deploy-key-based guidance unless a human explicitly requests that change.
 - `op-firebase-setup device-source-of-truth` creates the deployer service account, grants deploy roles, and grants the current maintainer impersonation rights.
